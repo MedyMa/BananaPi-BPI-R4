@@ -152,12 +152,6 @@ pushd package/kernel/mt76
 sed -i '/mt7662u_rom_patch.bin/a\\techo mt76-usb disable_usb_sg=1 > $\(1\)\/etc\/modules.d\/mt76-usb' Makefile
 popd
 
-# Add R4S GPU 驱动
-pushd package/kernel/linux
-rm -rf modules/video.mk
-wget -P modules/ https://github.com/immortalwrt/immortalwrt/raw/master/package/kernel/linux/modules/video.mk
-popd
-
 # Add po2lmo
 git clone https://github.com/openwrt-dev/po2lmo.git
 pushd po2lmo
