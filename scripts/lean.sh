@@ -165,7 +165,8 @@ sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generat
 
 # Custom configs
 #git am $GITHUB_WORKSPACE/patches/lean/*.patch
-patch -p1 < $GITHUB_WORKSPACE/patches/lean/*.patch
+patch -p1 < ../patches/lean/rockchip-add-more-cpu-operating-points-for.patch
+patch -p1 < ../patches/lean/rockchip-rk3399-overclock-to-2.2-1.8-GHz-for-NanoPi4.patch
 echo -e " Lean's OpenWrt built on "$(date +%Y.%m.%d)"\n -----------------------------------------------------" >> package/base-files/files/etc/banner
 
 # Add CUPInfo
