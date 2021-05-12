@@ -23,7 +23,7 @@ git clone --depth=1 https://github.com/immortalwrt/openwrt-tmate
 
 # Add luci-app-passwall
 git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall luci/applications/openwrt-passwall
-rm -rf luci/applications/openwrt-passwall/shadowsocksr-libev
+#rm -rf luci/applications/openwrt-passwall/shadowsocksr-libev
 
 # Add gotop
 svn co https://github.com/immortalwrt/packages/branches/openwrt-18.06/admin/gotop packages/admin/gotop
