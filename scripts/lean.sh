@@ -9,7 +9,6 @@
 # Add luci-app-ssr-plus
 pushd package/lean
 git clone --depth=1 https://github.com/fw876/helloworld
-rm -rf helloworld/shadowsocksr-libev
 popd
 
 # Clone community packages to package/community
