@@ -10,7 +10,6 @@
 pushd package/lean
 git clone --depth=1 https://github.com/fw876/helloworld
 popd
-rm -rf tmp && ./scripts/feeds install -f -p helloworld shadowsocksr-libev
 
 # Clone community packages to package/community
 mkdir package/community
