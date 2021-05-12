@@ -9,8 +9,6 @@
 # Add luci-app-ssr-plus
 pushd package/lean
 git clone --depth=1 https://github.com/fw876/helloworld
-rm -rf helloworld/shadowsocksr-libev
-svn co https://github.com/xiaorouji/openwrt-passwall/trunk/shadowsocksr-libev helloworld/shadowsocksr-libev
 popd
 
 # Clone community packages to package/community
