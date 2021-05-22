@@ -88,8 +88,8 @@ popd
 # Add luci-app-netdata
 rm -rf package/lean/luci-app-netdata
 rm -rf customfeeds/packages/admin/netdata
-svn co https://github.com/immortalwrt/luci/branches/openwrt-18.06/applications/luci-app-netdata package/lean/luci-app-netdata
-svn co https://github.com/immortalwrt/packages/branches/openwrt-18.06/admin/netdata customfeeds/packages/admin/netdata
+svn co https://github.com/immortalwrt/luci/branches/openwrt-18.06/applications/luci-app-netdata package/community/luci-app-netdata
+svn co https://github.com/immortalwrt/packages/branches/openwrt-18.06/admin/netdata package/community/netdata
 
 # Add CPUInfo
 #pushd feeds/luci/modules/luci-mod-admin-full/luasrc/view/admin_status
