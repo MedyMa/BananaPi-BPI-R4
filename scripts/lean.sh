@@ -47,12 +47,6 @@ git clone --depth=1 https://github.com/NateLol/luci-app-oled
 # Add luci-app-adguardhome
 #svn co https://github.com/Lienol/openwrt/trunk/package/diy/luci-app-adguardhome
 #svn co https://github.com/Lienol/openwrt/trunk/package/diy/adguardhome
-
-# Add luci-app-netdata
- rm -rf ../lean/luci-app-netdata
- svn co https://github.com/281677160/openwrt-package/trunk/luci-app-netdata
- rm -rf ../../customfeeds/packages/admin/netdata
- svn co https://github.com/281677160/openwrt-package/trunk/netdata
  
 # Add luci-app-diskman
 git clone --depth=1 https://github.com/SuLingGG/luci-app-diskman
