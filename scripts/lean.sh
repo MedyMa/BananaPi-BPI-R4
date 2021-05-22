@@ -50,9 +50,11 @@ git clone --depth=1 https://github.com/NateLol/luci-app-oled
 
 # Add luci-app-netdata
 rm -rf ../lean/luci-app-netdata
-svn co https://github.com/281677160/openwrt-package/trunk/luci-app-netdata
+#svn co https://github.com/281677160/openwrt-package/trunk/luci-app-netdata
+svn co https://github.com/immortalwrt/luci/branches/openwrt-18.06/applications/luci-app-netdata
 rm -rf ../../customfeeds/packages/admin/netdata
-svn co https://github.com/281677160/openwrt-package/trunk/netdata
+#svn co https://github.com/281677160/openwrt-package/trunk/netdata
+svn co https://github.com/immortalwrt/packages/branches/openwrt-18.06/admin/netdata
 
 # Add luci-app-smartdns & smartdns
 svn co https://github.com/281677160/openwrt-package/trunk/luci-app-smartdns
