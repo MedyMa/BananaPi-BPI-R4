@@ -48,6 +48,12 @@ git clone --depth=1 https://github.com/NateLol/luci-app-oled
 #svn co https://github.com/Lienol/openwrt/trunk/package/diy/luci-app-adguardhome
 #svn co https://github.com/Lienol/openwrt/trunk/package/diy/adguardhome
 
+# Add luci-app-netdata
+ rm -rf ../lean/luci-app-netdata
+ svn co https://github.com/281677160/openwrt-package/trunk/luci-app-netdata
+ rm -rf ../../customfeeds/packages/admin/netdata
+ svn co https://github.com/281677160/openwrt-package/trunk/netdata
+ 
 # Add luci-app-diskman
 git clone --depth=1 https://github.com/SuLingGG/luci-app-diskman
 mkdir parted
@@ -84,12 +90,6 @@ svn co https://github.com/zcy85611/Openwrt-Package/trunk/udpspeeder-tunnel
 # Add OpenAppFilter
 git clone --depth=1 https://github.com/destan19/OpenAppFilter
 popd
-
-# Add luci-app-netdata
-rm -rf package/lean/luci-app-netdata
-rm -rf customfeeds/packages/admin/netdata
-svn co https://github.com/immortalwrt/luci/branches/openwrt-18.06/applications/luci-app-netdata package/community/luci-app-netdata
-svn co https://github.com/immortalwrt/packages/branches/openwrt-18.06/admin/netdata package/community/netdata
 
 # Add CPUInfo
 #pushd feeds/luci/modules/luci-mod-admin-full/luasrc/view/admin_status
