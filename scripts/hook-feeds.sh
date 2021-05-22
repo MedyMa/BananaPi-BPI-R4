@@ -18,6 +18,12 @@ svn co https://github.com/immortalwrt/packages/branches/openwrt-18.06/devel/pack
 svn co https://github.com/immortalwrt/luci/trunk/applications/luci-app-gowebdav luci/applications/luci-app-gowebdav
 svn co https://github.com/immortalwrt/packages/trunk/net/gowebdav packages/net/gowebdav
 
+# Add luci-app-netdata
+rm -rf packages/admin/netdata
+svn co https://github.com/281677160/openwrt-package/trunk/netdata packages/admin/netdata
+rm -rf ../package/lean/luci-app-netdata
+svn co https://github.com/281677160/openwrt-package/trunk/luci-app-netdata luci/applications/luci-app-netdata
+
 # Add luci-app-smartdns
 svn co https://github.com/immortalwrt/luci/branches/openwrt-18.06/applications/luci-app-smartdns luci/applications/luci-app-smartdns
 svn co https://github.com/immortalwrt/packages/branches/openwrt-18.06/net/smartdns packages/net/smartdns
