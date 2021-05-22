@@ -51,8 +51,8 @@ git clone --depth=1 https://github.com/NateLol/luci-app-oled
 # Add luci-app-netdata
 rm -rf ../lean/luci-app-netdata
 rm -rf ../../customfeeds/packages/admin/netdata
-svn co https://github.com/immortalwrt/luci/branches/openwrt-18.06/applications/luci-app-netdata luci/applications/luci-app-netdata
-svn co https://github.com/immortalwrt/packages/branches/openwrt-18.06/admin/netdata packages/admin/netdata
+svn co https://github.com/immortalwrt/luci/branches/openwrt-18.06/applications/luci-app-netdata
+svn co https://github.com/immortalwrt/packages/branches/openwrt-18.06/admin/netdata
 
 # Add luci-app-diskman
 git clone --depth=1 https://github.com/SuLingGG/luci-app-diskman
