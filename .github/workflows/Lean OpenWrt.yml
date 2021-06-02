@@ -222,7 +222,6 @@ jobs:
           rm -rf packages
           cd $OPENWRTROOT/bin/targets/$TARGET/
           curl -sL https://git.io/file-transfer | bash -s beta
-          sudo chmod +x transfer
           df -hT $PWD
           echo "::set-output name=ORGANIZE_STATUS::success"
 
