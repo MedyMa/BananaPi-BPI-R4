@@ -82,7 +82,6 @@ jobs:
     - name: Install Feeds
       run: |
         cd $OPENWRTROOT
-        make dirclean
         ./scripts/feeds install -a
 
     - name: Load Custom Configuration
