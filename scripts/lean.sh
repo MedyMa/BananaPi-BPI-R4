@@ -47,6 +47,8 @@ git clone --depth=1 https://github.com/NateLol/luci-app-oled
 # Add luci-app-adguardhome
 #svn co https://github.com/Lienol/openwrt/trunk/package/diy/luci-app-adguardhome
 #svn co https://github.com/Lienol/openwrt/trunk/package/diy/adguardhome
+svn co https://github.com/281677160/openwrt-package/trunk/feeds/luci/applications/luci-app-adguardhome
+svn co https://github.com/281677160/openwrt-package/trunk/feeds/packages/net/adguardhome
 
 # Add luci-app-smartdns & smartdns
 svn co https://github.com/281677160/openwrt-package/trunk/feeds/luci/applications/luci-app-smartdns
