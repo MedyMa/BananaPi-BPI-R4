@@ -10,7 +10,7 @@ pushd customfeeds
 
 # Add luci-app-adguardhome
 svn co https://github.com/immortalwrt/luci/trunk/applications/luci-app-adguardhome luci/applications/luci-app-adguardhome
-svn co https://github.com/immortalwrt/trunk/openwrt-18.06/net/adguardhome packages/net/adguardhome
+svn co https://github.com/immortalwrt/packages/trunk/net/adguardhome packages/net/adguardhome
 #svn co https://github.com/immortalwrt/packages/branches/openwrt-18.06/lang/node-yarn packages/lang/node-yarn
 #svn co https://github.com/immortalwrt/packages/branches/openwrt-18.06/devel/packr packages/devel/packr
 
