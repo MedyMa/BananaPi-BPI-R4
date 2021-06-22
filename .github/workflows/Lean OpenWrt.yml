@@ -61,11 +61,13 @@ jobs:
         git config --global user.email "git@github.com"
         git config --global user.name "GitHub"
         git clone $REPO_URL -b $REPO_BRANCH openwrt
-        #cd openwrt
-        #rm -rf ./target/linux/rockchip
-        #svn co https://github.com/immortalwrt/immortalwrt/branches/master/target/linux/rockchip target/linux/rockchip
-        #rm -rf ./package/boot/uboot-rockchip
-        #svn co https://github.com/immortalwrt/immortalwrt/branches/master/package/boot/uboot-rockchip package/boot/uboot-rockchip
+        cd openwrt
+        rm -rf ./target/linux/rockchip
+        svn co https://github.com/immortalwrt/immortalwrt/branches/master/target/linux/rockchip target/linux/rockchip
+        rm -rf ./package/boot/uboot-rockchip
+        rm -rf ./package/boot/boot/arm-trusted-firmware-rk3328
+        svn co https://github.com/immortalwrt/immortalwrt/branches/master/package/boot/uboot-rockchip package/boot/uboot-rockchip
+        svn co https://github.com/immortalwrt/immortalwrt/branches/master/package/boot/arm-trusted-firmware-rk3328 package/boot/arm-trusted-firmware-rk3328
     
     - name: Update Feeds
       id: update
