@@ -63,8 +63,8 @@ jobs:
         git config --global user.name "GitHub"
         git clone $REPO_URL -b $REPO_BRANCH openwrt
         cd openwrt
-        #rm -rf ./package/kernel/mac80211
-        #svn co https://github.com/immortalwrt/immortalwrt/branches/master/package/kernel/mac80211 package/kernel/mac80211
+        rm -rf ./package/kernel/mac80211
+        svn co https://github.com/immortalwrt/immortalwrt/branches/master/package/kernel/mac80211 package/kernel/mac80211
         
     - name: Update Feeds
       id: update
