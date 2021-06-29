@@ -5,7 +5,6 @@ opkg install gzip
 cd /tmp
 rm -rf artifact openwrt-rockchip*.img.gz openwrt-rockchip*img*
 echo -e '\e[92m准备下载升级文件\e[0m'
-
 wget https://github.com/MedyMa/NanoPi-R4S/releases/download/$(date +%Y.%m.%d)-Lean/openwrt-rockchip-armv8-friendlyarm_nanopi-r4s-ext4-sysupgrade.img.gz
 if [ -f /tmp/openwrt-rockchip-armv8-friendlyarm_nanopi-r4s-ext4-sysupgrade.img.gz	]; then
 	echo -e '\e[92m今天固件已下载，准备解压\e[0m'
@@ -19,7 +18,6 @@ else
 		exit 1
 	fi
 fi
-
 cd /tmp
 echo -e '\e[92m准备解压镜像文件\e[0m'
 pv openwrt-rockchip-armv8-friendlyarm_nanopi-r4s-ext4-sysupgrade.img.gz | gunzip -dc > openwrt-rockchip-armv8-friendlyarm_nanopi-r4s-ext4-sysupgrade.img
