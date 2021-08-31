@@ -32,9 +32,6 @@ git clone --depth=1 https://github.com/KyleRicardo/MentoHUST-OpenWrt-ipk
 # Add luci-proto-minieap
 git clone --depth=1 https://github.com/ysc3839/luci-proto-minieap
 
-# Add ServerChan
-git clone --depth=1 https://github.com/tty228/luci-app-serverchan
-
 # Add OpenClash
 git clone --depth=1 -b master https://github.com/vernesong/OpenClash
 
