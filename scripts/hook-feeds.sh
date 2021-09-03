@@ -8,14 +8,6 @@
 # Svn checkout packages from immortalwrt's repository
 pushd customfeeds
 
-# Add luci-app-cpufreq
-svn co https://github.com/immortalwrt/luci/trunk/applications/luci-app-cpufreq luci/applications/luci-app-cpufreq
-rm -rf ../package/lean/luci-app-cpufreq
-
-# Add luci-app-cpulimit
-svn co https://github.com/immortalwrt/luci/trunk/applications/luci-app-cpulimit luci/applications/luci-app-cpulimit
-svn co https://github.com/immortalwrt/packages/trunk/utils/cpulimit packages/cpulimit
-
 # Add luci-app-eqos
 svn co https://github.com/immortalwrt/luci/trunk/applications/luci-app-eqos luci/applications/luci-app-eqos
 
