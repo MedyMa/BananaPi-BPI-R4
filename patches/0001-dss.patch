@@ -1,0 +1,27 @@
+From 9b1003dcd3b12107fb3069cfa0c8ad58f2442ae9 Mon Sep 17 00:00:00 2001
+From: root <root@dev131.embedfire.local>
+Date: Fri, 3 Sep 2021 10:26:15 +0000
+Subject: [PATCH] dss
+
+---
+ package/lean/default-settings/files/zzz-default-settings | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/package/lean/default-settings/files/zzz-default-settings b/package/lean/default-settings/files/zzz-default-settings
+index bc1e8f8..ff3ab0c 100755
+--- a/package/lean/default-settings/files/zzz-default-settings
++++ b/package/lean/default-settings/files/zzz-default-settings
+@@ -40,6 +40,10 @@ echo 'iptables -t nat -A PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 53'
+ echo 'iptables -t nat -A PREROUTING -p tcp --dport 53 -j REDIRECT --to-ports 53' >> /etc/firewall.user
+ echo '[ -n "$(command -v ip6tables)" ] && ip6tables -t nat -A PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 53' >> /etc/firewall.user
+ echo '[ -n "$(command -v ip6tables)" ] && ip6tables -t nat -A PREROUTING -p tcp --dport 53 -j REDIRECT --to-ports 53' >> /etc/firewall.user
++echo 'net.bridge.bridge-nf-call-iptables=0' >> /etc/sysctl.conf
++echo 'net.bridge.bridge-nf-call-ip6tables=0' >> /etc/sysctl.conf
++echo 'net.bridge.bridge-nf-call-arptables=0' >> /etc/sysctl.conf
++echo 'net.bridge.bridge-nf-filter-vlan-tagged=0' >> /etc/sysctl.conf
+ 
+ sed -i '/option disabled/d' /etc/config/wireless
+ sed -i '/set wireless.radio${devidx}.disabled/d' /lib/wifi/mac80211.sh
+-- 
+2.25.1
+
