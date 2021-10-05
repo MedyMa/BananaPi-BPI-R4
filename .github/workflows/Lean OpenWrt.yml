@@ -90,7 +90,7 @@ jobs:
         ../$DIY_SH
         ../scripts/preset-clash-core.sh armv8
         ../scripts/preset-terminal-tools.sh
-
+        make defconfig
     - name: Download Package
       id: package
       run: |
@@ -99,7 +99,6 @@ jobs:
         then
             echo "CONFIG_ALL_NONSHARED=y" >> .config
         fi
-        make defconfig
         ../scripts/modify_config.sh
         cat .config
         make download -j8
