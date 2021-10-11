@@ -91,6 +91,7 @@ jobs:
         ../scripts/preset-clash-core.sh armv8
         ../scripts/preset-terminal-tools.sh
         make defconfig
+        
     - name: Download Package
       id: package
       run: |
@@ -132,7 +133,7 @@ jobs:
         echo "::set-output name=FIRMWARE::$(echo $PWD)"
         echo "::set-output name=COMPILE_STATUS::success"
 
-        - name: Generate Firmware
+    - name: Generate Firmware
       if: steps.compile.outputs.COMPILE_STATUS == 'success'
       id: generate
       run: |
