@@ -29,8 +29,6 @@ git clone --depth=1 https://github.com/immortalwrt/openwrt-tmate
 
 # Add luci-app-passwall
 git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall luci/applications/openwrt-passwall
-sed -i 's/ upx\/host//g' luci/applications/openwrt-passwall/v2ray-plugin/Makefile
-grep -lr upx/host luci/applications/openwrt-passwall/* | xargs -t -I {} sed -i '/upx\/host/d' {}
 
 # Add gotop
 svn co https://github.com/immortalwrt/packages/branches/openwrt-18.06/admin/gotop packages/admin/gotop
