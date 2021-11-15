@@ -104,12 +104,14 @@ popd
 
 # Add luci-app-ddnsto
 pushd package/network/services
-git clone --depth=1 https://github.com/linkease/ddnsto-openwrt
+svn co https://github.com/linkease/nas-packages-luci/trunk/luci/luci-app-ddnsto
+svn co https://github.com/linkease/nas-packages/trunk/network/services/ddnsto
 popd
 
 # Add luci-app-linkease
 pushd package/network/services
-git clone --depth=1 https://github.com/linkease/linkease-openwrt
+svn co https://github.com/linkease/nas-packages-luci/trunk/luci/luci-app-linkease
+svn co https://github.com/linkease/nas-packages/trunk/network/services/linkease
 popd
 
 # Add Pandownload
