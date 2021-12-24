@@ -89,7 +89,7 @@ svn co https://github.com/zcy85611/Openwrt-Package/trunk/udp2raw
 svn co https://github.com/zcy85611/Openwrt-Package/trunk/udpspeeder-tunnel
 
 # Add OpenAppFilter
-git clone --depth=1 https://github.com/destan19/OpenAppFilter
+#git clone --depth=1 https://github.com/destan19/OpenAppFilter
 popd
 
 # Add CPUInfo
