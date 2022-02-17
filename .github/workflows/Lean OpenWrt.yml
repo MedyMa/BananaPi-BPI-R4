@@ -24,7 +24,6 @@ env:
   IPV6MOD_IN_FIRMWARE: true
   KMODS_IN_FIRMWARE: true
   UPLOAD_WETRANSFER: true
-  UPLOAD_COWTRANSFER: true
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
 
