@@ -238,7 +238,7 @@ jobs:
         if: steps.organize.outputs.ORGANIZE_STATUS == 'success' && env.UPLOAD_COWTRANSFER == 'true'
         run: |
           cd $OPENWRTROOT/bin/targets/$TARGET/
-          ./transfer cow --block 2621440 -s -p 64 --no-progress --cookie="remember-mev2=b0VUYmsxSlZGU3NvVUx1V3FzX09ncElUZDNrTToxNjQ2Mjg1NjUzNTE1Ojk0MDg4NDg5YjE1ZWVkMzBlNWZkZDU5NWVhNjMzYTlh;" -a "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJndWlkIjoiYjI3YTljZmItYWIwOC00NThiLWEwYzktNTUzZmEwNjQ5N2ZlIiwiZXhwIjoxNjQ1NjgwODUzfQ.FZekQ1OkPhLZk3a6HFkWb4jl6MZo9XZNNd-Z9AJNwzw" ${FIRMWARE} 2>&1 | tee cowtransfer.log
+          ./transfer cow --block 2621440 -s -p 64 --no-progress --cookie="remember-mev2=${{ secrets.COW_COOKIE }};" -a "${{ secrets.COW_TOKEN }}" ${FIRMWARE} 2>&1 | tee cowtransfer.log
           echo "::warning file=Firmware-Cowtransfer.com::$(cat cowtransfer.log | grep https)"
           echo "::set-output name=url::$(cat cowtransfer.log | grep https | cut -f3 -d" ")"
 
