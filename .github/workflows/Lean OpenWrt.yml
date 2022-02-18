@@ -24,7 +24,7 @@ env:
   IPV6MOD_IN_FIRMWARE: true
   KMODS_IN_FIRMWARE: true
   UPLOAD_WETRANSFER: true
-  UPLOAD_1FICHIER: true
+  UPLOAD_FICHIER: true
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
 
@@ -233,14 +233,14 @@ jobs:
           echo "::warning file=Firmware-Wetransfer.com::$(cat wetransfer.log | grep https)"
           echo "::set-output name=url::$(cat wetransfer.log | grep https | cut -f3 -d" ")"
 
-      - name: Upload Firmware To 1Fichier
-        id: 1fichier
-        if: steps.organize.outputs.ORGANIZE_STATUS == 'success' && env.UPLOAD_1FICHIER == 'true'
+      - name: Upload Firmware To Fichier
+        id: fichier
+        if: steps.organize.outputs.ORGANIZE_STATUS == 'success' && env.UPLOAD_FICHIER == 'true'
         run: |
           cd $OPENWRTROOT/bin/targets/$TARGET/
-          ./transfer fic --no-progress ${FIRMWARE} 2>&1 | tee 1fichier.log
-          echo "::warning file=Firmware-1Fichier.com::$(cat 1fichier.log | grep https)"
-          echo "::set-output name=url::$(cat 1fichier.log | grep https | cut -f3 -d" ")"
+          ./transfer fic --no-progress ${FIRMWARE} 2>&1 | tee fichier.log
+          echo "::warning file=Firmware-Fichier.com::$(cat fichier.log | grep https)"
+          echo "::set-output name=url::$(cat fichier.log | grep https | cut -f3 -d" ")"
           
       - name: Generate release tag
         id: tag
@@ -250,7 +250,7 @@ jobs:
           echo "::set-output name=release_date::$(date +"%Y.%m.%d")"
           touch release.txt
           [ $UPLOAD_WETRANSFER = true ] && echo "🔗 [WeTransfer](${{ steps.wetransfer.outputs.url }})" >> release.txt
-          [ $UPLOAD_1FICHIER = true ] && echo "🔗 [1Fichier](${{ steps.1fichier.outputs.url }})" >> release.txt
+          [ $UPLOAD_1FICHIER = true ] && echo "🔗 [Fichier](${{ steps.fichier.outputs.url }})" >> release.txt
           echo "::set-output name=status::success"
 
       - name: Upload firmware to release
