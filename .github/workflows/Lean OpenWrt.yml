@@ -250,7 +250,7 @@ jobs:
           echo "::set-output name=release_date::$(date +"%Y.%m.%d")"
           touch release.txt
           [ $UPLOAD_WETRANSFER = true ] && echo "🔗 [WeTransfer](${{ steps.wetransfer.outputs.url }})" >> release.txt
-          [ $UPLOAD_1FICHIER = true ] && echo "🔗 [Fichier](${{ steps.fichier.outputs.url }})" >> release.txt
+          [ $UPLOAD_FICHIER = true ] && echo "🔗 [Fichier](${{ steps.fichier.outputs.url }})" >> release.txt
           echo "::set-output name=status::success"
 
       - name: Upload firmware to release
