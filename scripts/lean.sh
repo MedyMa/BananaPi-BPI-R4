@@ -17,7 +17,7 @@ pushd package/community
 
 # Add Lienol's Packages
 git clone --depth=1 https://github.com/Lienol/openwrt-package
-rm -rf ../lean/luci-app-kodexplorer
+rm -rf ../../customfeeds/luci/applications/luci-app-kodexplorer
 rm -rf openwrt-package/verysync
 rm -rf openwrt-package/luci-app-verysync
 
@@ -61,14 +61,14 @@ mkdir parted
 cp luci-app-diskman/Parted.Makefile parted/Makefile
 
 # Add luci-app-dockerman
-rm -rf ../lean/luci-app-docker
+rm -rf ../../customfeeds/luci/applications/luci-app-docker
 git clone --depth=1 https://github.com/lisaac/luci-app-dockerman
 git clone --depth=1 https://github.com/lisaac/luci-lib-docker
 
 # Add luci-theme-argon
 git clone --depth=1 -b 18.06 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
-rm -rf ../../customfeeds/luci/themes luci-theme-argon
+rm -rf ../../customfeeds/luci/themes/luci-theme-argon
 
 # Add subconverter
 git clone --depth=1 https://github.com/tindy2013/openwrt-subconverter
