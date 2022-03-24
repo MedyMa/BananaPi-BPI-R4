@@ -10,6 +10,8 @@
 pushd package/lean
 git clone --depth=1 https://github.com/fw876/helloworld
 popd
+#Delete
+rm -rf ./package/kernel/linux/modules/fs.mk
 
 # Clone community packages to package/community
 mkdir package/community
