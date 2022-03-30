@@ -11,12 +11,6 @@ pushd package/lean
 git clone --depth=1 https://github.com/fw876/helloworld
 popd
 
-#Delete
-pushd package/kernel/linux/modules
-rm -rf fs.mk
-svn co https://github.com/immortalwrt/immortalwrt/branches/master/package/kernel/linux/modules/fs.mk
-popd
-
 # Clone community packages to package/community
 mkdir package/community
 pushd package/community
