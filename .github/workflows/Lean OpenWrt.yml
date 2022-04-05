@@ -101,10 +101,6 @@ jobs:
       id: package
       run: |
         cd $OPENWRTROOT
-        if "$KMODS_IN_FIRMWARE" = 'true'
-        then
-            echo "CONFIG_ALL_NONSHARED=y" >> .config
-        fi
         ../scripts/modify_config.sh
         cat .config
         make download -j8
