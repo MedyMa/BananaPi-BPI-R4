@@ -11,6 +11,12 @@ pushd package/lean
 git clone --depth=1 https://github.com/fw876/helloworld
 popd
 
+# Delete mac80211
+pushd package/kernel
+rm -rf mac80211
+svn co https://github.com/immortalwrt/immortalwrt/branches/master/package/kernel/mac80211
+popd
+
 # Clone community packages to package/community
 mkdir package/community
 pushd package/community
