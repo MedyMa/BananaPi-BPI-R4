@@ -22,7 +22,7 @@ rm -rf openwrt-package/verysync
 rm -rf openwrt-package/luci-app-verysync
 
 # Add luci-app-passwall
-svn co https://github.com/xiaorouji/openwrt-passwall/branches/packages/luci-app-passwall
+svn co https://github.com/xiaorouji/openwrt-passwall/branches/packages/openwrt-passwall
 svn co https://github.com/xiaorouji/openwrt-passwall/branches/luci/luci-app-passwall
 
 # Add luci-app-vssr <M>
