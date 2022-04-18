@@ -23,7 +23,6 @@ env:
   DIY_SH: scripts/lean.sh
   IPV6MOD_IN_FIRMWARE: true
   KMODS_IN_FIRMWARE: true
-  UPLOAD_WETRANSFER: true
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
 
@@ -172,115 +171,46 @@ jobs:
         make target/install -j$(nproc) || make target/install -j1 V=s
         make checksum
         echo "::set-output name=GENERATE_STATUS::success"
+        
+    - name: Generate release tag
+      id: tag
+      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+      run: |
+        echo "::set-output name=release_tag::$(date +"%Y.%m.%d")-Lean"
+        echo "::set-output name=release_date::$(date +"%Y.%m.%d")"
+        touch release.txt
+        [ $UPLOAD_WETRANSFER = true ] && echo "🔗 [WeTransfer](${{ steps.wetransfer.outputs.url }})" >> release.txt
+        echo "::set-output name=status::success"
 
-    - name: Upload Bin Folder
-      uses: actions/upload-artifact@main
-      if: steps.generate.outputs.GENERATE_STATUS == 'success'
+    - name: Upload firmware to release
+      uses: softprops/action-gh-release@v1
+      if: steps.tag.outputs.status == 'success' && !cancelled()
+      env:
+        GITHUB_TOKEN: ${{ secrets.RELEASES_TOKEN }}
       with:
-        name: bin-archive
-        path: openwrt/bin
-        
-  Upload:
-    needs: [Build]
-    runs-on: ubuntu-20.04
-    if: github.repository == 'MedyMa/NanoPi-R4S'
-    steps:
-      - name: Checkout
-        uses: actions/checkout@main
-        
-      - name: Restore Variables
-        run: |
-          echo "OPENWRTROOT=$(echo '${{needs.Build.outputs.OPENWRTROOT}}')" >> $GITHUB_ENV
-          echo "PLATFORM=$(echo '${{needs.Build.outputs.PLATFORM}}')" >> $GITHUB_ENV
-          echo "TARGET=$(echo '${{needs.Build.outputs.TARGET}}')" >> $GITHUB_ENV
-          echo "SUBTARGET=$(echo '${{needs.Build.outputs.SUBTARGET}}')" >> $GITHUB_ENV
-          echo "FIRMWARE=$(echo '${{needs.Build.outputs.FIRMWARE}}')" >> $GITHUB_ENV
-          echo "GENERATE_STATUS=$(echo '${{needs.Build.outputs.GENERATE_STATUS}}')" >> $GITHUB_ENV
-        
-      - name: Download Bin Folder
-        uses: actions/download-artifact@v2
-        if: env.GENERATE_STATUS == 'success'
-        with:
-          name: bin-archive
-          path: openwrt/bin
-          
-      - name: Deploy Packages-Server
-        if: env.GENERATE_STATUS == 'success'
-        run: |
-          mkdir -p server/web/snapshots/targets/$TARGET/$SUBTARGET
-          cp -r $OPENWRTROOT/bin/packages server/web/snapshots
-          cp -r $OPENWRTROOT/bin/targets/$TARGET/$SUBTARGET/packages server/web/snapshots/targets/$TARGET/$SUBTARGET
-          mv server packages-server
-          zip -qrm packages-server.zip packages-server
-          mv packages-server.zip $OPENWRTROOT/bin/targets/$TARGET/$SUBTARGET
+        name: ${{ steps.tag.outputs.release_date }} Lean OpenWrt
+        tag_name: ${{ steps.tag.outputs.release_tag }}
+        body_path: release.txt
+        files: ${{ env.FIRMWARE }}/*
 
-      - name: Organize Files
-        id: organize
-        if: env.GENERATE_STATUS == 'success'
-        run: |
-          cd ${FIRMWARE}
-          rm -rf packages
-          cd $OPENWRTROOT/bin/targets/$TARGET/
-          curl -sL https://git.io/file-transfer | sh
-          df -hT $PWD
-          echo "::set-output name=ORGANIZE_STATUS::success"
 
-      - name: Upload Firmware To WeTransfer
-        id: wetransfer
-        if: steps.organize.outputs.ORGANIZE_STATUS == 'success' && env.UPLOAD_WETRANSFER == 'true'
-        run: |
-          cd $OPENWRTROOT/bin/targets/$TARGET/
-          ./transfer wet -s -p 16 --no-progress ${FIRMWARE} 2>&1 | tee wetransfer.log
-          echo "::warning file=Firmware-Wetransfer.com::$(cat wetransfer.log | grep https)"
-          echo "::set-output name=url::$(cat wetransfer.log | grep https | cut -f3 -d" ")"
-          
-      - name: Generate release tag
-        id: tag
-        if: env.UPLOAD_RELEASE == 'true' && !cancelled()
-        run: |
-          echo "::set-output name=release_tag::$(date +"%Y.%m.%d")-Lean"
-          echo "::set-output name=release_date::$(date +"%Y.%m.%d")"
-          touch release.txt
-          [ $UPLOAD_WETRANSFER = true ] && echo "🔗 [WeTransfer](${{ steps.wetransfer.outputs.url }})" >> release.txt
-          echo "::set-output name=status::success"
+    - name: Delete workflow runs
+      uses: GitRML/delete-workflow-runs@main
+      with:
+        retain_days: 1
+        keep_minimum_runs: 1
 
-      - name: Upload firmware to release
-        uses: softprops/action-gh-release@v1
-        if: steps.tag.outputs.status == 'success' && !cancelled()
-        env:
-          GITHUB_TOKEN: ${{ secrets.RELEASES_TOKEN }}
-        with:
-          name: ${{ steps.tag.outputs.release_date }} Lean OpenWrt
-          tag_name: ${{ steps.tag.outputs.release_tag }}
-          body_path: release.txt
-          files: ${{ env.FIRMWARE }}/*
+    - name: Remove old Releases
+      uses: dev-drprasad/delete-older-releases@v0.1.0
+      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+      with:
+        keep_latest: 3
+        delete_tags: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.RELEASES_TOKEN }}
 
-      - name: Build & Push Docker Image To Dockerhub
-        run: |
-          cd openwrt/bin/targets/$TARGET/$SUBTARGET/
-          docker import openwrt-rockchip-armv8-friendlyarm_nanopi-r4s-rootfs.tar.gz ${{ secrets.DOCKERHUB_USERNAME }}/openwrt:lean
-          docker login -u ${{ secrets.DOCKERHUB_USERNAME }} -p ${{ secrets.DOCKERHUB_TOKEN }}
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/openwrt:lean
-          docker tag ${{ secrets.DOCKERHUB_USERNAME }}/openwrt:lean ${{ secrets.DOCKERHUB_USERNAME }}/openwrt:latest
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/openwrt:latest
-
-      - name: Delete workflow runs
-        uses: GitRML/delete-workflow-runs@main
-        with:
-          retain_days: 1
-          keep_minimum_runs: 1
-
-      - name: Remove old Releases
-        uses: dev-drprasad/delete-older-releases@v0.1.0
-        if: env.UPLOAD_RELEASE == 'true' && !cancelled()
-        with:
-          keep_latest: 3
-          delete_tags: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.RELEASES_TOKEN }}
-
-      - name: Delete Artifacts
-        uses: geekyeggo/delete-artifact@v1
-        with:
-          name: |
-            bin-archive
+    - name: Delete Artifacts
+      uses: geekyeggo/delete-artifact@v1
+      with:
+        name: |
+          bin-archive
