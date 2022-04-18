@@ -208,9 +208,3 @@ jobs:
         delete_tags: true
       env:
         GITHUB_TOKEN: ${{ secrets.RELEASES_TOKEN }}
-
-    - name: Delete Artifacts
-      uses: geekyeggo/delete-artifact@v1
-      with:
-        name: |
-          bin-archive
