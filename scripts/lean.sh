@@ -70,9 +70,9 @@ git clone --depth=1 https://github.com/tindy2013/openwrt-subconverter
 svn co https://github.com/openwrt/packages/trunk/utils/apk
 
 # Add luci-udptools
-svn co https://github.com/zcy85611/Openwrt-Package/trunk/luci-udptools
-svn co https://github.com/zcy85611/Openwrt-Package/trunk/udp2raw
-svn co https://github.com/zcy85611/Openwrt-Package/trunk/udpspeeder
+svn co https://github.com/zcy85611/Packages/trunk/luci-udptools
+svn co https://github.com/zcy85611/Packages/trunk/udp2raw
+svn co https://github.com/zcy85611/Packages/trunk/udpspeeder
 
 # Add OpenAppFilter
 git clone --depth=1 https://github.com/destan19/OpenAppFilter
