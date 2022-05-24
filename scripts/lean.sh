@@ -6,11 +6,6 @@
 # Blog: https://p3terx.com
 #=================================================
 
-# Add luci-app-ssr-plus
-pushd package/lean
-git clone --depth=1 https://github.com/fw876/helloworld
-popd
-
 # Clone community packages to package/community
 mkdir package/community
 pushd package/community
@@ -20,6 +15,9 @@ git clone --depth=1 https://github.com/Lienol/openwrt-package
 rm -rf ../../customfeeds/luci/applications/luci-app-kodexplorer
 rm -rf openwrt-package/verysync
 rm -rf openwrt-package/luci-app-verysync
+
+# Add luci-app-ssr-plus
+git clone --depth=1 https://github.com/fw876/helloworld
 
 # Add luci-app-passwall
 git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall
