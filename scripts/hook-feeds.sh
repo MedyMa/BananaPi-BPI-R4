@@ -21,7 +21,8 @@ svn co https://github.com/immortalwrt/packages/trunk/net/gowebdav packages/net/g
 # Add luci-app-netdata
 #rm -rf packages/admin/netdata
 #svn co https://github.com/281677160/openwrt-package/trunk/netdata packages/admin/netdata
-#rm -rf luci/applications/luci-app-netdata
+rm -rf luci/applications/luci-app-netdata
+git clone --depth=1 https://github.com/sirpdboy/luci-app-netdata
 #svn co https://github.com/281677160/openwrt-package/trunk/luci-app-netdata luci/applications/luci-app-netdata
 
 # Add tmate
