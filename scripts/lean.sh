@@ -148,7 +148,6 @@ sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generat
 #sed -i 's/5.10/5.15/g' target/linux/rockchip/Makefile
 
 # Custom configs
-git am $GITHUB_WORKSPACE/patches/lean/*.patch
 
 echo -e " Lean's OpenWrt built on "$(date +%Y.%m.%d)"\n -----------------------------------------------------" >> package/base-files/files/etc/banner
 echo 'net.bridge.bridge-nf-call-iptables=0' >> package/base-files/files/etc/sysctl.conf
