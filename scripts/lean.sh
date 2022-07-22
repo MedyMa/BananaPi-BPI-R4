@@ -33,16 +33,9 @@ git clone --depth=1 https://github.com/ysc3839/luci-proto-minieap
 # Add OpenClash
 git clone --depth=1 -b master https://github.com/vernesong/OpenClash
 
-# Add luci-app-onliner (need luci-app-nlbwmon)
-git clone --depth=1 https://github.com/rufengsuixing/luci-app-onliner
-
 # Add luci-app-adguardhome
 svn co https://github.com/Lienol/openwrt-package/branches/other/luci-app-adguardhome
 #svn co https://github.com/Lienol/openwrt/trunk/package/diy/adguardhome
-
-# Add luci-app-smartdns & smartdns
-svn co https://github.com/281677160/openwrt-package/trunk/luci-app-smartdns
-svn co https://github.com/281677160/openwrt-package/trunk/smartdns
 
 # Add luci-app-diskman
 git clone --depth=1 https://github.com/SuLingGG/luci-app-diskman
@@ -64,11 +57,6 @@ git clone --depth=1 https://github.com/tindy2013/openwrt-subconverter
 # Add apk (Apk Packages Manager)
 svn co https://github.com/openwrt/packages/trunk/utils/apk
 
-# Add luci-udptools
-svn co https://github.com/zcy85611/Packages/trunk/luci-udptools
-svn co https://github.com/zcy85611/Packages/trunk/udp2raw
-svn co https://github.com/zcy85611/Packages/trunk/udpspeeder
-
 # Add OpenAppFilter
 git clone --depth=1 https://github.com/destan19/OpenAppFilter
 popd
@@ -87,17 +75,6 @@ popd
 pushd package/network/services
 svn co https://github.com/linkease/nas-packages-luci/trunk/luci/luci-app-ddnsto
 svn co https://github.com/linkease/nas-packages/trunk/network/services/ddnsto
-popd
-
-# Add luci-app-linkease
-pushd package/network/services
-svn co https://github.com/linkease/nas-packages-luci/trunk/luci/luci-app-linkease
-svn co https://github.com/linkease/nas-packages/trunk/network/services/linkease
-popd
-
-# Add Pandownload
-pushd package/lean
-svn co https://github.com/immortalwrt/packages/trunk/net/pandownload-fake-server
 popd
 
 # Mod zzz-default-settings
