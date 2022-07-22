@@ -6,6 +6,14 @@
 # Blog: https://p3terx.com
 #=================================================
 
+rm -rf ./target/linux/rockchip/armv8/base-files/etc/hotplug.d/usb
+rm -rf package/kernel/mac80211
+svn co https://github.com/immortalwrt/immortalwrt/branches/openwrt-18.06-k5.4/package/kernel/mac80211 package/kernel/mac80211
+rm -rf package/kernel/rtl8821cu
+svn co https://github.com/immortalwrt/immortalwrt/branches/openwrt-18.06-k5.4/package/kernel/rtl8821cu package/kernel/rtl8821cu
+rm -rf package/kernel/mwlwifi
+svn co https://github.com/immortalwrt/immortalwrt/branches/openwrt-18.06-k5.4/package/kernel/mwlwifi package/kernel/mwlwifi
+
 # Clone community packages to package/community
 mkdir package/community
 pushd package/community
@@ -54,6 +62,7 @@ rm -rf ../../customfeeds/luci/themes/luci-theme-argon
 
 # Add subconverter
 git clone --depth=1 https://github.com/tindy2013/openwrt-subconverter
+
 # Add apk (Apk Packages Manager)
 svn co https://github.com/openwrt/packages/trunk/utils/apk
 
@@ -97,12 +106,6 @@ pushd feeds/packages/net
 rm -rf https-dns-proxy
 svn co https://github.com/Lienol/openwrt-packages/trunk/net/https-dns-proxy
 popd
-
-# Use snapshots syncthing package
-#pushd feeds/packages/utils
-#rm -rf syncthing
-#svn co https://github.com/openwrt/packages/trunk/utils/syncthing
-#popd
 
 # Fix mt76 wireless driver
 pushd package/kernel/mt76
