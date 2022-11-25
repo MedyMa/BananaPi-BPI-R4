@@ -68,7 +68,7 @@ jobs:
       run: |
         cd openwrt
         echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
-        echo "::set-output name=OPENWRTROOT::$(echo $PWD)"
+        echo "OPENWRTROOT=$(echo $PWD)"	>> $GITHUB_OUTPUT	
         mkdir customfeeds
         git clone --depth=1 https://github.com/coolsnowwolf/packages customfeeds/packages
         git clone --depth=1 https://github.com/coolsnowwolf/luci customfeeds/luci
@@ -115,18 +115,19 @@ jobs:
         cd $OPENWRTROOT/bin/packages/*
         PLATFORM=$(basename `pwd`)
         echo "PLATFORM=$PLATFORM" >> $GITHUB_ENV
-        echo "::set-output name=PLATFORM::$(echo $PLATFORM)"
+        echo "PLATFORM=$(echo $PLATFORM)" >> $GITHUB_OUTPUT
         cd $OPENWRTROOT/bin/targets/*
         TARGET=$(basename `pwd`)
         echo "TARGET=$TARGET" >> $GITHUB_ENV
-        echo "::set-output name=TARGET::$(echo $TARGET)"
+        echo "TARGET=$(echo $TARGET)" >> $GITHUB_OUTPUT
         cd *
         SUBTARGET=$(basename `pwd`)
         echo "SUBTARGET=$SUBTARGET" >> $GITHUB_ENV
-        echo "::set-output name=SUBTARGET::$(echo $SUBTARGET)"
+        echo "SUBTARGET=$(echo $SUBTARGET)" >> $GITHUB_OUTPUT
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-        echo "::set-output name=FIRMWARE::$(echo $PWD)"
-        echo "::set-output name=COMPILE_STATUS::success"
+        echo "SUBTARGET=$(echo $SUBTARGET)" >> $GITHUB_OUTPUT
+        echo "FIRMWARE=$(echo $PWD)" >> $GITHUB_OUTPUT
+        echo "COMPILE_STATUS=success" >> $GITHUB_OUTPUT
 
     - name: Generate Firmware
       if: steps.compile.outputs.COMPILE_STATUS == 'success'
@@ -165,7 +166,7 @@ jobs:
         make package/install -j$(nproc) || make package/install -j1 V=s
         make target/install -j$(nproc) || make target/install -j1 V=s
         make checksum
-        echo "::set-output name=GENERATE_STATUS::success"
+        echo "GENERATE_STATUS=success" >> $GITHUB_OUTPUT
         
     - name: Upload Bin Folder
       uses: actions/upload-artifact@main
@@ -216,7 +217,7 @@ jobs:
           cd $OPENWRTROOT/bin/targets/$TARGET/
           curl -sL https://git.io/file-transfer | sh
           df -hT $PWD
-          echo "::set-output name=ORGANIZE_STATUS::success"
+          echo "ORGANIZE_STATUS=success" >> $GITHUB_OUTPUT
       - name: Upload Firmware To WeTransfer
         id: wetransfer
         if: steps.organize.outputs.ORGANIZE_STATUS == 'success' && env.UPLOAD_WETRANSFER == 'true'
@@ -224,17 +225,17 @@ jobs:
           cd $OPENWRTROOT/bin/targets/$TARGET/
           ./transfer wet -s -p 16 --no-progress ${FIRMWARE} 2>&1 | tee wetransfer.log
           echo "::warning file=Firmware-Wetransfer.com::$(cat wetransfer.log | grep https)"
-          echo "::set-output name=url::$(cat wetransfer.log | grep https | cut -f3 -d" ")"
+          echo "url=$(cat wetransfer.log | grep https | cut -f3 -d" ")" >> $GITHUB_OUTPUT
           
       - name: Generate release tag
         id: tag
         if: env.UPLOAD_RELEASE == 'true' && !cancelled()
         run: |
-          echo "::set-output name=release_tag::$(date +"%Y.%m.%d")-Lean"
-          echo "::set-output name=release_date::$(date +"%Y.%m.%d")"
+          echo "release_tag=$(date +"%Y.%m.%d")-Lean" >> $GITHUB_OUTPUT
+          echo "release_date=$(date +"%Y.%m.%d")" >> $GITHUB_OUTPUT
           touch release.txt
           [ $UPLOAD_WETRANSFER = true ] && echo "🔗 [WeTransfer](${{ steps.wetransfer.outputs.url }})" >> release.txt
-          echo "::set-output name=status::success"
+          echo "status=success" >> $GITHUB_OUTPUT
       - name: Upload firmware to release
         uses: softprops/action-gh-release@v1
         if: steps.tag.outputs.status == 'success' && !cancelled()
