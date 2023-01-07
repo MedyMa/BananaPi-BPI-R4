@@ -34,8 +34,9 @@ git clone --depth=1 https://github.com/ysc3839/luci-proto-minieap
 git clone --depth=1 -b master https://github.com/vernesong/OpenClash
 
 # Add luci-app-adguardhome
-svn co https://github.com/Lienol/openwrt-package/branches/other/luci-app-adguardhome
-#svn co https://github.com/Lienol/openwrt/trunk/package/diy/adguardhome
+svn co https://github.com/kenzok8/openwrt-packages/trunk/luci-app-adguardhome
+#svn co https://github.com/Lienol/openwrt-package/branches/other/luci-app-adguardhome
+
 
 # Add luci-app-diskman
 git clone --depth=1 https://github.com/SuLingGG/luci-app-diskman
