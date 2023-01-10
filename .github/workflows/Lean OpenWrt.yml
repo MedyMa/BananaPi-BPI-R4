@@ -178,6 +178,7 @@ jobs:
   Upload:
     needs: [Build]
     runs-on: ubuntu-20.04
+    container: node:16.16.0
     if: github.repository == 'MedyMa/NanoPi-R4S'
     steps:
       - name: Checkout
@@ -193,7 +194,7 @@ jobs:
           echo "GENERATE_STATUS=$(echo '${{needs.Build.outputs.GENERATE_STATUS}}')" >> $GITHUB_ENV
         
       - name: Download Bin Folder
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v3
         if: env.GENERATE_STATUS == 'success'
         with:
           name: bin-archive
