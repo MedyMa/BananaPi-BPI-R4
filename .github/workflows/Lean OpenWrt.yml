@@ -30,7 +30,7 @@ env:
 jobs:
   Build:
     runs-on: ubuntu-20.04
-    container: node:16.16.0
+    #container: node:16.16.0
     if: github.repository == 'MedyMa/NanoPi-R4S'
     outputs:
       OPENWRTROOT: ${{ steps.update.outputs.OPENWRTROOT }}
