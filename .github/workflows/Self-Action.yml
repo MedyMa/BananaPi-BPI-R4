@@ -107,7 +107,7 @@ jobs:
         echo "SUBTARGET=$(echo $SUBTARGET)" >> $GITHUB_OUTPUT
         echo "FIRMWARE=$(echo $PWD)" >> $GITHUB_OUTPUT
         echo "COMPILE_STATUS=success" >> $GITHUB_OUTPUT
-
+        
     - name: Generate Firmware
       if: steps.compile.outputs.COMPILE_STATUS == 'success'
       id: generate
