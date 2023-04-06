@@ -110,7 +110,7 @@ sed -i 's/\/bin\/ash/\/usr\/bin\/zsh/g' package/base-files/files/etc/passwd
 sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generate
 
 # Test kernel 5.10
-#sed -i 's/5.15/6.1/g' target/linux/rockchip/Makefile
+sed -i 's/5.15/6.1/g' target/linux/rockchip/Makefile
 
 # Custom configs
 
