@@ -36,11 +36,6 @@ git clone --depth=1 -b master https://github.com/vernesong/OpenClash
 # Add luci-app-adguardhome
 svn co https://github.com/Lienol/openwrt-package/branches/other/luci-app-adguardhome
 
-# Add luci-app-diskman
-git clone --depth=1 https://github.com/SuLingGG/luci-app-diskman
-mkdir parted
-cp luci-app-diskman/Parted.Makefile parted/Makefile
-
 # Add luci-app-dockerman
 rm -rf ../../customfeeds/luci/applications/luci-app-docker
 git clone --depth=1 https://github.com/lisaac/luci-app-dockerman
