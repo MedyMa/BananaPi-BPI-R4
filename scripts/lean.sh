@@ -17,6 +17,7 @@ rm -rf openwrt-package/verysync
 rm -rf openwrt-package/luci-app-verysync
 
 # Add luci-app-ssr-plus
+mkdir package/helloworld
 pushd package/helloworld
 svn co https://github.com/fw876/helloworld/branches/main/  
 popd
