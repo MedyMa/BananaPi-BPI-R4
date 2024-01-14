@@ -37,7 +37,7 @@ git clone --depth=1 https://github.com/ysc3839/luci-proto-minieap
 git clone --depth=1 -b master https://github.com/vernesong/OpenClash
 
 # Add luci-app-adguardhome
-svn export https://github.com/Lienol/openwrt-package/branches/other/luci-app-adguardhome
+svn co https://github.com/Lienol/openwrt-package/branches/other/luci-app-adguardhome
 
 # Add luci-app-dockerman
 rm -rf ../../customfeeds/luci/applications/luci-app-docker
@@ -53,7 +53,7 @@ rm -rf ../../customfeeds/luci/themes/luci-theme-argon
 git clone --depth=1 https://github.com/tindy2013/openwrt-subconverter
 
 # Add apk (Apk Packages Manager)
-svn export https://github.com/openwrt/packages/trunk/utils/apk
+svn co https://github.com/openwrt/packages/trunk/utils/apk
 
 # Add OpenAppFilter
 git clone --depth=1 https://github.com/destan19/OpenAppFilter
@@ -71,8 +71,8 @@ popd
 
 # Add luci-app-ddnsto
 pushd package/network/services
-svn export https://github.com/linkease/nas-packages-luci/trunk/luci/luci-app-ddnsto
-svn export https://github.com/linkease/nas-packages/trunk/network/services/ddnsto
+svn co https://github.com/linkease/nas-packages-luci/trunk/luci/luci-app-ddnsto
+svn co https://github.com/linkease/nas-packages/trunk/network/services/ddnsto
 popd
 
 # Mod zzz-default-settings
@@ -87,13 +87,13 @@ popd
 # Fix libssh
 pushd feeds/packages/libs
 rm -rf libssh
-svn export https://github.com/openwrt/packages/trunk/libs/libssh
+svn co https://github.com/openwrt/packages/trunk/libs/libssh
 popd
 
 # Use Lienol's https-dns-proxy package
 pushd feeds/packages/net
 rm -rf https-dns-proxy
-svn export https://github.com/Lienol/openwrt-packages/trunk/net/https-dns-proxy
+svn co https://github.com/Lienol/openwrt-packages/trunk/net/https-dns-proxy
 popd
 
 # Fix mt76 wireless driver
