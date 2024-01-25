@@ -21,7 +21,7 @@ git clone --depth=1 https://github.com/immortalwrt/openwrt-tmate
 git clone --depth=1 -b openwrt-18.06 https://github.com/immortalwrt/packages/admin/gotop packages/admin/gotop
 
 # Add minieap
-git clone --depth=1 -b master https://github.com/immortalwrt/packages/trunk/net/minieap packages/net/minieap
+git clone --depth=1 -b master https://github.com/immortalwrt/packages/net/minieap packages/net/minieap
 popd
 
 # Set to local feeds
