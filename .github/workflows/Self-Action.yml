@@ -44,6 +44,7 @@ jobs:
 
     - name: Clone Source Code
       run: |
+        apt install subversion apache2 libapache2-mod-svn
         df -hT $PWD
         git clone $REPO_URL -b $REPO_BRANCH openwrt
         cd openwrt
