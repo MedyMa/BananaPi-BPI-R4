@@ -9,19 +9,19 @@
 pushd customfeeds
 
 # Add luci-app-eqos
-git clone --depth=1 -b master https://github.com/immortalwrt/luci/applications/luci-app-eqos luci/applications/luci-app-eqos
+git clone --depth=1 https://github.com/immortalwrt/luci/applications/luci-app-eqos 
 
 # Add luci-proto-modemmanager
-git clone --depth=1 -b master https://github.com/immortalwrt/luci/protocols/luci-proto-modemmanager luci/protocols/luci-proto-modemmanager
+git clone --depth=1 https://github.com/immortalwrt/luci/protocols/luci-proto-modemmanager 
 
 # Add tmate
 git clone --depth=1 https://github.com/immortalwrt/openwrt-tmate
 
 # Add gotop
-git clone --depth=1 -b openwrt-18.06 https://github.com/immortalwrt/packages/admin/gotop packages/admin/gotop
+git clone --depth=1 https://github.com/immortalwrt/packages/admin/gotop 
 
 # Add minieap
-git clone --depth=1 -b master https://github.com/immortalwrt/packages/net/minieap packages/net/minieap
+git clone --depth=1 https://github.com/immortalwrt/packages/net/minieap 
 popd
 
 # Set to local feeds
