@@ -37,7 +37,7 @@ git clone --depth=1 https://github.com/ysc3839/luci-proto-minieap
 git clone --depth=1 -b master https://github.com/vernesong/OpenClash
 
 # Add luci-app-adguardhome
-git clone --depth=1 -b other https://github.com/Lienol/openwrt-package/luci-app-adguardhome
+svn co https://github.com/Lienol/openwrt-package/branches/other/luci-app-adguardhome
 
 # Add luci-app-dockerman
 rm -rf ../../customfeeds/luci/applications/luci-app-docker
@@ -53,7 +53,7 @@ rm -rf ../../customfeeds/luci/themes/luci-theme-argon
 git clone --depth=1 https://github.com/tindy2013/openwrt-subconverter
 
 # Add apk (Apk Packages Manager)
-git clone --depth=1 -b master https://github.com/openwrt/packages/utils/apk
+svn co https://github.com/openwrt/packages/trunk/utils/apk
 
 # Add OpenAppFilter
 git clone --depth=1 https://github.com/destan19/OpenAppFilter
@@ -71,8 +71,8 @@ popd
 
 # Add luci-app-ddnsto
 pushd package/network/services
-git clone --depth=1 -b main https://github.com/linkease/nas-packages-luci/luci/luci-app-ddnsto
-git clone --depth=1 -b master https://github.com/linkease/nas-packages/network/services/ddnsto
+svn co https://github.com/linkease/nas-packages-luci/trunk/luci/luci-app-ddnsto
+svn co https://github.com/linkease/nas-packages/trunk/network/services/ddnsto
 popd
 
 # Mod zzz-default-settings
@@ -87,13 +87,13 @@ popd
 # Fix libssh
 pushd feeds/packages/libs
 rm -rf libssh
-git clone --depth=1 -b master https://github.com/openwrt/packages/libs/libssh
+svn co https://github.com/openwrt/packages/trunk/libs/libssh
 popd
 
 # Use Lienol's https-dns-proxy package
 pushd feeds/packages/net
 rm -rf https-dns-proxy
-git clone --depth=1 -b 22.03 https://github.com/Lienol/openwrt-packages/net/https-dns-proxy
+svn co https://github.com/Lienol/openwrt-packages/trunk/net/https-dns-proxy
 popd
 
 # Fix mt76 wireless driver
@@ -111,7 +111,6 @@ sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generat
 #sed -i 's/5.15/5.4/g' target/linux/rockchip/Makefile
 
 # Custom configs
-
 echo -e " Lean's OpenWrt built on "$(date +%Y.%m.%d)"\n -----------------------------------------------------" >> package/base-files/files/etc/banner
 echo 'net.bridge.bridge-nf-call-iptables=0' >> package/base-files/files/etc/sysctl.conf
 echo 'net.bridge.bridge-nf-call-ip6tables=0' >> package/base-files/files/etc/sysctl.conf
