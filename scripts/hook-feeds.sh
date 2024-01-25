@@ -4,24 +4,24 @@
 # Author: SuLingGG
 # Blog: https://mlapp.cn
 #=================================================
-
 # Svn checkout packages from immortalwrt's repository
+
 pushd customfeeds
 
 # Add luci-app-eqos
-git clone --depth=1 https://github.com/immortalwrt/luci/applications/luci-app-eqos 
+svn co https://github.com/immortalwrt/luci/trunk/applications/luci-app-eqos luci/applications/luci-app-eqos
 
 # Add luci-proto-modemmanager
-git clone --depth=1 https://github.com/immortalwrt/luci/protocols/luci-proto-modemmanager 
+svn co https://github.com/immortalwrt/luci/trunk/protocols/luci-proto-modemmanager luci/protocols/luci-proto-modemmanager
 
 # Add tmate
 git clone --depth=1 https://github.com/immortalwrt/openwrt-tmate
 
 # Add gotop
-git clone --depth=1 https://github.com/immortalwrt/packages/admin/gotop 
+svn co https://github.com/immortalwrt/packages/branches/openwrt-18.06/admin/gotop packages/admin/gotop
 
 # Add minieap
-git clone --depth=1 https://github.com/immortalwrt/packages/net/minieap 
+svn co https://github.com/immortalwrt/packages/trunk/net/minieap packages/net/minieap
 popd
 
 # Set to local feeds
