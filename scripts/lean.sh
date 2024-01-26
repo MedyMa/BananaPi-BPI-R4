@@ -34,10 +34,10 @@ git clone --depth=1 https://github.com/jerrykuku/luci-app-vssr
 git clone --depth=1 https://github.com/ysc3839/luci-proto-minieap
 
 # Add OpenClash
-git clone --depth=1 -b master https://github.com/vernesong/OpenClash
+git clone --depth=1 https://github.com/vernesong/OpenClash
 
 # Add luci-app-adguardhome
-svn co https://github.com/Lienol/openwrt-package/branches/other/luci-app-adguardhome
+git clone --depth=1 https://github.com/MedyMa/luci-app-adguardhome
 
 # Add luci-app-dockerman
 rm -rf ../../customfeeds/luci/applications/luci-app-docker
@@ -51,9 +51,6 @@ rm -rf ../../customfeeds/luci/themes/luci-theme-argon
 
 # Add subconverter
 git clone --depth=1 https://github.com/tindy2013/openwrt-subconverter
-
-# Add apk (Apk Packages Manager)
-svn co https://github.com/openwrt/packages/trunk/utils/apk
 
 # Add OpenAppFilter
 git clone --depth=1 https://github.com/destan19/OpenAppFilter
@@ -71,8 +68,11 @@ popd
 
 # Add luci-app-ddnsto
 pushd package/network/services
-svn co https://github.com/linkease/nas-packages-luci/trunk/luci/luci-app-ddnsto
-svn co https://github.com/linkease/nas-packages/trunk/network/services/ddnsto
+git clone --depth=1 https://github.com/linkease/nas-packages-luci
+rm -rf luci/luci-app-istorex luci-app-linkease luci-app-quickstart luci-app-unishare luci-lib-iform
+git clone --depth=1 https://github.com/linkease/nas-packages
+rm -rf multimedia
+rm -rf network/services/linkease quickstart unishare webdav2
 popd
 
 # Mod zzz-default-settings
@@ -84,17 +84,6 @@ export date_version=$(date -d "$(rdate -n -4 -p pool.ntp.org)" +'%Y-%m-%d')
 sed -i "s/${orig_version}/${orig_version} ${date_version}/g" zzz-default-settings
 popd
 
-# Fix libssh
-pushd feeds/packages/libs
-rm -rf libssh
-svn co https://github.com/openwrt/packages/trunk/libs/libssh
-popd
-
-# Use Lienol's https-dns-proxy package
-pushd feeds/packages/net
-rm -rf https-dns-proxy
-svn co https://github.com/Lienol/openwrt-packages/trunk/net/https-dns-proxy
-popd
 
 # Fix mt76 wireless driver
 pushd package/kernel/mt76
