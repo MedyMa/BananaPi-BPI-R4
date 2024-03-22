@@ -20,13 +20,10 @@ function merge_package(){
     mv $2 package/openwrt-packages/
     rm -rf $repo
 }
+
 rm -rf ../../customfeeds/packages/utils/apk
 # Add apk (Apk Packages Manager)
 merge_package https://github.com/openwrt/packages packages/utils/apk
-
-# Add golang-1.22
-rm -rf ../../customfeeds/packages/lang/golang
-git clone https://github.com/sbwml/packages_lang_golang -b 22.x packages/lang/golang
 
 # Add Lienol's Packages
 git clone --depth=1 https://github.com/Lienol/openwrt-package
