@@ -32,14 +32,14 @@ rm -rf openwrt-package/verysync
 rm -rf openwrt-package/luci-app-verysync
 
 # Add luci-app-ssr-plus
-mkdir helloworld
-pushd helloworld
-git clone --depth=1 https://github.com/fw876/helloworld
-popd
+# mkdir helloworld
+# pushd helloworld
+# git clone --depth=1 https://github.com/fw876/helloworld
+# popd
 
 # Add luci-app-passwall
-git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall
-git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall-packages
+# git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall
+# git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall-packages
 
 # Add luci-app-vssr <M>
 git clone --depth=1 https://github.com/jerrykuku/lua-maxminddb.git
