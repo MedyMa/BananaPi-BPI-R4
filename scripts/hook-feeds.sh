@@ -9,7 +9,8 @@
 # Set to local feeds
 pushd customfeeds/packages
 export packages_feed="$(pwd)"
-git clone --depth=1 https://github.com/fw876/helloworld helloworld
+rm -rf net/{xray-core,v2ray-core,v2ray-geodata,sing-box}
+git clone https://github.com/sbwml/openwrt_helloworld helloworld
 popd
 pushd customfeeds/luci
 export luci_feed="$(pwd)"
