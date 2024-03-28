@@ -11,8 +11,6 @@ pushd customfeeds/packages
 export packages_feed="$(pwd)"
 rm -rf net/{xray-core,v2ray-core,v2ray-geodata,sing-box}
 git clone https://github.com/sbwml/openwrt_helloworld helloworld
-rm -rf lang/golang
-git clone https://github.com/sbwml/packages_lang_golang -b 22.x lang/golang
 popd
 pushd customfeeds/luci
 export luci_feed="$(pwd)"
