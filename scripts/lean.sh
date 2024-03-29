@@ -79,15 +79,6 @@ popd
 #sed -i 's/or "1"%>/or "1"%> ( <%=luci.sys.exec("expr `cat \/sys\/class\/thermal\/thermal_zone0\/temp` \/ 1000") or "?"%> \&#8451; ) /g' index.htm
 #popd
 
-# Add luci-app-ddnsto
-#pushd package/network/services
-#git clone --depth=1 https://github.com/linkease/nas-packages-luci
-#rm -rf luci/luci-app-istorex luci-app-linkease luci-app-quickstart luci-app-unishare luci-lib-iform
-#git clone --depth=1 https://github.com/linkease/nas-packages
-#rm -rf multimedia
-#rm -rf network/services/linkease quickstart unishare webdav2
-#popd
-
 # Mod zzz-default-settings
 pushd package/lean/default-settings/files
 sed -i '/http/d' zzz-default-settings
