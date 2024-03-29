@@ -80,13 +80,13 @@ popd
 #popd
 
 # Add luci-app-ddnsto
-pushd package/network/services
-git clone --depth=1 https://github.com/linkease/nas-packages-luci
-rm -rf luci/luci-app-istorex luci-app-linkease luci-app-quickstart luci-app-unishare luci-lib-iform
-git clone --depth=1 https://github.com/linkease/nas-packages
-rm -rf multimedia
-rm -rf network/services/linkease quickstart unishare webdav2
-popd
+#pushd package/network/services
+#git clone --depth=1 https://github.com/linkease/nas-packages-luci
+#rm -rf luci/luci-app-istorex luci-app-linkease luci-app-quickstart luci-app-unishare luci-lib-iform
+#git clone --depth=1 https://github.com/linkease/nas-packages
+#rm -rf multimedia
+#rm -rf network/services/linkease quickstart unishare webdav2
+#popd
 
 # Mod zzz-default-settings
 pushd package/lean/default-settings/files
