@@ -24,8 +24,6 @@ function merge_package(){
 rm -rf ../../customfeeds/packages/utils/apk
 # Add apk (Apk Packages Manager)
 merge_package https://github.com/openwrt/packages packages/utils/apk
-merge_package https://github.com/immortalwrt/luci luci/applications/luci-app-alist
-merge_package https://github.com/immortalwrt/packages packages/net/alist
 
 # Add Lienol's Packages
 git clone --depth=1 https://github.com/Lienol/openwrt-package
