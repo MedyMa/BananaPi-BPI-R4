@@ -10,10 +10,8 @@
 pushd customfeeds/packages
 rm -rf net/adguardhome
 git clone --depth=1 https://github.com/linkease/nas-packages
-git clone --depth=1 https://github.com/MedyMa/luci-app-adguardhome net/adguardhome
 rm -rf nas-packages/multimedia
 rm -rf nas-packages/network/services/{linkease,quickstart,unishare,webdav2}
-rm -rf net/adguardhome/{luci-app-adguardhome}
 rm -rf net/{xray-core,v2ray-core,v2ray-geodata,sing-box}
 export packages_feed="$(pwd)"
 popd
@@ -26,7 +24,6 @@ git clone --depth=1 https://github.com/fw876/helloworld
 git clone --depth=1 https://github.com/linkease/nas-packages-luci
 git clone --depth=1 https://github.com/sbwml/luci-app-alist
 git clone --depth=1 https://github.com/MedyMa/luci-app-adguardhome
-rm -rf luci-app-adguardhome/{adguardhome}
 rm -rf nas-packages-luci/luci/{luci-app-istorex,luci-app-linkease,luci-app-quickstart,luci-app-unishare,luci-lib-iform}
 export luci_feed="$(pwd)"
 popd
