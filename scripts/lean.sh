@@ -47,9 +47,6 @@ git clone --depth=1 https://github.com/ysc3839/luci-proto-minieap
 # Add OpenClash
 git clone --depth=1 https://github.com/vernesong/OpenClash
 
-# Add luci-app-adguardhome
-git clone --depth=1 https://github.com/MedyMa/luci-app-adguardhome
-
 # Add luci-app-dockerman
 rm -rf ../../customfeeds/luci/applications/luci-app-docker
 git clone --depth=1 https://github.com/lisaac/luci-app-dockerman
