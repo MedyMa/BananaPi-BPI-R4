@@ -13,7 +13,7 @@ git clone --depth=1 https://github.com/linkease/nas-packages
 git clone --depth=1 https://github.com/MedyMa/luci-app-adguardhome net/adguardhome
 rm -rf nas-packages/multimedia
 rm -rf nas-packages/network/services/{linkease,quickstart,unishare,webdav2}
-rm -rf net/adguardhome/luci-app-adguardhome/{luci-app-adguardhome}
+rm -rf net/adguardhome/{luci-app-adguardhome}
 rm -rf net/{xray-core,v2ray-core,v2ray-geodata,sing-box}
 export packages_feed="$(pwd)"
 popd
