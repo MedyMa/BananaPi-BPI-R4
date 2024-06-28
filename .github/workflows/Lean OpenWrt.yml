@@ -73,7 +73,7 @@ jobs:
         chmod +x scripts/*.sh
         cd $OPENWRTROOT
         ../$DIY_SH
-        ../scripts/preset-clash-core.sh armv8
+        ../scripts/preset-clash-core.sh
         ../scripts/preset-terminal-tools.sh
         make defconfig
         
@@ -165,7 +165,7 @@ jobs:
         echo "status=success" >> $GITHUB_OUTPUT
           
     - name: Upload firmware to release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       if: steps.tag.outputs.status == 'success' && !cancelled()
       env:
         GITHUB_TOKEN: ${{ secrets.RELEASES_TOKEN }}
@@ -182,7 +182,7 @@ jobs:
         keep_minimum_runs: 1
 
     - name: Remove old Releases
-      uses: dev-drprasad/delete-older-releases@v0.3.2
+      uses: dev-drprasad/delete-older-releases@v0.3.3
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
       with:
         keep_latest: 3
@@ -191,7 +191,7 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.RELEASES_TOKEN }}
 
     - name: Delete Artifacts
-      uses: geekyeggo/delete-artifact@v2
+      uses: geekyeggo/delete-artifact@v5
       with:
         name: |
           bin-archive
