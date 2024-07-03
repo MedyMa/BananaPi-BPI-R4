@@ -25,16 +25,6 @@ rm -rf ../../customfeeds/packages/utils/apk
 # Add apk (Apk Packages Manager)
 merge_package https://github.com/openwrt/packages packages/utils/apk
 
-# Add luci-app-ssr-plus
-# mkdir helloworld
-# pushd helloworld
-# git clone --depth=1 https://github.com/fw876/helloworld
-# popd
-
-# Add luci-app-passwall
-# git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall
-# git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall-packages
-
 # Add luci-proto-minieap
 git clone --depth=1 https://github.com/ysc3839/luci-proto-minieap
 
