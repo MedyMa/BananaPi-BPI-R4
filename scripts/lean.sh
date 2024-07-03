@@ -25,12 +25,6 @@ rm -rf ../../customfeeds/packages/utils/apk
 # Add apk (Apk Packages Manager)
 merge_package https://github.com/openwrt/packages packages/utils/apk
 
-# Add Lienol's Packages
-git clone --depth=1 https://github.com/Lienol/openwrt-package
-rm -rf ../../customfeeds/luci/applications/luci-app-kodexplorer
-rm -rf openwrt-package/verysync
-rm -rf openwrt-package/luci-app-verysync
-
 # Add luci-app-ssr-plus
 # mkdir helloworld
 # pushd helloworld
