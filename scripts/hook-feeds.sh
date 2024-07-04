@@ -12,7 +12,7 @@ rm -rf net/adguardhome
 git clone --depth=1 https://github.com/linkease/nas-packages
 rm -rf nas-packages/multimedia
 rm -rf nas-packages/network/services/{linkease,quickstart,unishare,webdav2}
-rm -rf net/{xray-core,v2ray-core,v2ray-geodata,sing-box}
+# rm -rf net/{xray-core,v2ray-core,v2ray-geodata,sing-box}
 export packages_feed="$(pwd)"
 popd
 pushd customfeeds/luci
