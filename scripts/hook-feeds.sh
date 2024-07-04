@@ -16,11 +16,11 @@ rm -rf net/{xray-core,v2ray-core,v2ray-geodata,sing-box}
 export packages_feed="$(pwd)"
 popd
 pushd customfeeds/luci
-git clone --depth=1 https://github.com/jerrykuku/lua-maxminddb.git
-git clone --depth=1 https://github.com/MilesPoupart/luci-app-vssr
+# git clone --depth=1 https://github.com/jerrykuku/lua-maxminddb.git
+# git clone --depth=1 https://github.com/MilesPoupart/luci-app-vssr
 git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall
 git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall-packages
-git clone --depth=1 https://github.com/fw876/helloworld
+# git clone --depth=1 https://github.com/fw876/helloworld
 git clone --depth=1 https://github.com/linkease/nas-packages-luci
 git clone --depth=1 https://github.com/sbwml/luci-app-alist
 git clone --depth=1 https://github.com/MedyMa/luci-app-adguardhome
