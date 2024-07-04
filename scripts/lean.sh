@@ -26,10 +26,10 @@ rm -rf ../../customfeeds/packages/utils/apk
 merge_package https://github.com/openwrt/packages packages/utils/apk
 
 # Add luci-proto-minieap
-git clone --depth=1 https://github.com/ysc3839/luci-proto-minieap
+# git clone --depth=1 https://github.com/ysc3839/luci-proto-minieap
 
 # Add OpenClash
-git clone --depth=1 https://github.com/vernesong/OpenClash
+# git clone --depth=1 https://github.com/vernesong/OpenClash
 
 # Add luci-app-dockerman
 rm -rf ../../customfeeds/luci/applications/luci-app-docker
@@ -42,10 +42,10 @@ git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
 rm -rf ../../customfeeds/luci/themes/luci-theme-argon
 
 # Add subconverter
-git clone --depth=1 https://github.com/tindy2013/openwrt-subconverter
+# git clone --depth=1 https://github.com/tindy2013/openwrt-subconverter
 
 # Add OpenAppFilter
-git clone --depth=1 https://github.com/destan19/OpenAppFilter
+# git clone --depth=1 https://github.com/destan19/OpenAppFilter
 popd
 
 # Add CPUInfo
