@@ -30,7 +30,7 @@ env:
 jobs:
   Build:
     runs-on: ubuntu-latest
-    if: github.repository == 'MedyMa/NanoPi-R4S'
+    if: github.repository == 'BananaPi-R4'
     outputs:
       OPENWRTROOT: ${{ steps.update.outputs.OPENWRTROOT }}
       PLATFORM: ${{ steps.compile.outputs.PLATFORM }}
