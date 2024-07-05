@@ -106,7 +106,6 @@ jobs:
         cd $OPENWRTROOT
         ../$DIY_SH
         ../scripts/preset-clash-core.sh
-        ../scripts/preset-terminal-tools.sh
         make defconfig
         
     - name: Download Package
