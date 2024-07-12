@@ -25,9 +25,6 @@ function merge_package(){
 # # Add apk (Apk Packages Manager)
 # merge_package https://github.com/openwrt/packages packages/utils/apk
 
-# Add luci-proto-minieap
-# git clone --depth=1 https://github.com/ysc3839/luci-proto-minieap
-
 # Add OpenClash
 git clone --depth=1 https://github.com/vernesong/OpenClash
 
@@ -47,29 +44,6 @@ rm -rf ../../customfeeds/luci/themes/luci-theme-argon
 # Add OpenAppFilter
 # git clone --depth=1 https://github.com/destan19/OpenAppFilter
 popd
-
-# Add CPUInfo
-#pushd feeds/luci/modules/luci-mod-admin-full/luasrc/view/admin_status
-#sed -i '/Load Average/i\\t\t<tr><td width="33%"><%:CPU Temperature%></td><td><%=luci.sys.exec("cut -c1-2 /sys/class/thermal/thermal_zone0/temp")%><span>&#8451;</span></td></tr>' index.htm
-#sed -i '/Load Average/i\\t\t<tr><td width="33%"><%:欢迎订阅 Youbube 频道%></td><td><a href="https://www.youtube.com"><%:YOURENAME%></a></td></tr>' index.htm
-#sed -i 's/pcdata(boardinfo.system or "?")/"ARMv8"/' index.htm
-#sed -i 's/<%=luci.sys.exec("cat \/etc\/bench.log") or " "%>//' index.htm
-#sed -i 's|pcdata(boardinfo.system or "?")|luci.sys.exec("uname -m") or "?"|g' index.htm
-#sed -i 's/or "1"%>/or "1"%> ( <%=luci.sys.exec("expr `cat \/sys\/class\/thermal\/thermal_zone0\/temp` \/ 1000") or "?"%> \&#8451; ) /g' index.htm
-#popd
-
-# # Mod zzz-default-settings
-# pushd package/lean/default-settings/files
-# sed -i '/http/d' zzz-default-settings
-# sed -i '/18.06/d' zzz-default-settings
-# export orig_version=$(cat "zzz-default-settings" | grep DISTRIB_REVISION= | awk -F "'" '{print $2}')
-# export date_version=$(date -d "$(rdate -n -4 -p pool.ntp.org)" +'%Y-%m-%d')
-# sed -i "s/${orig_version}/${orig_version} ${date_version}/g" zzz-default-settings
-# popd
-
-
-# # Change default shell to zsh
-# sed -i 's/\/bin\/ash/\/usr\/bin\/zsh/g' package/base-files/files/etc/passwd
 
 # Modify default IP
 sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generate
