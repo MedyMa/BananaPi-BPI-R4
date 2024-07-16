@@ -19,7 +19,7 @@ function merge_package(){
 
 # Set to local feeds
 rm -rf package/wwan/*
-merge_package https://github.com/DHDAXCW/lede-rockchip/package/wwan package/wwan
+merge_package https://github.com/DHDAXCW/lede-rockchip package/wwan
 pushd customfeeds/packages
 rm -rf net/adguardhome
 git clone --depth=1 https://github.com/linkease/nas-packages
