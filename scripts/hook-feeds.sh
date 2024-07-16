@@ -6,7 +6,20 @@
 #=================================================
 # Svn checkout packages from immortalwrt's repository
 
+# Merge_package
+function merge_package(){
+    repo=`echo $1 | rev | cut -d'/' -f 1 | rev`
+    pkg=`echo $2 | rev | cut -d'/' -f 1 | rev`
+    # find package/ -follow -name $pkg -not -path "package/openwrt-packages/*" | xargs -rt rm -rf
+    git clone --depth=1 --single-branch $1
+    [ -d package/openwrt-packages ] || mkdir -p package/openwrt-packages
+    mv $2 package/openwrt-packages/
+    rm -rf $repo
+}
+
 # Set to local feeds
+rm -rf package/wwan
+merge_package ttps://github.com/DHDAXCW/lede-rockchip/package/wwan package/wwan
 pushd customfeeds/packages
 rm -rf net/adguardhome
 git clone --depth=1 https://github.com/linkease/nas-packages
