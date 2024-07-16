@@ -29,10 +29,10 @@ git clone --depth=1 https://github.com/jjm2473/openwrt-apps.git
 rm -rf openwrt-apps/{homebox,luci-app-cpufreg,luci-app-homeboX,luci-app-tasks,luci-lib-mac-vendor,LICENSE,README.md,luci-alias.mk}
 export luci_feed="$(pwd)"
 popd
-sed -i '/src-git packages/d' feeds.conf.default
-echo "src-link packages $packages_feed" >> feeds.conf.default
-sed -i '/src-git luci/d' feeds.conf.default
-echo "src-link luci $luci_feed" >> feeds.conf.default
+# sed -i '/src-git packages/d' feeds.conf.default
+# echo "src-link packages $packages_feed" >> feeds.conf.default
+# sed -i '/src-git luci/d' feeds.conf.default
+# echo "src-link luci $luci_feed" >> feeds.conf.default
 
 # Update feeds
 ./scripts/feeds update -a
