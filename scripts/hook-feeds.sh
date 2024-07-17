@@ -40,8 +40,7 @@ git clone --depth=1 https://github.com/linkease/nas-packages-luci
 # git clone --depth=1 https://github.com/sbwml/luci-app-alist
 git clone --depth=1 https://github.com/MedyMa/luci-app-adguardhome
 rm -rf nas-packages-luci/luci/{luci-app-istorex,luci-app-linkease,luci-app-quickstart,luci-app-unishare,luci-lib-iform}
-git clone --depth=1 https://github.com/jjm2473/openwrt-apps.git
-rm -rf openwrt-apps/{homebox,luci-app-cpufreg,luci-app-homeboX,luci-app-tasks,luci-lib-mac-vendor,LICENSE,README.md,luci-alias.mk}
+merge_package https://github.com/jjm2473/openwrt-apps luci-app-fan
 export luci_feed="$(pwd)"
 popd
 sed -i '/src-git packages/d' feeds.conf.default
