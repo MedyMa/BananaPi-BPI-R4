@@ -18,7 +18,7 @@ function merge_package(){
 }
 
 # Set to local feeds
-rm -rf package/wwan/*
+# rm -rf package/wwan/*
 pushd customfeeds/packages
 rm -rf net/adguardhome
 git clone --depth=1 https://github.com/linkease/nas-packages
