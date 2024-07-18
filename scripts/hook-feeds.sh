@@ -38,7 +38,7 @@ git clone --depth=1 https://github.com/linkease/nas-packages-luci
 git clone --depth=1 https://github.com/MedyMa/luci-app-adguardhome
 rm -rf nas-packages-luci/luci/{luci-app-istorex,luci-app-linkease,luci-app-quickstart,luci-app-unishare,luci-lib-iform}
 merge_package https://github.com/MedyMa/OpenWRT_x86_x64 OpenWRT_x86_x64/package/luci-app-fan
-merge_package https://github.com/DHDAXCW/lede-rockchip lede-rockchip/package/wwan
+# merge_package https://github.com/DHDAXCW/lede-rockchip lede-rockchip/package/wwan
 export luci_feed="$(pwd)"
 popd
 sed -i '/src-git packages/d' feeds.conf.default
