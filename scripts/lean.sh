@@ -26,7 +26,7 @@ function merge_package(){
 # merge_package https://github.com/openwrt/packages packages/utils/apk
 
 # Add OpenClash
-# git clone --depth=1 https://github.com/vernesong/OpenClash
+git clone --depth=1 https://github.com/vernesong/OpenClash
 
 # Add luci-theme-argon
 git clone --depth=1 -b 18.06 https://github.com/jerrykuku/luci-theme-argon
