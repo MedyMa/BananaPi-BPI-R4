@@ -11,22 +11,22 @@ mkdir package/community
 pushd package/community
 
 # Merge_package
-# function merge_package(){
-#     repo=`echo $1 | rev | cut -d'/' -f 1 | rev`
-#     pkg=`echo $2 | rev | cut -d'/' -f 1 | rev`
-#     # find package/ -follow -name $pkg -not -path "package/openwrt-packages/*" | xargs -rt rm -rf
-#     git clone --depth=1 --single-branch $1
-#     [ -d package/openwrt-packages ] || mkdir -p package/openwrt-packages
-#     mv $2 package/openwrt-packages/
-#     rm -rf $repo
-# }
+function merge_package(){
+    repo=`echo $1 | rev | cut -d'/' -f 1 | rev`
+    pkg=`echo $2 | rev | cut -d'/' -f 1 | rev`
+    # find package/ -follow -name $pkg -not -path "package/openwrt-packages/*" | xargs -rt rm -rf
+    git clone --depth=1 --single-branch $1
+    [ -d package/openwrt-packages ] || mkdir -p package/openwrt-packages
+    mv $2 package/openwrt-packages/
+    rm -rf $repo
+}
 
 # # rm -rf ../../customfeeds/packages/utils/apk
 # # # Add apk (Apk Packages Manager)
 # # merge_package https://github.com/openwrt/packages packages/utils/apk
 
 # # Add OpenClash
-# git clone --depth=1 https://github.com/vernesong/OpenClash
+git clone --depth=1 https://github.com/vernesong/OpenClash
 
 # Add luci-theme-argon
 git clone --depth=1 -b 18.06 https://github.com/jerrykuku/luci-theme-argon
@@ -46,8 +46,8 @@ sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generat
 # Test kernel 5.10
 sed -i 's/6.1/6.6/g' target/linux/rockchip/Makefile
 
-# rm -rf feeds/packages/lang/golang
-# git clone https://github.com/sbwml/packages_lang_golang -b 22.x feeds/packages/lang/golang
+rm -rf feeds/packages/lang/golang
+git clone https://github.com/sbwml/packages_lang_golang -b 22.x feeds/packages/lang/golang
 
 # Custom configs
 echo -e "OpenWrt built on "$(date +%Y.%m.%d)"\n -----------------------------------------------------" >> package/base-files/files/etc/banner
