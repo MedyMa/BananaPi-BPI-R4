@@ -28,8 +28,8 @@ rm -rf nas-packages/network/services/{linkease,quickstart,unishare,webdav2}
 export packages_feed="$(pwd)"
 popd
 pushd customfeeds/luci
-git clone --depth=1 https://github.com/jerrykuku/lua-maxminddb.git
-git clone --depth=1 https://github.com/MilesPoupart/luci-app-vssr
+# git clone --depth=1 https://github.com/jerrykuku/lua-maxminddb.git
+# git clone --depth=1 https://github.com/MilesPoupart/luci-app-vssr
 git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall
 git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall-packages
 git clone --depth=1 https://github.com/fw876/helloworld
