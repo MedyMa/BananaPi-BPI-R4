@@ -32,8 +32,8 @@ pushd customfeeds/luci
 # git clone --depth=1 https://github.com/MilesPoupart/luci-app-vssr
 git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall
 git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall-packages
-# git clone --depth=1 https://github.com/fw876/helloworld
-# rm -rf helloworld/gn
+git clone --depth=1 https://github.com/fw876/helloworld
+rm -rf helloworld/gn
 git clone --depth=1 https://github.com/linkease/nas-packages-luci
 git clone --depth=1 https://github.com/sbwml/luci-app-alist
 git clone --depth=1 https://github.com/MedyMa/luci-app-adguardhome
