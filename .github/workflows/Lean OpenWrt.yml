@@ -68,6 +68,7 @@ jobs:
       run: |
         # docker rmi $(docker images -q)
         sudo -E apt-get -qq update
+        sudo apt update && sudo apt upgrade -y
         sudo -E apt-get -qq full-upgrade
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq autoclean
