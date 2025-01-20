@@ -67,12 +67,12 @@ jobs:
         DEBIAN_FRONTEND: noninteractive
       run: |
         # docker rmi $(docker images -q)
-        sudo -E apt -yqq update
-        sudo -E apt -yqq full-upgrade
-        sudo -E apt -yqq autoremove --purge
-        sudo -E apt -yqq autoclean
-        sudo -E apt -yqq clean
-        sudo -E apt -yqq install $(sed -n "1{s/\r$//g;p;q}" $GITHUB_WORKSPACE/Depends.txt)
+        sudo apt-get -qq update
+        sudo apt-get -qq full-upgrade
+        sudo apt-get -qq autoremove --purge
+        sudo apt-get -qq autoclean
+        sudo apt-get -qq clean
+        sudo apt-get -qq install $(sed -n "1{s/\r$//g;p;q}" $GITHUB_WORKSPACE/Depends.txt)
         sudo -E systemctl daemon-reload
         
     - name: Clone Source Code
