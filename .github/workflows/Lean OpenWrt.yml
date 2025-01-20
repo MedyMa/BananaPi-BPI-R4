@@ -29,7 +29,7 @@ env:
 
 jobs:
   Build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     if: github.repository == 'MedyMa/BananaPi-BPI-R4'
     outputs:
       OPENWRTROOT: ${{ steps.update.outputs.OPENWRTROOT }}
@@ -51,33 +51,29 @@ jobs:
         remove_haskell: true
         remove_tool_cache: true
         remove_swap: true
-        remove_packages: "android* azure* clang* dotnet* firefox* ghc* golang* google* libclang* libgl1* lld* llvm* \
-          microsoft* mongodb* mono* mysql* nodejs* openjdk* php* postgresql* powershell* snap* temurin* yarn* zulu*"
+        remove_packages: "android* azure* clang* dotnet* firefox* ghc* golang* google* libclang* libgl1* \
+          lld* llvm* microsoft* mongodb* mono* mysql* nodejs* openjdk* php* postgresql* powershell* snap* temurin* yarn* zulu*"
         remove_packages_one_command: true
         remove_folders: "/etc/apt/sources.list.d* /etc/mono* /etc/mysql* /usr/include/linux/android* /usr/lib/llvm* /usr/lib/mono* \
-            /usr/local/lib/android* /usr/local/lib/node_modules* /usr/local/share/chromium* /usr/local/share/powershell* \
-            /usr/local/share/vcpkg/ports/azure* /usr/local/share/vcpkg/ports/google* /usr/local/share/vcpkg/ports/libpq/android* \
-            /usr/local/share/vcpkg/ports/llvm* /usr/local/share/vcpkg/ports/mysql* /usr/local/share/vcpkg/ports/snap* \
-            /usr/share/azure* /usr/share/dotnet* /usr/share/glade* /usr/share/miniconda* /usr/share/php* /usr/share/swift \
-            /var/lib/mysql* /var/log/azure*"
-        testing: false 
-        
+          /usr/local/lib/android* /usr/local/lib/node_modules* /usr/local/share/chromium* /usr/local/share/powershell* /usr/local/share/vcpkg/ports/azure* \
+          /usr/local/share/vcpkg/ports/google* /usr/local/share/vcpkg/ports/libpq/android* /usr/local/share/vcpkg/ports/llvm* /usr/local/share/vcpkg/ports/mysql* \
+          /usr/local/share/vcpkg/ports/snap* /usr/share/azure* /usr/share/dotnet* /usr/share/glade* /usr/share/miniconda* /usr/share/php* /usr/share/swift \
+          /var/lib/mysql* /var/log/azure*"
+        testing: false
+      
     - name: Initialization Environment
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
-        sudo -E apt-get -qq update
-        sudo /bin/bash -c "$(curl -sL https://git.io/vokNn)"
-        sudo -E apt-fast -y -qq install asciidoc bash bcc bin86 binutils bison bzip2 clang-15 llvm-15 clang llvm file flex g++ g++-multilib gawk gcc gcc-multilib gettext git gzip help2man intltool libboost-dev libelf-dev libncurses-dev libncurses5-dev libssl-dev libthread-queue-any-perl libusb-dev libxml-parser-perl make patch perl-modules python3-dev python3-pip python3-pyelftools python3-setuptools rsync sharutils swig time unzip util-linux wget xsltproc zlib1g-dev zip zstd
-        sudo -E apt-fast -y -qq install dos2unix dwarves quilt npm jq
-        sudo -E npm install -g pnpm
-        pip3 install --user -U pylibfdt --break-system-packages
-        sudo -E apt-get -qq autoremove --purge
-        sudo -E apt-get -qq clean
-        sudo -E git config --global user.name 'GitHub Actions' && git config --global user.email 'noreply@github.com'
-        sudo -E git config --global core.abbrev auto
-        df -h
-        
+        docker rmi $(docker images -q)
+        sudo -E apt -yqq update
+        sudo -E apt -yqq full-upgrade
+        sudo -E apt -yqq install ack antlr3 asciidoc autoconf automake autopoint binutils bison build-essential bzip2 ccache clang cmake cpio curl device-tree-compiler flex gawk gettext gcc-multilib g++-multilib git gperf haveged help2man intltool libc6-dev-i386 libelf-dev libfuse-dev libglib2.0-dev libgmp3-dev libltdl-dev libmpc-dev libmpfr-dev libncurses5-dev libncursesw5-dev libpython3-dev libreadline-dev libssl-dev libtool llvm lrzsz mkisofs msmtp ninja-build p7zip p7zip-full patch pkgconf python3 python3-pyelftools python3-setuptools qemu-utils rsync scons squashfs-tools subversion swig texinfo uglifyjs upx-ucl unzip vim wget xmlto xxd zlib1g-dev
+        sudo -E apt -yqq autoremove --purge
+        sudo -E apt -yqq clean
+        sudo -E systemctl daemon-reload
+        sudo -E timedatectl set-timezone "$TZ"
+
     - name: Clone Source Code
       run: |
         df -hT $PWD
