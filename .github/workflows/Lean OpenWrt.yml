@@ -29,7 +29,7 @@ env:
 
 jobs:
   Build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     if: github.repository == 'MedyMa/BananaPi-BPI-R4'
     outputs:
       OPENWRTROOT: ${{ steps.update.outputs.OPENWRTROOT }}
@@ -90,7 +90,7 @@ jobs:
         git clone --depth=1 https://github.com/coolsnowwolf/packages customfeeds/packages
         git clone --depth=1 https://github.com/coolsnowwolf/luci customfeeds/luci
         chmod +x ../scripts/*.sh
-        ./scripts/hook-feeds.sh
+        ../scripts/hook-feeds.sh
 
     - name: Install Feeds
       run: |
