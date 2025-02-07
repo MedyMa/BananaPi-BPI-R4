@@ -71,5 +71,6 @@ mkdir files/lib
 mkdir files/lib/firmware
 mkdir files/lib/firmware/mediatek
 mkdir files/lib/firmware/mediatek/mt7996
-cp -f $GITHUB_WORKSPACE/patches/mt7966 files/lib/firmware/mediatek/mt7996
+pushd files/lib/firmware/mediatek/mt7996
+cp -f $GITHUB_WORKSPACE/patches/mt7966/*.bin
 popd
