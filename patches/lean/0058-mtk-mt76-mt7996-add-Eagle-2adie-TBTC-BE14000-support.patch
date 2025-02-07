@@ -1,0 +1,195 @@
+Subject: [PATCH] 1
+wifi: mt76: mt7996: support mt7996 2+3+3 variant
+---
+Index: mt7996/eeprom.c
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/mt7996/eeprom.c b/mt7996/eeprom.c
+--- a/mt7996/eeprom.c	(revision 0ac3041a9ac8f79aa0b859213bc223e0c471fcfb)
++++ b/mt7996/eeprom.c	(revision 8ad06fc44bb989b918e0c86da896235001b14419)
+@@ -26,6 +26,8 @@
+ {
+ 	switch (mt76_chip(&dev->mt76)) {
+ 	case 0x7990:
++		if (dev->var_type == MT7996_VAR_TYPE_233)
++			return MT7996_EEPROM_DEFAULT_233;
+ 		return MT7996_EEPROM_DEFAULT;
+ 	case 0x7992:
+ 		return MT7992_EEPROM_DEFAULT;
+Index: mt7996/init.c
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/mt7996/init.c b/mt7996/init.c
+--- a/mt7996/init.c	(revision 0ac3041a9ac8f79aa0b859213bc223e0c471fcfb)
++++ b/mt7996/init.c	(revision fc85b7f81fa0b41839936471ef16e7a037653836)
+@@ -884,6 +884,27 @@
+ #endif
+ }
+ 
++static int mt7996_chip_variant_init(struct mt7996_dev *dev)
++{
++	u32 val = mt76_rr(dev, MT_PAD_GPIO);
++
++	switch (mt76_chip(&dev->mt76)) {
++	case 0x7990:
++		if (u32_get_bits(val, MT_PAD_GPIO_2ADIE_TBTC))
++			dev->var_type = MT7996_VAR_TYPE_233;
++		else
++			dev->var_type = MT7996_VAR_TYPE_444;
++		break;
++	case 0x7992:
++		dev->var_type = MT7992_VAR_TYPE_44;
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
+ static int mt7996_init_hardware(struct mt7996_dev *dev)
+ {
+ 	int ret, idx;
+@@ -899,6 +920,12 @@
+ 	INIT_LIST_HEAD(&dev->wed_rro.poll_list);
+ 	spin_lock_init(&dev->wed_rro.lock);
+ 
++	ret = mt7996_chip_variant_init(dev);
++	if (ret){
++        return ret;
++    }
++
++
+ 	ret = mt7996_dma_init(dev);
+ 	if (ret)
+ 		return ret;
+@@ -910,8 +937,10 @@
+ 		return ret;
+ 
+ 	ret = mt7996_wed_rro_init(dev);
+-	if (ret)
+-		return ret;
++	if (ret){
++        return ret;
++    }
++
+ 
+ 	ret = mt7996_eeprom_init(dev);
+ 	if (ret < 0)
+Index: mt7996/mcu.c
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/mt7996/mcu.c b/mt7996/mcu.c
+--- a/mt7996/mcu.c	(revision 0ac3041a9ac8f79aa0b859213bc223e0c471fcfb)
++++ b/mt7996/mcu.c	(revision 8ad06fc44bb989b918e0c86da896235001b14419)
+@@ -17,6 +17,11 @@
+ 		_fw = MT7992_##name;				\
+ 		break;						\
+ 	case 0x7990:						\
++		if ((_dev)->var_type == MT7996_VAR_TYPE_233)	\
++			_fw = MT7996_##name##_233;		\
++		else						\
++			_fw = MT7996_##name;			\
++		break;						\
+ 	default:						\
+ 		_fw = MT7996_##name;				\
+ 		break;						\
+@@ -2851,6 +2856,7 @@
+ 
+ static int mt7996_load_ram(struct mt7996_dev *dev)
+ {
++	const char *dsp_name;
+ 	int ret;
+ 
+ 	ret = __mt7996_load_ram(dev, "WM", fw_name(dev, FIRMWARE_WM),
+@@ -2858,7 +2864,8 @@
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = __mt7996_load_ram(dev, "DSP", fw_name(dev, FIRMWARE_DSP),
++	dsp_name = is_mt7996(&dev->mt76) ? MT7996_FIRMWARE_DSP : MT7992_FIRMWARE_DSP;
++	ret = __mt7996_load_ram(dev, "DSP", dsp_name,
+ 				MT7996_RAM_TYPE_DSP);
+ 	if (ret)
+ 		return ret;
+Index: mt7996/mt7996.h
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/mt7996/mt7996.h b/mt7996/mt7996.h
+--- a/mt7996/mt7996.h	(revision 0ac3041a9ac8f79aa0b859213bc223e0c471fcfb)
++++ b/mt7996/mt7996.h	(revision 8ad06fc44bb989b918e0c86da896235001b14419)
+@@ -34,12 +34,17 @@
+ #define MT7996_FIRMWARE_DSP		"mediatek/mt7996/mt7996_dsp.bin"
+ #define MT7996_ROM_PATCH		"mediatek/mt7996/mt7996_rom_patch.bin"
+ 
++#define MT7996_FIRMWARE_WA_233		"mediatek/mt7996/mt7996_wa_233.bin"
++#define MT7996_FIRMWARE_WM_233		"mediatek/mt7996/mt7996_wm_233.bin"
++#define MT7996_ROM_PATCH_233		"mediatek/mt7996/mt7996_rom_patch_233.bin"
++
+ #define MT7992_FIRMWARE_WA		"mediatek/mt7996/mt7992_wa.bin"
+ #define MT7992_FIRMWARE_WM		"mediatek/mt7996/mt7992_wm.bin"
+ #define MT7992_FIRMWARE_DSP		"mediatek/mt7996/mt7992_dsp.bin"
+ #define MT7992_ROM_PATCH		"mediatek/mt7996/mt7992_rom_patch.bin"
+ 
+ #define MT7996_EEPROM_DEFAULT		"mediatek/mt7996/mt7996_eeprom.bin"
++#define MT7996_EEPROM_DEFAULT_233	"mediatek/mt7996/mt7996_eeprom_233.bin"
+ #define MT7992_EEPROM_DEFAULT		"mediatek/mt7996/mt7992_eeprom.bin"
+ #define MT7996_EEPROM_SIZE		7680
+ #define MT7996_EEPROM_BLOCK_SIZE	16
+@@ -89,6 +94,14 @@
+ struct mt7996_dfs_pulse;
+ struct mt7996_dfs_pattern;
+ 
++enum mt7996_var_type {
++	MT7996_VAR_TYPE_444,
++	MT7996_VAR_TYPE_233,
++
++	/* mt7992 */
++	MT7992_VAR_TYPE_44,
++};
++
+ enum mt7996_ram_type {
+ 	MT7996_RAM_TYPE_WM,
+ 	MT7996_RAM_TYPE_WA,
+@@ -329,6 +342,7 @@
+ 	spinlock_t reg_lock;
+ 
+ 	u8 wtbl_size_group;
++	u8 var_type;
+ };
+ 
+ enum {
+@@ -406,8 +420,7 @@
+ 		return band <= MT_BAND1;
+ 
+ 	/* tri-band support */
+-	if (band <= MT_BAND2 &&
+-	    mt76_get_field(dev, MT_PAD_GPIO, MT_PAD_GPIO_ADIE_COMB) <= 1)
++	if (band <= MT_BAND2 && dev->var_type)
+ 		return true;
+ 
+ 	return band == MT_BAND0 || band == MT_BAND2;
+Index: mt7996/regs.h
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/mt7996/regs.h b/mt7996/regs.h
+--- a/mt7996/regs.h	(revision 0ac3041a9ac8f79aa0b859213bc223e0c471fcfb)
++++ b/mt7996/regs.h	(revision 8ad06fc44bb989b918e0c86da896235001b14419)
+@@ -662,6 +662,7 @@
+ 
+ #define MT_PAD_GPIO				0x700056f0
+ #define MT_PAD_GPIO_ADIE_COMB			GENMASK(16, 15)
++#define MT_PAD_GPIO_2ADIE_TBTC			BIT(19)
+ 
+ #define MT_HW_REV				0x70010204
+ #define MT_HW_REV1				0x8a00
