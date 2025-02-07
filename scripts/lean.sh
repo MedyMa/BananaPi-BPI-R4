@@ -44,7 +44,7 @@ popd
 sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generate
 
 # Test kernel 5.10
-sed -i 's/6.1/6.6/g' target/linux/rockchip/Makefile
+# sed -i 's/6.1/6.6/g' target/linux/rockchip/Makefile
 
 rm -rf feeds/packages/lang/golang
 git clone https://github.com/sbwml/packages_lang_golang -b 22.x feeds/packages/lang/golang
