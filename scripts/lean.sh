@@ -66,7 +66,13 @@ pushd package/kernel/mt76
 rm -rf Makefile
 cp -f $GITHUB_WORKSPACE/patches/lean/Makefile Makefile
 popd
-mkdir files/lib/firmware/mediatek/mt7996
+mkdir files/lib
+pushd files/lib
+mkdir firmware/mediatek
+popd
+pushd files/lib/firmware/mediatek
+mkdir mt7996
+popd
 pushd files/lib/firmware/mediatek/mt7996
 cp -f $GITHUB_WORKSPACE/patches/mt7966/*
 popd
