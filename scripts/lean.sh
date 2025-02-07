@@ -58,19 +58,19 @@ echo -e "OpenWrt built on "$(date +%Y.%m.%d)"\n --------------------------------
 #cp -f $GITHUB_WORKSPACE/scripts/cpuinfo cpuinfo
 #popd
 
-# Add Wifi7 Drivers
-pushd package/kernel/mt76/patches
-cp -f $GITHUB_WORKSPACE/patches/lean/0058-mtk-mt76-mt7996-add-Eagle-2adie-TBTC-BE14000-support.patch 0058-mtk-mt76-mt7996-add-Eagle-2adie-TBTC-BE14000-support.patch
-popd
-pushd package/kernel/mt76
-rm -rf Makefile
-cp -f $GITHUB_WORKSPACE/patches/lean/Makefile Makefile
-popd
-mkdir files
-mkdir files/lib
-mkdir files/lib/firmware
-mkdir files/lib/firmware/mediatek
-mkdir files/lib/firmware/mediatek/mt7996
-pushd files/lib/firmware/mediatek/mt7996
-cp -f $GITHUB_WORKSPACE/patches/mt7966/*.bin
-popd
+# # Add Wifi7 Drivers
+# pushd package/kernel/mt76/patches
+# cp -f $GITHUB_WORKSPACE/patches/lean/0058-mtk-mt76-mt7996-add-Eagle-2adie-TBTC-BE14000-support.patch 0058-mtk-mt76-mt7996-add-Eagle-2adie-TBTC-BE14000-support.patch
+# popd
+# pushd package/kernel/mt76
+# rm -rf Makefile
+# cp -f $GITHUB_WORKSPACE/patches/lean/Makefile Makefile
+# popd
+# mkdir files
+# mkdir files/lib
+# mkdir files/lib/firmware
+# mkdir files/lib/firmware/mediatek
+# mkdir files/lib/firmware/mediatek/mt7996
+# pushd files/lib/firmware/mediatek/mt7996
+# cp -f $GITHUB_WORKSPACE/patches/mt7966/*.bin
+# popd
