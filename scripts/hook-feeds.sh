@@ -26,7 +26,10 @@ rm -rf nas-packages/multimedia
 rm -rf nas-packages/network/services/{linkease,quickstart,unishare,webdav2}
 # rm -rf net/{xray-core,v2ray-core,v2ray-geodata,sing-box}
 export packages_feed="$(pwd)"
+rm -rf lang/rust
+merge_package https://github.com/openwrt/packages lang/rust
 popd
+
 pushd customfeeds/luci
 git clone --depth=1 https://github.com/jerrykuku/lua-maxminddb.git
 git clone --depth=1 https://github.com/MilesPoupart/luci-app-vssr
