@@ -25,6 +25,9 @@ function merge_package(){
 # # # Add apk (Apk Packages Manager)
 # # merge_package https://github.com/openwrt/packages packages/utils/apk
 
+rm -rf ../../customfeeds/packages/lang/rust
+merge_package https://github.com/openwrt/packages packages/lang/rust
+
 # # Add OpenClash
 git clone --depth=1 https://github.com/vernesong/OpenClash
 
