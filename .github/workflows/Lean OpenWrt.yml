@@ -17,8 +17,8 @@ on:
     types: started
 
 env:
-  REPO_URL: https://github.com/DHDAXCW/lede-rockchip
-  REPO_BRANCH: filogic
+  REPO_URL: https://github.com/coolsnowwolf/lede
+  REPO_BRANCH: master
   CONFIG_FILE: configs/lean/R4.config
   DIY_SH: scripts/lean.sh
   IPV6MOD_IN_FIRMWARE: true
