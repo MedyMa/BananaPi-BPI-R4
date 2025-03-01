@@ -28,8 +28,8 @@ rm -rf nas-packages/network/services/{linkease,quickstart,unishare,webdav2}
 export packages_feed="$(pwd)"
 popd
 
-# rm -rf customfeeds/packages/lang/rust
-# merge_package https://github.com/openwrt/packages packages/lang/rust
+rm -rf customfeeds/packages/lang/rust
+merge_package https://github.com/openwrt/packages packages/lang/rust
 
 pushd customfeeds/luci
 git clone --depth=1 https://github.com/jerrykuku/lua-maxminddb.git
@@ -43,7 +43,7 @@ git clone --depth=1 https://github.com/sbwml/luci-app-alist
 git clone --depth=1 https://github.com/MedyMa/luci-app-adguardhome
 rm -rf nas-packages-luci/luci/{luci-app-istorex,luci-app-linkease,luci-app-quickstart,luci-app-unishare,luci-lib-iform}
 merge_package https://github.com/kenzok8/jell jell/luci-app-fan
-merge_package https://github.com/DHDAXCW/lede-rockchip lede-rockchip/package/wwan
+# merge_package https://github.com/DHDAXCW/lede-rockchip lede-rockchip/package/wwan
 export luci_feed="$(pwd)"
 popd
 sed -i '/src-git packages/d' feeds.conf.default
