@@ -40,9 +40,11 @@ git clone --depth=1 https://github.com/fw876/helloworld
 rm -rf helloworld/gn
 git clone --depth=1 https://github.com/linkease/nas-packages-luci
 git clone --depth=1 https://github.com/sbwml/luci-app-alist
-git clone --depth=1 https://github.com/MedyMa/luci-app-adguardhome
+# git clone --depth=1 https://github.com/MedyMa/luci-app-adguardhome
 rm -rf nas-packages-luci/luci/{luci-app-istorex,luci-app-linkease,luci-app-quickstart,luci-app-unishare,luci-lib-iform}
 merge_package https://github.com/kenzok8/jell jell/luci-app-fan
+merge_package https://github.com/kenzok8/jell jell/adguardhome
+merge_package https://github.com/kenzok8/jell jell/luci-app-adguardhome
 # merge_package https://github.com/DHDAXCW/lede-rockchip lede-rockchip/package/wwan
 export luci_feed="$(pwd)"
 popd
