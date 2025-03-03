@@ -44,7 +44,7 @@ popd
 sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generate
 
 # # Test
-# sed -i 's/kmod-mt7996-firmware/kmod-mt7996-233-firmware/g' target/linux/mediatek/image/filogic.mk
+sed -i 's/R24.12.12-D/R25.03.01-D/g' package/lean/default-settings/files/zzz-default-settings
 
 
 # Test kernel 5.10
