@@ -28,8 +28,8 @@ rm -rf nas-packages/network/services/{linkease,quickstart,unishare,webdav2}
 export packages_feed="$(pwd)"
 popd
 
-rm -rf customfeeds/packages/lang/rust
-merge_package https://github.com/openwrt/packages packages/lang/rust
+# rm -rf customfeeds/packages/lang/rust
+# merge_package https://github.com/openwrt/packages packages/lang/rust
 
 pushd customfeeds/luci
 git clone --depth=1 https://github.com/jerrykuku/lua-maxminddb.git
