@@ -17,8 +17,8 @@ on:
     types: started
 
 env:
-  REPO_URL: https://github.com/DHDAXCW/lede-rockchip
-  REPO_BRANCH: filogic
+  REPO_URL: https://github.com/openwrt/openwrt
+  REPO_BRANCH: main
   CONFIG_FILE: configs/lean/R4.config
   DIY_SH: scripts/lean.sh
   IPV6MOD_IN_FIRMWARE: true
@@ -87,8 +87,8 @@ jobs:
         echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
         echo "OPENWRTROOT=$(echo $PWD)"	>> $GITHUB_OUTPUT	
         mkdir customfeeds
-        git clone --depth=1 https://github.com/coolsnowwolf/packages customfeeds/packages
-        git clone --depth=1 https://github.com/coolsnowwolf/luci customfeeds/luci
+        git clone --depth=1 https://github.com/openwrt/packages customfeeds/packages
+        git clone --depth=1 https://github.com/openwrt/luci customfeeds/luci
         chmod +x ../scripts/*.sh
         ../scripts/hook-feeds.sh
 
