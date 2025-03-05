@@ -47,7 +47,7 @@ merge_package https://github.com/shidahuilang/openwrt-package openwrt-package/lu
 merge_package https://github.com/kenzok8/jell jell/luci-app-fan
 merge_package https://github.com/kenzok8/jell jell/adguardhome
 merge_package https://github.com/kenzok8/jell jell/luci-app-adguardhome
-# merge_package https://github.com/DHDAXCW/lede-rockchip lede-rockchip/package/wwan
+merge_package https://github.com/DHDAXCW/lede-rockchip lede-rockchip/package/wwan
 export luci_feed="$(pwd)"
 popd
 sed -i '/src-git packages/d' feeds.conf.default
