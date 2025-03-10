@@ -5,6 +5,10 @@
 git clone -b Immortalwrt https://github.com/shidahuilang/openwrt-package ./package/openwrt-packages
 rm -rf ./package/openwrt-packages/relevance/alist 
 rm -rf ./package/openwrt-packages/relevance/shadowsocks-libev
+rm -rf ./package/openwrt-packages/relevance/internet-detector-mod-email
+rm -rf ./package/openwrt-packages/luci-app-clouddrive2
+rm -rf ./package/openwrt-packages/luci-app-floatip
+rm -rf ./package/openwrt-packages/luci-app-nginx-pingos
 # Clone community packages to package/community
 mkdir package/community
 pushd package/community
