@@ -2,11 +2,7 @@
 #
 # Add a feed source
 #echo 'src-git moruiris https://github.com/moruiris/openwrt-packages;immortalwrt' >>feeds.conf.default
-
-rm -rf packege/base-files
-push package
-merge_package "-b openwrt-24.10 https://github.com/openwrt/openwrt" openwrt/package/base-files
-popd
+#  Luci packages
 git clone -b Immortalwrt https://github.com/shidahuilang/openwrt-package ./package/openwrt-packages
 rm -rf ./package/openwrt-packages/relevance/alist 
 rm -rf ./package/openwrt-packages/relevance/shadowsocks-libev
@@ -26,6 +22,10 @@ function merge_package(){
     mv $2 package/openwrt-packages/
     rm -rf $repo
 }
+rm -rf packege/base-files
+push package
+merge_package "-b openwrt-24.10 https://github.com/openwrt/openwrt" openwrt/package/base-files
+popd
 
 # Clone community packages to package/community
 mkdir package/community
