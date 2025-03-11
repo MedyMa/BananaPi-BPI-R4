@@ -4,7 +4,9 @@
 #echo 'src-git moruiris https://github.com/moruiris/openwrt-packages;immortalwrt' >>feeds.conf.default
 
 rm -rf packege/base-files
-merge_package "-b openwrt-24.10 https://github.com/openwrt/openwrt/package/base-files" package/base-files
+push package
+merge_package "-b openwrt-24.10 https://github.com/openwrt/openwrt" openwrt/package/base-files
+popd
 git clone -b Immortalwrt https://github.com/shidahuilang/openwrt-package ./package/openwrt-packages
 rm -rf ./package/openwrt-packages/relevance/alist 
 rm -rf ./package/openwrt-packages/relevance/shadowsocks-libev
