@@ -13,6 +13,7 @@ function merge_package(){
     rm -rf $repo
 }
 
+merge_package "-b openwrt-24.10 https://github.com/openwrt/openwrt/package/base-files" 
 git clone -b Immortalwrt https://github.com/shidahuilang/openwrt-package ./package/openwrt-packages
 rm -rf ./package/openwrt-packages/relevance/alist 
 rm -rf ./package/openwrt-packages/relevance/shadowsocks-libev
