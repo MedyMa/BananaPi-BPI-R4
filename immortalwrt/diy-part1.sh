@@ -23,7 +23,7 @@ function merge_package(){
     rm -rf $repo
 }
 rm -rf packege/base-files
-push package
+pushd package
 merge_package "-b openwrt-24.10 https://github.com/openwrt/openwrt" openwrt/package/base-files
 popd
 
