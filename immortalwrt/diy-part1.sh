@@ -39,7 +39,6 @@ git clone --depth=1 https://github.com/fw876/helloworld
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
 merge_package https://github.com/kenzok8/jell jell/luci-app-fan
-merge_package https://github.com/kenzok8/jell jell/luci-app-fan
 merge_package https://github.com/kenzok8/jell jell/adguardhome
 merge_package https://github.com/kenzok8/jell jell/luci-app-adguardhome
 merge_package https://github.com/kenzok8/jell jell/luci-app-netdata
