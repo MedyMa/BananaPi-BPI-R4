@@ -44,4 +44,5 @@ merge_package https://github.com/kenzok8/jell jell/luci-app-adguardhome
 merge_package https://github.com/kenzok8/jell jell/luci-app-netdata
 merge_package https://github.com/kenzok8/jell jell/luci-app-serverchan
 merge_package https://github.com/DHDAXCW/lede-rockchip lede-rockchip/package/wwan
+merge_package "-b openwrt-24.10 https://github.com/immortalwrt/packages" packages/admin/netdata
 popd
