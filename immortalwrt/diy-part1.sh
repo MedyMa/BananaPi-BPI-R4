@@ -13,7 +13,6 @@ rm -rf ./package/openwrt-packages/luci-app-nginx-pingos
 rm -rf ./package/openwrt-packages/luci-app-syncthing
 rm -rf ./package/openwrt-packages/luci-app-adguardhome
 rm -rf ./package/openwrt-packages/relevance/adguardhome
-rm -rf ./package/openwrt-packages/luci-app-netdata
 
 # Merge_package
 function merge_package(){
@@ -40,9 +39,7 @@ git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
 merge_package https://github.com/kenzok8/jell jell/luci-app-fan
 merge_package https://github.com/kenzok8/jell jell/adguardhome
 merge_package https://github.com/kenzok8/jell jell/luci-app-adguardhome
-merge_package https://github.com/kenzok8/jell jell/luci-app-netdata
 merge_package https://github.com/kenzok8/jell jell/luci-app-serverchan
 merge_package https://github.com/DHDAXCW/lede-rockchip lede-rockchip/package/wwan
 merge_package "-b openwrt-24.10 https://github.com/openwrt/openwrt" openwrt/package/base-files
-git clone -b 23.05 https://github.com/muink/openwrt-netdata-ssl
 popd
