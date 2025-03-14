@@ -42,4 +42,11 @@ merge_package https://github.com/kenzok8/jell jell/luci-app-adguardhome
 merge_package https://github.com/kenzok8/jell jell/luci-app-serverchan
 merge_package https://github.com/DHDAXCW/lede-rockchip lede-rockchip/package/wwan
 merge_package "-b openwrt-24.10 https://github.com/openwrt/openwrt" openwrt/package/base-files
+
+# add luci-app-mosdns
+rm -rf feeds/packages/lang/golang
+git clone https://github.com/sbwml/packages_lang_golang -b 23.x feeds/packages/lang/golang
+rm -rf feeds/packages/net/v2ray-geodata
+git clone https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
+git clone https://github.com/sbwml/v2ray-geodata package/v2ray-geodata
 popd
