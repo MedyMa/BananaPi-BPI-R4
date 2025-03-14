@@ -24,10 +24,6 @@ function merge_package(){
     mv $2 package/openwrt-packages/
     rm -rf $repo
 }
-rm -rf packege/base-files
-pushd package
-merge_package "-b openwrt-24.10 https://github.com/openwrt/openwrt" openwrt/package/base-files
-popd
 
 # Clone community packages to package/community
 mkdir package/community
