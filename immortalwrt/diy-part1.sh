@@ -32,6 +32,8 @@ git clone --depth=1 https://github.com/fw876/helloworld
 # Add luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
+# Add OpenClash
+git clone --depth=1 https://github.com/vernesong/OpenClash
 merge_package https://github.com/kenzok8/jell jell/luci-app-fan
 merge_package https://github.com/kenzok8/jell jell/adguardhome
 merge_package https://github.com/kenzok8/jell jell/luci-app-adguardhome
