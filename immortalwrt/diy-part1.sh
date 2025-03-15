@@ -13,7 +13,8 @@ rm -rf ./package/openwrt-packages/luci-app-nginx-pingos
 rm -rf ./package/openwrt-packages/luci-app-syncthing
 rm -rf ./package/openwrt-packages/luci-app-adguardhome
 rm -rf ./package/openwrt-packages/relevance/adguardhome
-
+rm -rf ./package/openwrt-packages/luci-app-netdata
+rm -rf ./package/openwrt-packages/relevance/netdata
 # Merge_package
 function merge_package(){
     repo=`echo $1 | rev | cut -d'/' -f 1 | rev`
