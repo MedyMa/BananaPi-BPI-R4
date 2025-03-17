@@ -1,20 +1,5 @@
 #!/bin/bash
-#
-# Add a feed source
-#echo 'src-git moruiris https://github.com/moruiris/openwrt-packages;immortalwrt' >>feeds.conf.default
-#  Luci packages
-git clone -b Immortalwrt https://github.com/shidahuilang/openwrt-package ./package/openwrt-packages
-rm -rf ./package/openwrt-packages/relevance/alist 
-rm -rf ./package/openwrt-packages/relevance/shadowsocks-libev
-rm -rf ./package/openwrt-packages/relevance/internet-detector-mod-email
-rm -rf ./package/openwrt-packages/luci-app-clouddrive2
-rm -rf ./package/openwrt-packages/luci-app-floatip
-rm -rf ./package/openwrt-packages/luci-app-nginx-pingos
-rm -rf ./package/openwrt-packages/luci-app-syncthing
-rm -rf ./package/openwrt-packages/luci-app-adguardhome
-rm -rf ./package/openwrt-packages/relevance/adguardhome
-rm -rf ./package/openwrt-packages/luci-app-netdata
-rm -rf ./package/openwrt-packages/relevance/netdata
+
 # Merge_package
 function merge_package(){
     repo=`echo $1 | rev | cut -d'/' -f 1 | rev`
@@ -26,21 +11,20 @@ function merge_package(){
     rm -rf $repo
 }
 
+rm -rf feeds/luci/themes/luci-theme-argon
+rm -rf feeds/luci/applications/luci-app-argon-config
+
 # Clone community packages to package/community
 mkdir package/community
 pushd package/community
 git clone --depth=1 https://github.com/fw876/helloworld
-# Add luci-theme-argon
+git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall2
+git clone --depth=1 https://github.com/nikkinikki-org/OpenWrt-nikki
+git clobe --depth=1 https://github.com/DHDAXCW/dhdaxcw-app
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
-# Add OpenClash
-git clone --depth=1 https://github.com/vernesong/OpenClash
 merge_package https://github.com/kenzok8/jell jell/luci-app-fan
-merge_package https://github.com/kenzok8/jell jell/adguardhome
-merge_package https://github.com/kenzok8/jell jell/luci-app-adguardhome
-merge_package https://github.com/kenzok8/jell jell/luci-app-serverchan
-merge_package https://github.com/DHDAXCW/lede-rockchip lede-rockchip/package/wwan
-merge_package "-b openwrt-24.10 https://github.com/openwrt/openwrt" openwrt/package/base-files
+
 popd
 
 # add luci-app-mosdns
@@ -49,3 +33,5 @@ git clone https://github.com/sbwml/packages_lang_golang -b 23.x feeds/packages/l
 rm -rf feeds/packages/net/v2ray-geodata
 git clone https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
 git clone https://github.com/sbwml/v2ray-geodata package/v2ray-geodata
+
+merge_package https://github.com/DHDAXCW/lede-rockchip lede-rockchip/package/wwan
