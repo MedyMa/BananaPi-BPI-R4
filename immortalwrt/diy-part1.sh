@@ -13,7 +13,7 @@ function merge_package(){
 
 rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/luci/applications/luci-app-argon-config
-
+rm -rf feeds/packages/net/mosdns
 # Clone community packages to package/community
 mkdir package/community
 pushd package/community
@@ -28,3 +28,10 @@ git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
 merge_package https://github.com/kenzok8/jell jell/luci-app-fan
 merge_package https://github.com/DHDAXCW/lede-rockchip lede-rockchip/package/wwan
 popd
+
+# add luci-app-mosdns
+rm -rf feeds/packages/lang/golang
+git clone https://github.com/sbwml/packages_lang_golang -b 23.x feeds/packages/lang/golang
+rm -rf feeds/packages/net/v2ray-geodata
+git clone https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
+git clone https://github.com/sbwml/v2ray-geodata package/v2ray-geodata
