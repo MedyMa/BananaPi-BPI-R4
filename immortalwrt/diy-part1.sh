@@ -24,7 +24,6 @@ git clobe --depth=1 https://github.com/DHDAXCW/dhdaxcw-app
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
 merge_package https://github.com/kenzok8/jell jell/luci-app-fan
-
 popd
 
 # add luci-app-mosdns
