@@ -27,6 +27,9 @@ git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
 merge_package https://github.com/kenzok8/jell jell/luci-app-fan
 merge_package https://github.com/DHDAXCW/lede-rockchip lede-rockchip/package/wwan
+merge_package https://github.com/kenzok8/jell jell/luci-app-serverchan
+merge_package https://github.com/kenzok8/jell jell/ddnsto
+merge_package https://github.com/kenzok8/jell jell/luci-app-ddnsto
 popd
 
 # add luci-app-mosdns
