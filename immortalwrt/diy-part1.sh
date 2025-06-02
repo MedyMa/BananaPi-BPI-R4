@@ -42,6 +42,6 @@ git clone https://github.com/sbwml/v2ray-geodata package/v2ray-geodata
 # add luci-app-OpenClash
 mkdir package/OpenClash
 pushd package/OpenClash
-git remote add -f origin https://github.com/vernesong/OpenClash.git
+git clone --depth=1  https://github.com/vernesong/OpenClash
 git config core.sparsecheckout true
 popd
