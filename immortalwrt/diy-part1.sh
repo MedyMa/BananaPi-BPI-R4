@@ -45,3 +45,9 @@ pushd package/OpenClash
 git clone --depth=1  https://github.com/vernesong/OpenClash
 git config core.sparsecheckout true
 popd
+
+# wireless-regdb modification
+rm -rf feeds/package/firmware/wireless-regdb/patches/*.*
+rm -rf feeds/package/firmware/wireless-regdb/Makefile
+\cp -r patches/filogic/500-tx_power.patch feeds/package/firmware/wireless-regdb/patches
+\cp -r patches/filogic/regdb.Makefile feeds/package/firmware/wireless-regdb/Makefile
