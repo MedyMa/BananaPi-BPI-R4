@@ -54,6 +54,9 @@ jobs:
     - name: Download firmware source code
       run: |
         git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
+        cd openwrt
+        rm -rf eeds.conf.default
+        cp -f $GITHUB_WORKSPACE/patches/filogic/feeds.conf.default 
 
     - name: Update & install feeds
       working-directory: ./openwrt
