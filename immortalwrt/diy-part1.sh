@@ -53,5 +53,6 @@ cp -f $GITHUB_WORKSPACE/patches/filogic/500-tx_power.patch package/firmware/wire
 cp -f $GITHUB_WORKSPACE/patches/filogic/regdb.Makefile package/firmware/wireless-regdb/Makefile
 
 # Mtk Packages
+pushd package
 merge_package "-b mt7988-2410-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/package/mtk
-
+popd
