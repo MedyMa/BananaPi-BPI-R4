@@ -479,6 +479,7 @@ CONFIG_PACKAGE_luci-proto-vxlan=y
 CONFIG_PACKAGE_luci-proto-wireguard=y
 CONFIG_PACKAGE_luci-proto-xfrm=y
 CONFIG_PACKAGE_luci-theme-argon=y
+CONFIG_PACKAGE_datconf=y
 CONFIG_PACKAGE_mii_mgr=y
 CONFIG_PACKAGE_mtkhqos_util=y
 CONFIG_PACKAGE_mtk-smp=y
