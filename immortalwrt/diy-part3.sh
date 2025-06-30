@@ -51,5 +51,3 @@ rm -rf package/firmware/wireless-regdb/patches/*.*
 rm -rf package/firmware/wireless-regdb/Makefile
 cp -f $GITHUB_WORKSPACE/patches/filogic/500-tx_power.patch package/firmware/wireless-regdb/patches
 cp -f $GITHUB_WORKSPACE/patches/filogic/regdb.Makefile package/firmware/wireless-regdb/Makefile
-rm -rf package/kernel/r8152
-merge_package "-b openwrt-24.10 https://github.com/immortalwrt/immortalwrt" immortalwrt/package/kernel/r8152
