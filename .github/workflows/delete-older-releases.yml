@@ -6,7 +6,7 @@ on:
     
 jobs:
   del_runs:
-    runs-on: ubuntu-22.10
+    runs-on: ubuntu-22.04
     steps:
     
     - name: Delete workflow runs
