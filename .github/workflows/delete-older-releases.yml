@@ -8,24 +8,18 @@ jobs:
   del_runs:
     runs-on: ubuntu-22.04
     steps:
-    
-    - name: Delete workflow runs
-      uses: Mattraks/delete-workflow-runs@v2
-      with:
-        retain_days: 2
-        keep_minimum_runs: 1
 
-    - name: Remove old Releases
+    - name: 删除工作流
+      uses: GitRML/delete-workflow-runs@main
+      with:
+        retain_days: 7
+        keep_minimum_runs: 0
+    
+    - name: 删除旧的Releases
       uses: dev-drprasad/delete-older-releases@v0.3.3
-      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+
       with:
         keep_latest: 30
         delete_tags: true
       env:
         GITHUB_TOKEN: ${{ secrets.RELEASES_TOKEN }}
-
-    - name: Delete Artifacts
-      uses: geekyeggo/delete-artifact@v5
-      with:
-        name: |
-          bin-archive
