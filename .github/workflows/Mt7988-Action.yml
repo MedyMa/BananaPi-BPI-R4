@@ -10,7 +10,7 @@ env:
   REPO_BRANCH: openwrt-24.10-6.6
   CONFIG_FILE: immortalwrt/mediatek/defconfig
   DIY_P1_SH: immortalwrt/diy-part3.sh
-  DIY_P2_SH: immortalwrt/diy-part2.sh
+  DIY_P2_SH: immortalwrt/diy-part4.sh
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
