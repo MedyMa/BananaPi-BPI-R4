@@ -13,10 +13,9 @@ function merge_package(){
 
 rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/luci/applications/luci-app-argon-config
-rm -rf package/emortal/autocore
-mkdir package/emortal/autocore
+rm -rf package/emortal/autocore/files/*
 pushd package/emortal/autocore
-merge_package "-b openwrt-24.10 https://github.com/immortalwrt/immortalwrt" immortalwrt/package/emortal/autocore
+merge_package "-b openwrt-24.10 https://github.com/immortalwrt/immortalwrt" immortalwrt/package/emortal/autocore/files
 popd
 
 # Clone community packages to package/community
