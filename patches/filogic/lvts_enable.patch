@@ -1,0 +1,10 @@
+--- a/target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a.dtsi
++++ b/target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a.dtsi
+@@ -869,7 +869,6 @@
+ 			nvmem-cells = <&lvts_calibration>;
+ 			nvmem-cell-names = "lvts-calib-data-1";
+ 			#thermal-sensor-cells = <1>;
+-			status = "disabled";
+ 		};
+ 
+ 		ssusb0: usb@11190000 {
