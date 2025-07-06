@@ -52,3 +52,5 @@ cp -f $GITHUB_WORKSPACE/patches/filogic/500-tx_power.patch package/firmware/wire
 cp -f $GITHUB_WORKSPACE/patches/filogic/regdb.Makefile package/firmware/wireless-regdb/Makefile
 merge_package https://github.com/DHDAXCW/lede-rockchip lede-rockchip/package/wwan
 # merge_package "-b mt7988-2410-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/package/mtk
+merge_package "-b mt7988-2410-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek
+
