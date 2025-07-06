@@ -26,7 +26,6 @@ git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
 merge_package https://github.com/kenzok8/jell jell/luci-app-fan
 merge_package https://github.com/kenzok8/jell jell/luci-app-serverchan
-merge_package https://github.com/DHDAXCW/lede-rockchip lede-rockchip/package/wwan
 merge_package "-b Immortalwrt https://github.com/shidahuilang/openwrt-package" openwrt-package/relevance/ddnsto
 merge_package "-b Immortalwrt https://github.com/shidahuilang/openwrt-package" openwrt-package/luci-app-ddnsto
 popd
@@ -51,3 +50,4 @@ rm -rf package/firmware/wireless-regdb/patches/*.*
 rm -rf package/firmware/wireless-regdb/Makefile
 cp -f $GITHUB_WORKSPACE/patches/filogic/500-tx_power.patch package/firmware/wireless-regdb/patches
 cp -f $GITHUB_WORKSPACE/patches/filogic/regdb.Makefile package/firmware/wireless-regdb/Makefile
+merge_package https://github.com/DHDAXCW/lede-rockchip lede-rockchip/package/wwan
