@@ -8,7 +8,7 @@ on:
 env:
   REPO_URL: https://github.com/padavanonly/immortalwrt-mt798x-6.6
   REPO_BRANCH: mt7988-6.6-mtwifi
-  CONFIG_FILE: immortalwrt/mediatek/defconfig
+  CONFIG_FILE: immortalwrt/mtk/defconfig
   DIY_P1_SH: immortalwrt/diy-part3.sh
   DIY_P2_SH: immortalwrt/diy-part4.sh
   UPLOAD_FIRMWARE: true
@@ -101,7 +101,7 @@ jobs:
       if: ${{ env.UPLOAD_FIRMWARE == 'true' && !cancelled() }}
       run: |
         cd openwrt/bin/targets/mediatek/filogic
-        rm -rf packages *mt798* *.config *.buildinfo *.json sha256sums 
+        # rm -rf packages *mt798* *.config *.buildinfo *.json sha256sums 
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
         
