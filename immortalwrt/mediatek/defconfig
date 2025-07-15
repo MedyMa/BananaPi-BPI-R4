@@ -112,6 +112,7 @@ CONFIG_PACKAGE_docker=y
 CONFIG_PACKAGE_docker-compose=y
 CONFIG_PACKAGE_dockerd=y
 CONFIG_PACKAGE_etherwake=y
+CONFIG_PACKAGE_ethtool-full=y
 CONFIG_PACKAGE_fdk-aac=y
 CONFIG_PACKAGE_frpc=y
 CONFIG_PACKAGE_fuse-utils=y
