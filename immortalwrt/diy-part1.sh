@@ -46,7 +46,7 @@ git config core.sparsecheckout true
 popd
 
 # wireless-regdb modification
-# rm -rf package/firmware/wireless-regdb/patches/*.*
+rm -rf package/firmware/wireless-regdb/patches/*.*
 # rm -rf package/firmware/wireless-regdb/Makefile
 cp -f $GITHUB_WORKSPACE/patches/filogic/500-tx_power.patch package/firmware/wireless-regdb/patches/500-tx_power.patch
 # cp -f $GITHUB_WORKSPACE/patches/filogic/regdb.Makefile package/firmware/wireless-regdb/Makefile
