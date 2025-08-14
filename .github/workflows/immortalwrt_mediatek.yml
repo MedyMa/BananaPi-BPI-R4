@@ -34,6 +34,9 @@ jobs:
         
     - name: Check out the project branch
       uses: actions/checkout@main
+      with:
+          fetch-depth: 0
+      
 
     - name: Initialize the compilation environment
       env:
@@ -58,6 +61,12 @@ jobs:
     - name: Download firmware source code
       run: |
         git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
+        
+    - name: Cache
+      uses: klever1988/cachewrtbuild@test
+      with:
+        ccache: 'true'
+        prefix: ${{ github.workspace }}/openwr
 
     - name: Update & install feeds
       working-directory: ./openwrt
