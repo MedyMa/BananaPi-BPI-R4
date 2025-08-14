@@ -34,9 +34,6 @@ jobs:
         
     - name: Check out the project branch
       uses: actions/checkout@main
-      with:
-          fetch-depth: 0
-      
 
     - name: Initialize the compilation environment
       env:
