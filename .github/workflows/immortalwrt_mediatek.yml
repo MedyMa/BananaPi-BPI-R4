@@ -7,7 +7,7 @@ on:
 
 env:
   REPO_URL: https://github.com/immortalwrt/immortalwrt
-  REPO_BRANCH: openwrt-latest
+  REPO_BRANCH: openwrt-24.10
   CONFIG_FILE: immortalwrt/mediatek/defconfig
   DIY_P1_SH: immortalwrt/diy-part1.sh
   DIY_P2_SH: immortalwrt/diy-part2.sh
@@ -19,7 +19,7 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
 
     steps:
     - name: Maximize build space
