@@ -64,3 +64,4 @@ merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-m
 merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/package/mtk/applications/mtkhqos_util
 rm -rf target/linux/mediatek/patches-6.6
 merge_package "-b mt7988-6.6-mt76 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/target/linux/mediatek/patches-6.6
+./scripts/feeds update -a
