@@ -53,8 +53,11 @@ popd
 merge_package https://github.com/DHDAXCW/lede-rockchip lede-rockchip/package/wwan
 rm -rf target/linux/mediatek/files-6.6/drivers/net
 merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/target/linux/mediatek/files-6.6/drivers/net
-merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/package/mtk
-rm -rf package/mtk/applications/5g-modem
+merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/package/mtk/applications/luci-app-Airpifanctrl
+merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/package/mtk/applications/luci-app-eqos-mtk
+merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/package/mtk/applications/luci-app-turboacc-mtk
+merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/package/mtk/applications/Airpi-gpio-fan
+merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/package/mtk/applications/mtkhqos_util
 cp -f $GITHUB_WORKSPACE/patches/filogic/9996-get-rid-of-stupid-mtd-NAND-warnings.patch target/linux/mediatek/patches-6.6/9996-get-rid-of-stupid-mtd-NAND-warnings.patch
 cp -f $GITHUB_WORKSPACE/patches/filogic/9997-hnat.patch target/linux/mediatek/patches-6.6/9997-hnat.patch
 cp -f $GITHUB_WORKSPACE/patches/filogic/9998-dsa-hnat.patch target/linux/mediatek/patches-6.6/9998-dsa-hnat.patch
