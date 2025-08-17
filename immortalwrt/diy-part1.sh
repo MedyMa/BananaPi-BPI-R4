@@ -52,6 +52,10 @@ popd
 # cp -f $GITHUB_WORKSPACE/patches/filogic/regdb.Makefile package/firmware/wireless-regdb/Makefile
 merge_package https://github.com/DHDAXCW/lede-rockchip lede-rockchip/package/wwan
 rm -rf target/linux/mediatek/files-6.6/drivers/net
+rm -rf package/kernel/linux/modules/netdevices.mk
+pushd package/kernel/linux/modules
+merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/package/kernel/linux/modules/netdevices.mk
+popd
 merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/target/linux/mediatek/files-6.6/drivers/net
 merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/package/mtk/applications/luci-app-Airpifanctrl
 merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/package/mtk/applications/luci-app-eqos-mtk
