@@ -51,7 +51,7 @@ popd
 # cp -f $GITHUB_WORKSPACE/patches/filogic/500-tx_power.patch package/firmware/wireless-regdb/patches/500-tx_power.patch
 # cp -f $GITHUB_WORKSPACE/patches/filogic/regdb.Makefile package/firmware/wireless-regdb/Makefile
 merge_package https://github.com/DHDAXCW/lede-rockchip lede-rockchip/package/wwan
-rm- rf target/linux/mediatek/files-6.6/drivers/net
+rm -rf target/linux/mediatek/files-6.6/drivers/net
 merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/target/linux/mediatek/files-6.6/drivers/net
 merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/package/mtk
 rm -rf package/mtk/applications/5g-modem
