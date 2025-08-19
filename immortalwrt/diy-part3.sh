@@ -48,6 +48,4 @@ rm -rf package/firmware/wireless-regdb/patches/*.*
 rm -rf package/firmware/wireless-regdb/Makefile
 cp -f $GITHUB_WORKSPACE/patches/filogic/500-tx_power.patch package/firmware/wireless-regdb/patches
 cp -f $GITHUB_WORKSPACE/patches/filogic/regdb.Makefile package/firmware/wireless-regdb/Makefile
-rm -rf package/mtk/drivers/warp
-merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/package/mtk/drivers/warp
 # cp -f $GITHUB_WORKSPACE/patches/filogic/lvts_enable.patch target/linux/mediatek/patches-6.6/lvts_enable.patch
