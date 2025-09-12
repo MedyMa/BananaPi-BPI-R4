@@ -17,42 +17,39 @@ function merge_package(){
     rm -rf $repo
 }
 
-# Set to local feeds
-# rm -rf package/wwan/*
-pushd customfeeds/packages
-rm -rf net/adguardhome
-git clone --depth=1 https://github.com/linkease/nas-packages
-rm -rf nas-packages/multimedia
-rm -rf nas-packages/network/services/{linkease,quickstart,unishare,webdav2}
-# rm -rf net/{xray-core,v2ray-core,v2ray-geodata,sing-box}
-export packages_feed="$(pwd)"
-popd
+rm -rf feeds/luci/themes/luci-theme-argon
+rm -rf feeds/luci/applications/luci-app-argon-config
 
-# rm -rf customfeeds/packages/lang/rust
-# merge_package https://github.com/openwrt/packages packages/lang/rust
-
-pushd customfeeds/luci
-git clone --depth=1 https://github.com/jerrykuku/lua-maxminddb.git
-git clone --depth=1 https://github.com/MilesPoupart/luci-app-vssr
+# Clone community packages to package/community
+mkdir package/community
+pushd package/community
+git clone --depth=1 https://github.com/fw876/helloworld
 git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall
 git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall-packages
-git clone --depth=1 https://github.com/fw876/helloworld
-rm -rf helloworld/gn
-git clone --depth=1 https://github.com/linkease/nas-packages-luci
-merge_package https://github.com/shidahuilang/openwrt-package openwrt-package/luci-app-alist
-# git clone --depth=1 https://github.com/sbwml/luci-app-alist
-# git clone --depth=1 https://github.com/MedyMa/luci-app-adguardhome
-rm -rf nas-packages-luci/luci/{luci-app-istorex,luci-app-linkease,luci-app-quickstart,luci-app-unishare,luci-lib-iform}
+git clone --depth=1 https://github.com/nikkinikki-org/OpenWrt-nikki
+git clone --depth=1 https://github.com/DHDAXCW/dhdaxcw-app
+git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
+git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
 merge_package https://github.com/kenzok8/jell jell/luci-app-fan
-merge_package https://github.com/kenzok8/jell jell/adguardhome
-merge_package https://github.com/kenzok8/jell jell/luci-app-adguardhome
-merge_package https://github.com/DHDAXCW/lede-rockchip lede-rockchip/package/wwan
-export luci_feed="$(pwd)"
+merge_package https://github.com/kenzok8/jell jell/wrtbwmon
+merge_package "-b Immortalwrt https://github.com/shidahuilang/openwrt-package" openwrt-package/relevance/ddnsto
+merge_package "-b Immortalwrt https://github.com/shidahuilang/openwrt-package" openwrt-package/luci-app-ddnsto
 popd
-sed -i '/src-git packages/d' feeds.conf.default
-echo "src-link packages $packages_feed" >> feeds.conf.default
-sed -i '/src-git luci/d' feeds.conf.default
-echo "src-link luci $luci_feed" >> feeds.conf.default
+
+# add luci-app-mosdns
+rm -rf feeds/packages/lang/golang
+git clone https://github.com/sbwml/packages_lang_golang -b 24.x feeds/packages/lang/golang
+rm -rf feeds/packages/net/v2ray-geodata
+rm -rf feeds/packages/net/mosdns
+git clone https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
+git clone https://github.com/sbwml/v2ray-geodata package/v2ray-geodata
+
+# add luci-app-OpenClash
+mkdir package/OpenClash
+pushd package/OpenClash
+git clone --depth=1  https://github.com/vernesong/OpenClash
+git config core.sparsecheckout true
+popd
 
 # Update feeds
 ./scripts/feeds update -a
