@@ -26,8 +26,8 @@ function merge_package(){
 # # merge_package https://github.com/openwrt/packages packages/utils/apk
 
 # Add luci-theme-argon
-git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
-git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
+# git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
+# git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
 
 # Add subconverter
 # git clone --depth=1 https://github.com/tindy2013/openwrt-subconverter
