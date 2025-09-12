@@ -25,13 +25,9 @@ function merge_package(){
 # # # Add apk (Apk Packages Manager)
 # # merge_package https://github.com/openwrt/packages packages/utils/apk
 
-# # Add OpenClash
-git clone --depth=1 https://github.com/vernesong/OpenClash
-
 # Add luci-theme-argon
-git clone --depth=1 -b 18.06 https://github.com/jerrykuku/luci-theme-argon
+git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
-rm -rf ../../customfeeds/luci/themes/luci-theme-argon
 
 # Add subconverter
 # git clone --depth=1 https://github.com/tindy2013/openwrt-subconverter
