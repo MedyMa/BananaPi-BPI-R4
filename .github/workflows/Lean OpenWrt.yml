@@ -24,8 +24,9 @@ env:
   DIY_P2_SH:  scripts/lean.sh
   IPV6MOD_IN_FIRMWARE: true
   KMODS_IN_FIRMWARE: true
-  UPLOAD_WETRANSFER: true
   UPLOAD_RELEASE: true
+  OPENWRT_NAME: immortalwrt
+  OPENWRT_DEVICE: R2S
   TZ: Asia/Shanghai
 
 jobs:
@@ -82,7 +83,7 @@ jobs:
         [ -e "$CONFIG_FILE" ] && cat "$CONFIG_FILE" > openwrt/.config
         chmod +x $OPENWRT_NAME/*.sh && cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
-        ../scripts/preset-clash-core.sh
+        ../../scripts/preset-clash-core.sh
         make defconfig
         
     - name: Download Package
