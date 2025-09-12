@@ -20,7 +20,8 @@ env:
   REPO_URL: https://github.com/immortalwrt/immortalwrt
   REPO_BRANCH: openwrt-24.10
   CONFIG_FILE: configs/lean/R4.config
-  DIY_SH: scripts/lean.sh
+  DIY_P1_SH:  scripts/hook-feeds.sh
+  DIY_P2_SH:  scripts/lean.sh
   IPV6MOD_IN_FIRMWARE: true
   KMODS_IN_FIRMWARE: true
   UPLOAD_WETRANSFER: true
@@ -64,29 +65,23 @@ jobs:
       run: |
         git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
 
-    - name: Update Feeds
-      id: update
+    - name: Update & install feeds
+      working-directory: ./openwrt
       run: |
-        cd openwrt
-        echo "OPENWRTROOT=$PWD" >> $GITHUB_ENV
-        echo "OPENWRTROOT=$(echo $PWD)"	>> $GITHUB_OUTPUT	
-        mkdir customfeeds
-        chmod +x ../scripts/*.sh
-        ../scripts/hook-feeds.sh
         ./scripts/feeds update -a
-
-    - name: Install Feeds
-      run: |
-        cd $OPENWRTROOT
         ./scripts/feeds install -a
-
-    - name: Load Custom Configuration
+        
+    - name: Load feeds.conf.default
       run: |
-        [ -e files ] && mv files $OPENWRTROOT/files
-        [ -e $CONFIG_FILE ] && mv $CONFIG_FILE $OPENWRTROOT/.config
-        chmod +x scripts/*.sh
-        cd $OPENWRTROOT
-        ../$DIY_SH
+        chmod +x $OPENWRT_NAME/*.sh
+        cd openwrt
+        $GITHUB_WORKSPACE/$DIY_P1_SH
+
+    - name: Load config
+      run: |
+        [ -e "$CONFIG_FILE" ] && cat "$CONFIG_FILE" > openwrt/.config
+        chmod +x $OPENWRT_NAME/*.sh && cd openwrt
+        $GITHUB_WORKSPACE/$DIY_P2_SH
         ../scripts/preset-clash-core.sh
         make defconfig
         
