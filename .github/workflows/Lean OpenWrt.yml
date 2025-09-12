@@ -17,7 +17,7 @@ on:
     types: started
 
 env:
-  REPO_URL: https://github.com/DHDAXCW/immortalwrt
+  REPO_URL: https://github.com/immortalwrt/immortalwrt
   REPO_BRANCH: openwrt-24.10
   CONFIG_FILE: configs/lean/R4.config
   DIY_P1_SH:  immortalwrt/hook-feeds.sh
