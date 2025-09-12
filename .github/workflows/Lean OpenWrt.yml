@@ -18,7 +18,7 @@ on:
 
 env:
   REPO_URL: https://github.com/immortalwrt/immortalwrt
-  REPO_BRANCH: master
+  REPO_BRANCH: openwrt-24.10
   CONFIG_FILE: configs/lean/R4.config
   DIY_P1_SH:  immortalwrt/hook-feeds.sh
   DIY_P2_SH:  immortalwrt/diy-part2.sh
@@ -26,7 +26,7 @@ env:
   KMODS_IN_FIRMWARE: true
   UPLOAD_RELEASE: true
   OPENWRT_NAME: immortalwrt
-  OPENWRT_DEVICE: R2S
+  OPENWRT_DEVICE: rockchip
   TZ: Asia/Shanghai
 
 jobs:
@@ -112,7 +112,7 @@ jobs:
       id: organize
       if: ${{ env.UPLOAD_FIRMWARE == 'true' && !cancelled() }}
       run: |
-        cd openwrt/bin/targets/mediatek/filogic
+        cd openwrt/bin/targets/rockchip/armv8
         rm -rf packages *.config *.buildinfo *.json sha256sums 
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
