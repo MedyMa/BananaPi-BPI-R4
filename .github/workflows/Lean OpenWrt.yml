@@ -25,7 +25,6 @@ env:
   IPV6MOD_IN_FIRMWARE: true
   KMODS_IN_FIRMWARE: true
   UPLOAD_RELEASE: true
-  OPENWRT_NAME: scripts
   OPENWRT_DEVICE: R2S
   TZ: Asia/Shanghai
 
@@ -74,22 +73,20 @@ jobs:
         
     - name: Load feeds.conf.default
       run: |
-        chmod +x $OPENWRT_NAME/*.sh
+        chmod +x ../scripts/*.sh
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P1_SH
 
     - name: Load config
       run: |
         [ -e "$CONFIG_FILE" ] && cat "$CONFIG_FILE" > openwrt/.config
-        chmod +x $OPENWRT_NAME/*.sh && cd openwrt
+        chmod +x ../scripts/*.sh && cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
-        ../scripts/preset-clash-core.sh
-        make defconfig
         
     - name: Download Package
       id: package
       run: |
-        cd $OPENWRTROOT
+        cd openwrt
         ../scripts/modify_config.sh
         cat .config
         make download -j8
@@ -99,7 +96,7 @@ jobs:
     - name: Compile Packages
       id: compile
       run: |
-        cd $OPENWRTROOT
+        cd openwrt
         echo -e "$(nproc) thread compile"
         make tools/compile -j$(nproc) || make tools/compile -j1 V=s
         make toolchain/compile -j$(nproc) || make toolchain/compile -j1 V=s
@@ -107,11 +104,11 @@ jobs:
         make diffconfig
         make package/compile -j$(nproc) IGNORE_ERRORS=1 || make package/compile -j1 V=s IGNORE_ERRORS=1
         make package/index
-        cd $OPENWRTROOT/bin/packages/*
+        cd openwrt/bin/packages/*
         PLATFORM=$(basename `pwd`)
         echo "PLATFORM=$PLATFORM" >> $GITHUB_ENV
         echo "PLATFORM=$(echo $PLATFORM)" >> $GITHUB_OUTPUT
-        cd $OPENWRTROOT/bin/targets/*
+        cd openwrt/bin/targets/*
         TARGET=$(basename `pwd`)
         echo "TARGET=$TARGET" >> $GITHUB_ENV
         echo "TARGET=$(echo $TARGET)" >> $GITHUB_OUTPUT
