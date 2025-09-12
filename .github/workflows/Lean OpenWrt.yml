@@ -25,18 +25,15 @@ env:
   IPV6MOD_IN_FIRMWARE: true
   KMODS_IN_FIRMWARE: true
   UPLOAD_RELEASE: true
+  OPENWRT_NAME: immortalwrt
   OPENWRT_DEVICE: R2S
   TZ: Asia/Shanghai
 
 jobs:
-  Build:
+  build:
     runs-on: ubuntu-latest
 
-      
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      
     - name: Maximize build space
       uses: easimon/maximize-build-space@master
       with:
@@ -45,9 +42,11 @@ jobs:
         remove-dotnet: 'true'
         remove-android: 'true'
         remove-haskell: 'true'
-        remove-codeql: 'true'  
-    
-      
+        remove-codeql: 'true'
+        
+    - name: Check out the project branch
+      uses: actions/checkout@main
+
     - name: Initialize the compilation environment
       env:
         DEBIAN_FRONTEND: noninteractive
@@ -61,6 +60,13 @@ jobs:
         sudo -E apt-get -qq clean ) &
         sudo timedatectl set-timezone "$TZ"
         
+    - name: Initialize Environment and Display System Info
+      env:
+        DEBIAN_FRONTEND: noninteractive
+      run: |
+        chmod +x $OPENWRT_NAME/*.sh
+        $GITHUB_WORKSPACE/$OPENWRT_NAME/system-Information.sh
+        
     - name: Download firmware source code
       run: |
         git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
@@ -73,63 +79,52 @@ jobs:
         
     - name: Load feeds.conf.default
       run: |
-        chmod +x ../scripts/*.sh
+        chmod +x $OPENWRT_NAME/*.sh
         cd openwrt
         $GITHUB_WORKSPACE/$DIY_P1_SH
 
     - name: Load config
       run: |
         [ -e "$CONFIG_FILE" ] && cat "$CONFIG_FILE" > openwrt/.config
-        chmod +x ../scripts/*.sh && cd openwrt
+        chmod +x $OPENWRT_NAME/*.sh && cd openwrt
         $GITHUB_WORKSPACE/$DIY_P2_SH
-        
-    - name: Download Package
+
+    - name: Download the installation package
       id: package
       run: |
         cd openwrt
-        ../scripts/modify_config.sh
+        make defconfig
         cat .config
-        make download -j8
+        make download -j$(nproc)
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
-  
-    - name: Compile Packages
+             
+    - name: Compile the firmware
       id: compile
       run: |
         cd openwrt
         echo -e "$(nproc) thread compile"
-        make tools/compile -j$(nproc) || make tools/compile -j1 V=s
-        make toolchain/compile -j$(nproc) || make toolchain/compile -j1 V=s
-        make target/compile -j$(nproc) || make target/compile -j1 V=s IGNORE_ERRORS=1
-        make diffconfig
-        make package/compile -j$(nproc) IGNORE_ERRORS=1 || make package/compile -j1 V=s IGNORE_ERRORS=1
-        make package/index
-        cd openwrt/bin/packages/*
-        PLATFORM=$(basename `pwd`)
-        echo "PLATFORM=$PLATFORM" >> $GITHUB_ENV
-        echo "PLATFORM=$(echo $PLATFORM)" >> $GITHUB_OUTPUT
-        cd openwrt/bin/targets/*
-        TARGET=$(basename `pwd`)
-        echo "TARGET=$TARGET" >> $GITHUB_ENV
-        echo "TARGET=$(echo $TARGET)" >> $GITHUB_OUTPUT
-        cd *
-        SUBTARGET=$(basename `pwd`)
-        echo "SUBTARGET=$SUBTARGET" >> $GITHUB_ENV
-        echo "SUBTARGET=$(echo $SUBTARGET)" >> $GITHUB_OUTPUT
-        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
-        echo "SUBTARGET=$(echo $SUBTARGET)" >> $GITHUB_OUTPUT
-        echo "FIRMWARE=$(echo $PWD)" >> $GITHUB_OUTPUT
-        echo "COMPILE_STATUS=success" >> $GITHUB_OUTPUT
-        
-    - name: Generate Firmware
-      if: steps.compile.outputs.COMPILE_STATUS == 'success'
-      id: generate
+        make -j$(nproc) || make -j1 || make -j1 V=s
+        echo "date1=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
+        echo "date2=$(date "+%Y年%m月%d日")" >> $GITHUB_ENV
+        echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: Organize and Rename Files
+      id: organize
+      if: ${{ env.UPLOAD_FIRMWARE == 'true' && !cancelled() }}
       run: |
-        make package/install -j$(nproc) || make package/install -j1 V=s
-        make target/install -j$(nproc) || make target/install -j1 V=s
-        make checksum
-        echo "GENERATE_STATUS=success" >> $GITHUB_OUTPUT
-          
+        cd openwrt/bin/targets/mediatek/filogic
+        rm -rf packages *.config *.buildinfo *.json sha256sums 
+        echo "FIRMWARE=$PWD" >> $GITHUB_ENV
+        echo "status=success" >> $GITHUB_OUTPUT
+        
+    - name: Upload the firmware to github
+      uses: actions/upload-artifact@main
+      if: steps.organize.outputs.status == 'success' && !cancelled()
+      with:
+        name: ${{ env.date1 }}_${{ env.OPENWRT_NAME }}_${{ env.OPENWRT_DEVICE }}
+        path: ${{ env.FIRMWARE }}
+
     - name: Generate release tags
       id: tag
       if: env.UPLOAD_RELEASE == 'true' && !cancelled()
@@ -138,7 +133,7 @@ jobs:
         touch release.txt
         echo "📥 固件下载" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
-          
+        
     - name: Publish to release
       uses: softprops/action-gh-release@v1
       if: steps.tag.outputs.status == 'success' && !cancelled()
@@ -149,24 +144,3 @@ jobs:
         name: ${{ env.date3 }}
         tag_name: ${{ steps.tag.outputs.release_tag }}
         body_path: release.txt
-
-    - name: Delete workflow runs
-      uses: Mattraks/delete-workflow-runs@v2
-      with:
-        retain_days: 1
-        keep_minimum_runs: 1
-
-    - name: Remove old Releases
-      uses: dev-drprasad/delete-older-releases@v0.3.3
-      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
-      with:
-        keep_latest: 7
-        delete_tags: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.RELEASES_TOKEN }}
-
-    - name: Delete Artifacts
-      uses: geekyeggo/delete-artifact@v5
-      with:
-        name: |
-          bin-archive
