@@ -17,8 +17,8 @@ on:
     types: started
 
 env:
-  REPO_URL: https://github.com/coolsnowwolf/lede
-  REPO_BRANCH: master
+  REPO_URL: https://github.com/immortalwrt/immortalwrt
+  REPO_BRANCH: openwrt-24.10
   CONFIG_FILE: configs/lean/R4.config
   DIY_P1_SH:  immortalwrt/hook-feeds.sh
   DIY_P2_SH:  immortalwrt/diy-part2.sh
