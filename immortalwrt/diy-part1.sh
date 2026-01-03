@@ -21,10 +21,10 @@ git clone --depth=1 https://github.com/fw876/helloworld
 git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall
 git clone --depth=1 https://github.com/xiaorouji/openwrt-passwall-packages
 git clone --depth=1 https://github.com/nikkinikki-org/OpenWrt-nikki
-git clone --depth=1 https://github.com/MedyMa/luci-app-adguardhome
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
 # merge_package https://github.com/kenzok8/jell jell/luci-app-fan
+merge_package https://github.com/DHDAXCW/dhdaxcw-app luci-app-adguardhome
 merge_package https://github.com/kenzok8/jell jell/wrtbwmon
 merge_package "-b Immortalwrt https://github.com/shidahuilang/openwrt-package" openwrt-package/relevance/ddnsto
 merge_package "-b Immortalwrt https://github.com/shidahuilang/openwrt-package" openwrt-package/luci-app-ddnsto
