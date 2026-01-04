@@ -49,7 +49,11 @@ rm -rf package/firmware/wireless-regdb/Makefile
 cp -f $GITHUB_WORKSPACE/patches/filogic/500-tx_power.patch package/firmware/wireless-regdb/patches
 cp -f $GITHUB_WORKSPACE/patches/filogic/regdb.Makefile package/firmware/wireless-regdb/Makefile
 rm -rf package/network/config/wifi-scripts
+rm -rf package/firmware/wireless-regdb
 pushd  package/network/config
 merge_package "-b openwrt-24.10 https://github.com/immortalwrt/immortalwrt" immortalwrt/package/network/config/wifi-scripts
+popd
+pushd  package/firmware
+merge_package "-b openwrt-24.10 https://github.com/immortalwrt/immortalwrt" immortalwrt/package/firmware/wireless-regdb
 popd
 # cp -f $GITHUB_WORKSPACE/patches/filogic/lvts_enable.patch target/linux/mediatek/patches-6.6/lvts_enable.patch
