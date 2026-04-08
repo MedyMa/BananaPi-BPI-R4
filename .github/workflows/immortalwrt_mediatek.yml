@@ -138,3 +138,12 @@ jobs:
         name: ${{ env.date3 }}
         tag_name: ${{ steps.tag.outputs.release_tag }}
         body_path: release.txt
+    
+    - name: 删除旧的Releases
+      uses: MedyMa/delete-older-releases@v0.3.4
+
+      with:
+        keep_latest: 30
+        delete_tags: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.RELEASES_TOKEN }}
