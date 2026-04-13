@@ -18,8 +18,8 @@ rm -rf feeds/luci/applications/luci-app-argon-config
 mkdir package/community
 pushd package/community
 git clone --depth=1 https://github.com/fw876/helloworld
-git clone --depth=1 https://github.com/Openwrt-Passwall/openwrt-passwall
-git clone --depth=1 https://github.com/Openwrt-Passwall/openwrt-passwall-packages
+src-git passwall_packages https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git;main
+src-git passwall_luci https://github.com/Openwrt-Passwall/openwrt-passwall.git;main
 git clone --depth=1 https://github.com/nikkinikki-org/OpenWrt-nikki
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
