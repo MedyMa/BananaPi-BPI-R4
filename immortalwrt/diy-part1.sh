@@ -31,6 +31,8 @@ merge_package https://github.com/kenzok8/jell jell/wrtbwmon
 # merge_package "-b Immortalwrt https://github.com/shidahuilang/openwrt-package" openwrt-package/luci-app-ddnsto
 merge_package "-b ddnsto-beta https://github.com/linkease/nas-packages-luci" nas-packages-luci/luci/luci-app-ddnsto
 merge_package "-b ddnsto-beta https://github.com/linkease/nas-packages" nas-packages/network/services/ddnsto
+sed -i 's/^PKG_SOURCE_DATE:=.*/PKG_SOURCE_DATE:=4.0.7/' package/openwrt-packages/ddnsto/Makefile
+sed -i 's/^PKG_HASH:=.*/PKG_HASH:=425cdb809f06e805e481e772e168309df44c591205be7f72f347f61c4200b42b/' package/openwrt-packages/ddnsto/Makefile
 popd
 
 # add luci-app-mosdns
