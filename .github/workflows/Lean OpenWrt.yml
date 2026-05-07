@@ -1,38 +1,26 @@
-#=================================================
-# https://github.com/P3TERX/Actions-OpenWrt
-# Description: Build OpenWrt using GitHub Actions
-# Lisence: MIT
-# Author: P3TERX
-# Blog: https://p3terx.com
-#=================================================
-
-name: Lean OpenWrt
+name: immortalwrt_mediatek
 
 on:
-  repository_dispatch:
-  workflow_dispatch:
   schedule:
-    - cron: 0 17 * * *
-  watch:
-    types: started
+    - cron: 0 16 * * *
+  workflow_dispatch:
 
 env:
   REPO_URL: https://github.com/immortalwrt/immortalwrt
-  REPO_BRANCH: openwrt-24.10
-  CONFIG_FILE: configs/lean/defconfig
-  DIY_P1_SH:  immortalwrt/hook-feeds.sh
-  DIY_P2_SH:  immortalwrt/diy-part2.sh
+  REPO_BRANCH: master
+  CONFIG_FILE: immortalwrt/MTK/defconfig
+  DIY_P1_SH: immortalwrt/diy-part3.sh
+  DIY_P2_SH: immortalwrt/diy-part4.sh
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
-  OPENWRT_NAME: immortalwrt
-  OPENWRT_DEVICE: rockchip
   TZ: Asia/Shanghai
+  OPENWRT_NAME: immortalwrt
+  OPENWRT_DEVICE: mediatek
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
-    timeout-minutes: 330
-
+    runs-on: ubuntu-latest
+    
     steps:
     - name: Maximize build space
       uses: easimon/maximize-build-space@master
@@ -40,10 +28,13 @@ jobs:
         root-reserve-mb: 512
         swap-size-mb: 1024
         remove-dotnet: 'true'
+        remove-android: 'true'
+        remove-haskell: 'true'
+        remove-codeql: 'true'
         
     - name: Check out the project branch
-      uses: actions/checkout@main
-
+      uses: actions/checkout@main       
+ 
     - name: Initialize the compilation environment
       env:
         DEBIAN_FRONTEND: noninteractive
@@ -51,13 +42,12 @@ jobs:
         ( sudo -E apt-get -qq update
         sudo -E apt-get -qq install build-essential clang flex g++ gawk gcc-multilib gettext \
         git libncurses5-dev libssl-dev python3-distutils rsync unzip zlib1g-dev swig libpython3-dev aria2 jq subversion qemu-utils ccache rename libelf-dev
-        sudo pip3 install pyelftools
         sudo -E apt-get -qq purge azure-cli ghc* zulu* hhvm llvm* firefox powershell openjdk* dotnet* google* mysql* php* android* rename speedtest-cli
         sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean ) &
         sudo timedatectl set-timezone "$TZ"
-
+        
     - name: Initialize Environment and Display System Info
       env:
         DEBIAN_FRONTEND: noninteractive
@@ -65,10 +55,17 @@ jobs:
         chmod +x $OPENWRT_NAME/*.sh
         $GITHUB_WORKSPACE/$OPENWRT_NAME/system-Information.sh
         
-        
     - name: Download firmware source code
       run: |
         git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
+        cd openwrt
+        git log --pretty=tformat:"%h" -n1 tools toolchain || echo "No toolchain history"
+
+    - name: Cache
+      uses: klever1988/cachewrtbuild@main
+      with:
+        ccache: 'true'
+        prefix: ${{ github.workspace }}/openwrt
 
     - name: Update & install feeds
       working-directory: ./openwrt
@@ -100,7 +97,6 @@ jobs:
              
     - name: Compile the firmware
       id: compile
-      timeout-minutes: 240
       run: |
         cd openwrt
         echo -e "$(nproc) thread compile"
@@ -113,8 +109,8 @@ jobs:
       id: organize
       if: ${{ env.UPLOAD_FIRMWARE == 'true' && !cancelled() }}
       run: |
-        cd openwrt/bin/targets/rockchip/armv8
-        rm -rf packages *.config *.buildinfo *.json sha256sums 
+        cd openwrt/bin/targets/mediatek/filogic
+        rm -rf packages *mt798* *.config *.buildinfo *.json sha256sums 
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
         
@@ -135,7 +131,7 @@ jobs:
         echo "status=success" >> $GITHUB_OUTPUT
         
     - name: Publish to release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v2
       if: steps.tag.outputs.status == 'success' && !cancelled()
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -144,3 +140,12 @@ jobs:
         name: ${{ env.date3 }}
         tag_name: ${{ steps.tag.outputs.release_tag }}
         body_path: release.txt
+    
+    - name: 删除旧的Releases
+      uses: MedyMa/delete-older-releases@v0.3.4
+
+      with:
+        keep_latest: 30
+        delete_tags: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.RELEASES_TOKEN }}
