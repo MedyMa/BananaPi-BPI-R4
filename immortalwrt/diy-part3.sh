@@ -25,6 +25,7 @@ git clone --depth=1 -b main https://github.com/Openwrt-Passwall/openwrt-passwall
 git clone --depth=1 https://github.com/nikkinikki-org/OpenWrt-nikki
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
+git clone --depth=1 https://github.com/1522042029/luci-app-socat
 # git clone --depth=1 https://github.com/Siriling/5G-Modem-Support
 # merge_package https://github.com/kenzok8/jell jell/luci-app-fan
 merge_package https://github.com/Siriling/5G-Modem-Support 5G-Modem-Support/luci-app-modem
