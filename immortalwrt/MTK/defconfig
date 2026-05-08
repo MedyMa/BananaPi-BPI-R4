@@ -46,8 +46,6 @@ CONFIG_PACKAGE_kmod-mt7996-firmware=y
 CONFIG_PACKAGE_kmod-mt7996-233-firmware=y
 CONFIG_PACKAGE_wpad-openssl=y
 CONFIG_PACKAGE_usbmode=y
-CONFIG_PACKAGE_ndisc6=y
-CONFIG_PACKAGE_rdisc6=y
 
 # Storage / SFP / modem bring-up diagnostics.
 CONFIG_PACKAGE_ethtool-full=y
