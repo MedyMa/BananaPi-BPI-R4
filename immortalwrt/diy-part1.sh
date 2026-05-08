@@ -27,7 +27,6 @@ git clone --depth=1 https://github.com/1522042029/luci-app-socat
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
 git clone --depth=1 https://github.com/Siriling/5G-Modem-Support
-# merge_package https://github.com/kenzok8/jell jell/luci-app-fan
 merge_package https://github.com/DHDAXCW/dhdaxcw-app dhdaxcw-app/luci-app-adguardhome
 merge_package https://github.com/MedyMa/luci-app-sfp-status luci-app-sfp-status/Luci-app
 merge_package https://github.com/kenzok8/jell jell/wrtbwmon
@@ -55,7 +54,5 @@ popd
 # rm -rf package/firmware/wireless-regdb/Makefile
 # cp -f $GITHUB_WORKSPACE/patches/filogic/500-tx_power.patch package/firmware/wireless-regdb/patches/500-tx_power.patch
 # cp -f $GITHUB_WORKSPACE/patches/filogic/regdb.Makefile package/firmware/wireless-regdb/Makefile
-merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/package/mtk/applications/luci-app-Airpifanctrl
-merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/package/mtk/applications/Airpi-gpio-fan
 merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/package/mtk/applications/mtkhqos_util
 ./scripts/feeds update -a
