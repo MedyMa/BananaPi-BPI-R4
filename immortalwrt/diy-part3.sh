@@ -171,6 +171,31 @@ regex_replace_once(
 )
 PY
 }
+# Relax trojan-plus OpenSSL pin so it can build against current toolchains.
+function patch_trojan_plus_package(){
+python3 - <<'PY'
+from pathlib import Path
+import re
+
+patch_matches = list(Path("package").rglob("openwrt-passwall-packages/trojan-plus/patches/002-Fix-boost1.89-build.patch"))
+
+if len(patch_matches) != 1:
+    raise SystemExit(f"Unexpected trojan-plus patch file count: {len(patch_matches)}")
+
+patch_path = patch_matches[0]
+text = patch_path.read_text(encoding="utf-8")
+new_text, count = re.subn(
+    r"find_package\(OpenSSL 1\.1\.[01] REQUIRED",
+    "find_package(OpenSSL REQUIRED",
+    text,
+)
+
+if count < 2:
+    raise SystemExit(f"Unexpected trojan-plus OpenSSL replacements: {count}")
+
+patch_path.write_text(new_text, encoding="utf-8")
+PY
+}
 
 rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/luci/applications/luci-app-argon-config
@@ -206,6 +231,7 @@ popd
 find package -path '*/luci-app-modem/Makefile' -exec sed -i '/+kmod-pcie_mhi \\/d' {} \;
 find package -path '*/luci-app-hypermodem/Makefile' -exec sed -i '/+kmod-pcie_mhi \\/d' {} \;
 patch_hypermodem_runtime
+patch_trojan_plus_package
 
 # add luci-app-mosdns
 rm -rf feeds/packages/lang/golang
