@@ -192,7 +192,8 @@ merge_package https://github.com/Siriling/5G-Modem-Support 5G-Modem-Support/luci
 merge_package https://github.com/Siriling/5G-Modem-Support 5G-Modem-Support/luci-app-hypermodem
 merge_package https://github.com/Siriling/5G-Modem-Support 5G-Modem-Support/ndisc
 merge_package https://github.com/DHDAXCW/dhdaxcw-app dhdaxcw-app/luci-app-adguardhome
-merge_package https://github.com/MedyMa/luci-app-sfp-status luci-app-sfp-status/Luci-app
+merge_package https://github.com/MedyMa/luci-app-sfp-status luci-app-sfp-status/Luci-app/luci-app-fan
+merge_package https://github.com/MedyMa/luci-app-sfp-status luci-app-sfp-status/Luci-app/luci-app-sfp-status
 merge_package https://github.com/kenzok8/jell jell/wrtbwmon
 # merge_package "-b Immortalwrt https://github.com/shidahuilang/openwrt-package" openwrt-package/relevance/ddnsto
 # merge_package "-b Immortalwrt https://github.com/shidahuilang/openwrt-package" openwrt-package/luci-app-ddnsto
