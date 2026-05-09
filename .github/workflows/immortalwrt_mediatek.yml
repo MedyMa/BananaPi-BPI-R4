@@ -61,11 +61,26 @@ jobs:
         cd openwrt
         git log --pretty=tformat:"%h" -n1 tools toolchain || echo "No toolchain history"
 
-    - name: Cache
-      uses: klever1988/cachewrtbuild@main
+    - name: Generate cache keys
+      id: cache-key
+      run: |
+        echo "ccache_period=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+    - name: Restore toolchain cache
+      uses: klever1988/cachewrtbuild@54ed4fe2f7d8b5cfbc0b928c159266ee892c2d3d
       with:
-        ccache: 'true'
+        ccache: 'false'
         prefix: ${{ github.workspace }}/openwrt
+        mixkey: ${{ env.OPENWRT_NAME }}-${{ env.OPENWRT_DEVICE }}-${{ env.REPO_BRANCH }}
+
+    - name: Restore ccache
+      id: ccache-restore
+      uses: actions/cache/restore@v5.0.5
+      with:
+        path: openwrt/.ccache
+        key: ccache-${{ env.OPENWRT_NAME }}-${{ env.OPENWRT_DEVICE }}-${{ env.REPO_BRANCH }}-${{ steps.cache-key.outputs.ccache_period }}
+        restore-keys: |
+          ccache-${{ env.OPENWRT_NAME }}-${{ env.OPENWRT_DEVICE }}-${{ env.REPO_BRANCH }}-
 
     - name: Update & install feeds
       working-directory: ./openwrt
@@ -104,6 +119,13 @@ jobs:
         echo "date1=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
         echo "date2=$(date "+%Y年%m月%d日")" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: Save ccache
+      if: steps.compile.outputs.status == 'success' && steps.ccache-restore.outputs.cache-hit != 'true'
+      uses: actions/cache/save@v5.0.5
+      with:
+        path: openwrt/.ccache
+        key: ${{ steps.ccache-restore.outputs.cache-primary-key }}
 
     - name: Organize and Rename Files
       id: organize
