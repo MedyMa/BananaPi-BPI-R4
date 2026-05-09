@@ -1,4 +1,4 @@
-name: immortalwrt_mediatek
+name: immortalwrt_mediatek_master
 
 on:
   schedule:
