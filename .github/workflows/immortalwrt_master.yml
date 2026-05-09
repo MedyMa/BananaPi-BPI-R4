@@ -23,7 +23,7 @@ jobs:
     
     steps:
     - name: Maximize build space
-      uses: easimon/maximize-build-space@master
+      uses: easimon/maximize-build-space@v10
       with:
         root-reserve-mb: 512
         swap-size-mb: 1024
@@ -33,7 +33,7 @@ jobs:
         remove-codeql: 'true'
         
     - name: Check out the project branch
-      uses: actions/checkout@main       
+      uses: actions/checkout@v6.0.2       
  
     - name: Initialize the compilation environment
       env:
@@ -115,10 +115,10 @@ jobs:
         echo "status=success" >> $GITHUB_OUTPUT
         
     - name: Upload the firmware to github
-      uses: actions/upload-artifact@main
+      uses: actions/upload-artifact@v7.0.1
       if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
-        name: ${{ env.date1 }}_${{ env.OPENWRT_NAME }}_${{ env.OPENWRT_DEVICE }}
+        name: ${{ env.date1 }}_${{ env.OPENWRT_NAME }}_${{ env.OPENWRT_DEVICE }}_${{ env.REPO_BRANCH }}
         path: ${{ env.FIRMWARE }}
 
     - name: Generate release tags
@@ -147,5 +147,6 @@ jobs:
       with:
         keep_latest: 30
         delete_tags: true
+        delete_tag_pattern: '^.*-immortalwrt_master$'
       env:
         GITHUB_TOKEN: ${{ secrets.RELEASES_TOKEN }}
