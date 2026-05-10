@@ -11,6 +11,16 @@ function merge_package(){
     rm -rf $repo
 }
 
+patch_makefile_dep() {
+    local file_path="$1"
+    local old_text="$2"
+    local new_text="$3"
+
+    [ -f "$file_path" ] || return 0
+    grep -qF "$old_text" "$file_path" || return 0
+    sed -i "s|$old_text|$new_text|g" "$file_path"
+}
+
 rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/luci/applications/luci-app-argon-config
 rm -rf feeds/luci/applications/luci-app-passwall
@@ -58,4 +68,26 @@ popd
 # cp -f $GITHUB_WORKSPACE/patches/filogic/500-tx_power.patch package/firmware/wireless-regdb/patches/500-tx_power.patch
 # cp -f $GITHUB_WORKSPACE/patches/filogic/regdb.Makefile package/firmware/wireless-regdb/Makefile
 # merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/package/mtk/applications/mtkhqos_util
+
 ./scripts/feeds update -a
+
+# openwrt-24.10 compatibility fixes for floating packages feed metadata.
+patch_makefile_dep \
+    feeds/packages/lang/python/python-ubus/Makefile \
+    'PKG_BUILD_DEPENDS:=python-setuptools/host' \
+    'PKG_BUILD_DEPENDS:=python3/host'
+patch_makefile_dep \
+    package/feeds/packages/python-ubus/Makefile \
+    'PKG_BUILD_DEPENDS:=python-setuptools/host' \
+    'PKG_BUILD_DEPENDS:=python3/host'
+
+patch_makefile_dep \
+    feeds/packages/admin/zabbix/Makefile \
+    'libnetsnmp-ssl' \
+    'libnetsnmp'
+patch_makefile_dep \
+    package/feeds/packages/zabbix/Makefile \
+    'libnetsnmp-ssl' \
+    'libnetsnmp'
+
+./scripts/feeds install -a
