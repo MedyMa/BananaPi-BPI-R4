@@ -7,6 +7,7 @@
 # ================================================
 
 echo "=== 系统信息 ==="
+
 # CPU 信息（中文）
 echo -e "\n=== CPU 信息 ==="
 echo -e "CPU 总核心数: $(nproc)"
@@ -18,8 +19,7 @@ if [ -f /proc/cpuinfo ]; then
   echo "架构类型: $(lscpu | grep 'Architecture' | cut -d':' -f2 | sed 's/^\s*//')"
   echo "每插槽核心数: $(lscpu | grep 'Core(s) per socket' | cut -d':' -f2 | sed 's/^\s*//')"
   echo "每核心线程数: $(lscpu | grep 'Thread(s) per core' | cut -d':' -f2 | sed 's/^\s*//')"
-      
-  # 最大频率和最小频率
+
   MAX_FREQ=$(lscpu | grep -E 'CPU max MHz|CPU MHz max' | cut -d':' -f2 | sed 's/^\s*//')
   MIN_FREQ=$(lscpu | grep -E 'CPU min MHz|CPU MHz min' | cut -d':' -f2 | sed 's/^\s*//')
   echo "最大频率: ${MAX_FREQ:-未知} MHz"
@@ -50,14 +50,6 @@ else
   echo "ethtool 未安装，仅显示基本网卡信息"
   ip -br addr show | awk '{print "接口: " $1 "\t状态: " $2 "\tIP: " $3}'
 fi
-
-#echo -e "\n=== 网络速度测试 ==="
-#if command -v speedtest-cli >/dev/null 2>&1; then
-#  echo "正在测试网络速度，请稍候..."
-#  speedtest-cli --simple
-#else
-#  echo "未找到 speedtest-cli，请确保已安装。"
-#fi
 
 # 其他系统详情
 echo -e "\n=== Additional System Details ==="
