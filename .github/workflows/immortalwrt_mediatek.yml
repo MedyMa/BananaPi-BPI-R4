@@ -129,7 +129,7 @@ jobs:
 
     - name: Organize and Rename Files
       id: organize
-      if: ${{ env.UPLOAD_FIRMWARE == 'true' && !cancelled() }}
+      if: ${{ steps.compile.outputs.status == 'success' && env.UPLOAD_FIRMWARE == 'true' && !cancelled() }}
       run: |
         cd openwrt/bin/targets/mediatek/filogic
         rm -rf packages *mt798* *.config *.buildinfo *.json sha256sums 
@@ -145,7 +145,7 @@ jobs:
 
     - name: Generate release tags
       id: tag
-      if: env.UPLOAD_RELEASE == 'true' && !cancelled()
+      if: steps.compile.outputs.status == 'success' && env.UPLOAD_RELEASE == 'true' && !cancelled()
       run: |
         echo "release_tag=${{ env.date1 }}-${{ env.OPENWRT_NAME }}_${{ env.REPO_BRANCH }}" >> $GITHUB_OUTPUT
         touch release.txt
@@ -164,6 +164,7 @@ jobs:
         body_path: release.txt
     
     - name: 删除旧的Releases
+      if: steps.tag.outputs.status == 'success' && !cancelled()
       uses: MedyMa/delete-older-releases@v0.3.4
 
       with:
