@@ -27,7 +27,6 @@ git clone --depth=1 https://github.com/nikkinikki-org/OpenWrt-nikki
 git clone --depth=1 https://github.com/1522042029/luci-app-socat
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
-sed -i 's/LUCI_DEPENDS:=wget-any +jsonfilter/LUCI_DEPENDS:=+@wget-any +jsonfilter/g' luci-theme-argon/Makefile
 # git clone --depth=1 https://github.com/Siriling/5G-Modem-Support
 merge_package https://github.com/DHDAXCW/dhdaxcw-app dhdaxcw-app/luci-app-adguardhome
 merge_package https://github.com/MedyMa/luci-app-sfp-status luci-app-sfp-status/Luci-app/luci-app-fan
