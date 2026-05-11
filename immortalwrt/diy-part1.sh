@@ -27,7 +27,7 @@ rm -rf feeds/luci/applications/luci-app-passwall
 rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2socks,hysteria,ipt2socks,microsocks,naiveproxy,shadowsocks-libev,shadowsocks-rust,shadowsocksr-libev,simple-obfs,tcping,trojan-plus,tuic-client,v2ray-plugin,xray-plugin,geoview,shadow-tls}
 
 # Clone community packages to package/community
-mkdir package/community
+mkdir -p package/community
 pushd package/community
 git clone --depth=1 https://github.com/fw876/helloworld
 rm -rf helloworld/{naiveproxy,shadowsocks-libev,shadowsocksr-libev,shadow-tls,simple-obfs,tcping,tuic-client,v2ray-plugin,xray-core,xray-plugin}
@@ -37,7 +37,6 @@ git clone --depth=1 https://github.com/nikkinikki-org/OpenWrt-nikki
 git clone --depth=1 https://github.com/1522042029/luci-app-socat
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
-sed -i 's/+wget-any/+wget/g' luci-theme-argon/Makefile
 # git clone --depth=1 https://github.com/Siriling/5G-Modem-Support
 merge_package https://github.com/DHDAXCW/dhdaxcw-app dhdaxcw-app/luci-app-adguardhome
 merge_package https://github.com/MedyMa/luci-app-sfp-status luci-app-sfp-status/Luci-app/luci-app-fan
@@ -56,7 +55,7 @@ rm -rf feeds/packages/net/mosdns
 git clone https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
 
 # add luci-app-OpenClash
-mkdir package/OpenClash
+mkdir -p package/OpenClash
 pushd package/OpenClash
 git clone --depth=1  https://github.com/vernesong/OpenClash
 git config core.sparsecheckout true
@@ -89,5 +88,10 @@ patch_makefile_dep \
     package/feeds/packages/zabbix/Makefile \
     'libnetsnmp-ssl' \
     'libnetsnmp'
+
+patch_makefile_dep \
+    package/community/luci-theme-argon/Makefile \
+    '+wget-any' \
+    '+wget'
 
 ./scripts/feeds install -a
