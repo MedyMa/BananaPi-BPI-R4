@@ -31,7 +31,7 @@ git clone --depth=1 https://github.com/1522042029/luci-app-socat
 # git clone --depth=1 https://github.com/Siriling/5G-Modem-Support
 # merge_package https://github.com/kenzok8/jell jell/luci-app-fan
 # merge_package https://github.com/Siriling/5G-Modem-Support 5G-Modem-Support/ndisc
-merge_package https://github.com/DHDAXCW/dhdaxcw-app dhdaxcw-app/luci-app-adguardhome
+# merge_package https://github.com/DHDAXCW/dhdaxcw-app dhdaxcw-app/luci-app-adguardhome
 merge_package https://github.com/MedyMa/luci-app-sfp-status luci-app-sfp-status/Luci-app/luci-app-fan
 merge_package https://github.com/MedyMa/luci-app-sfp-status luci-app-sfp-status/Luci-app/luci-app-sfp-status
 merge_package https://github.com/MedyMa/luci-app-sfp-status luci-app-sfp-status/Luci-app/luci-app-adguardhome
