@@ -90,10 +90,11 @@ patch_makefile_dep \
     package/feeds/packages/zabbix/Makefile \
     'libnetsnmp-ssl' \
     'libnetsnmp'
-
+    
+# Shrink the BPI-R4 U-Boot autoboot wait so boot time is not dominated by a 30s delay.
 patch_makefile_dep \
-    package/community/luci-theme-argon/Makefile \
-    '+wget-any' \
-    '+wget'
+    package/boot/uboot-mediatek/patches/450-add-bpi-r4.patch \
+    'CONFIG_BOOTDELAY=30' \
+    'CONFIG_BOOTDELAY=10'
 
 ./scripts/feeds install -a
