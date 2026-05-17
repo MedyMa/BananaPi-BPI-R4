@@ -70,13 +70,18 @@ popd
 # cp -f $GITHUB_WORKSPACE/patches/filogic/500-tx_power.patch package/firmware/wireless-regdb/patches/500-tx_power.patch
 # cp -f $GITHUB_WORKSPACE/patches/filogic/regdb.Makefile package/firmware/wireless-regdb/Makefile
 
-# BPi-R4 SFP on openwrt-25.12 can fall back to very low effective link speed
+# BPi-R4 SFP can fall back to a broken link on both 24.10 and 25.12
 # when the USXGMII PCS polarity is left at the default board-agnostic setting.
-cp -f $GITHUB_WORKSPACE/patches/filogic/995-bpi-r4-sfp-usxgmii-polarity.patch \
-	target/linux/mediatek/patches-6.12/995-arm64-dts-mediatek-mt7988a-bpi-r4-fix-usxgmii-polarity.patch
+if [ -d target/linux/mediatek/patches-6.12 ]; then
+    cp -f $GITHUB_WORKSPACE/patches/filogic/995-bpi-r4-sfp-usxgmii-polarity.patch \
+        target/linux/mediatek/patches-6.12/995-arm64-dts-mediatek-mt7988a-bpi-r4-fix-usxgmii-polarity.patch
+elif [ -d target/linux/mediatek/patches-6.6 ]; then
+    cp -f $GITHUB_WORKSPACE/patches/filogic/995-bpi-r4-sfp-usxgmii-polarity-24.10.patch \
+        target/linux/mediatek/patches-6.6/995-arm64-dts-mediatek-mt7988a-bpi-r4-fix-usxgmii-polarity.patch
+fi
 
-# Some BPi-R4 SFP links come up without carrier on 25.12 until they are retrained.
-mkdir -p target/linux/mediatek/filogic/base-files/etc/hotplug.d/iface
+# Some BPi-R4 SFP links come up without carrier until they are retrained once.
+mkdir -p target/linux/mediatek/filogic/base-files/etc/hotplug.d/iface   
 cp -f $GITHUB_WORKSPACE/patches/filogic/99-bpi-r4-sfp-retrain \
     target/linux/mediatek/filogic/base-files/etc/hotplug.d/iface/99-bpi-r4-sfp-retrain
 chmod 0755 target/linux/mediatek/filogic/base-files/etc/hotplug.d/iface/99-bpi-r4-sfp-retrain
