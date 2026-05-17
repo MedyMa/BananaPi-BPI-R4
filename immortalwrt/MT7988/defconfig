@@ -24,6 +24,10 @@ CONFIG_DRIVER_11BE_SUPPORT=y
 CONFIG_PACKAGE_firewall4=y
 CONFIG_PACKAGE_odhcp6c=y
 CONFIG_PACKAGE_odhcpd-ipv6only=y
+CONFIG_PACKAGE_iptables-nft=y
+CONFIG_PACKAGE_ip6tables-nft=y
+CONFIG_PACKAGE_ppp=y
+CONFIG_PACKAGE_ppp-mod-pppoe=y
 
 # MTK vendor WiFi 7 block aligned to mt798x-mt799x-6.6-mtwifi.
 CONFIG_PACKAGE_datconf=y
