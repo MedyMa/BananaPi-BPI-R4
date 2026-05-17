@@ -25,7 +25,6 @@ CONFIG_PACKAGE_odhcpd-ipv6only=y
 
 # openwrt-25.12 no longer exposes the old 24.10 MTK WiFi 7 proprietary block.
 # Keep the upstream BPI-R4 mt76/mt7996 platform packages explicit instead.
-CONFIG_PACKAGE_kmod-mediatek_hnat=y
 CONFIG_PACKAGE_kmod-cfg80211=y
 CONFIG_PACKAGE_kmod-mac80211=y
 CONFIG_PACKAGE_kmod-mt7996-firmware=y
