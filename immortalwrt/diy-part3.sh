@@ -29,7 +29,7 @@ rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2sock
 # Clone community packages to package/community
 mkdir -p package/community
 pushd package/community
-git clone --depth=1 -b dev https://github.com/fw876/helloworld
+git clone --depth=1 https://github.com/fw876/helloworld
 # rm -rf helloworld/{naiveproxy,shadowsocks-libev,shadowsocksr-libev,shadow-tls,simple-obfs,tcping,tuic-client,v2ray-plugin,xray-core,xray-plugin}
 git clone --depth=1 -b main https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git
 git clone --depth=1 -b main https://github.com/Openwrt-Passwall/openwrt-passwall.git
