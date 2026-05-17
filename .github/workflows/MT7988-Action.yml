@@ -20,6 +20,7 @@ env:
   TZ: Asia/Shanghai
   OPENWRT_NAME: immortalwrt
   OPENWRT_DEVICE: MT7988
+  OPENWRT_FLAVOR: BE14-draft
 
 jobs:
   build:
@@ -240,16 +241,18 @@ jobs:
       uses: actions/upload-artifact@v7.0.1
       if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
-        name: ${{ env.date1 }}_${{ env.OPENWRT_NAME }}_${{ env.OPENWRT_DEVICE }}_${{ env.REPO_BRANCH }}
+        name: ${{ env.date1 }}_${{ env.OPENWRT_NAME }}_${{ env.OPENWRT_DEVICE }}_${{ env.OPENWRT_FLAVOR }}_${{ env.REPO_BRANCH }}
         path: ${{ env.FIRMWARE }}
 
     - name: Generate release tags
       id: tag
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_RELEASE == 'true' && !cancelled()
       run: |
-        echo "release_tag=${{ env.date1 }}-${{ env.OPENWRT_NAME }}_${{ env.OPENWRT_DEVICE }}_${{ env.REPO_BRANCH }}" >> $GITHUB_OUTPUT
+        echo "release_tag=${{ env.date1 }}-${{ env.OPENWRT_NAME }}_${{ env.OPENWRT_DEVICE }}_${{ env.OPENWRT_FLAVOR }}_${{ env.REPO_BRANCH }}" >> $GITHUB_OUTPUT
         touch release.txt
         echo "📥 固件下载" >> release.txt
+        echo "Target flavor: ${{ env.OPENWRT_FLAVOR }}" >> release.txt
+        echo "Source branch: ${{ env.REPO_BRANCH }}" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
         
     - name: Publish to release
