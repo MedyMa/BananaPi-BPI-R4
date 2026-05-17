@@ -20,6 +20,7 @@ patch_makefile_dep() {
     [ -f "$file_path" ] || return 0
     grep -qF "$old_text" "$file_path" || return 0
     sed -i "s|$old_text|$new_text|g" "$
+｝
 
 rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/luci/applications/luci-app-argon-config
