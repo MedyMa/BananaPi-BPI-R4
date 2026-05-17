@@ -1,7 +1,7 @@
 --- a/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4.dtsi
 +++ b/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4.dtsi
-@@
- &watchdog {
+@@ -397,3 +397,11 @@
+ &xsphy {
  	status = "okay";
  };
 +
