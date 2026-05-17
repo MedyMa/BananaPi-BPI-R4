@@ -53,6 +53,14 @@ merge_package "-b ddnsto-beta https://github.com/linkease/nas-packages-luci" nas
 merge_package "-b ddnsto-beta https://github.com/linkease/nas-packages" nas-packages/network/services/ddnsto
 popd
 
+# The current 24.10-based tree lacks the xcrypt package block that defines libcrypt-compat.
+git clone --depth=1 --filter=blob:none --sparse -b openwrt-25.12 https://github.com/immortalwrt/immortalwrt.git immortalwrt-core
+git -C immortalwrt-core sparse-checkout set package/libs/xcrypt
+mkdir -p package/libs
+rm -rf package/libs/xcrypt
+cp -a immortalwrt-core/package/libs/xcrypt package/libs/
+rm -rf immortalwrt-core
+
 # add luci-app-mosdns
 rm -rf feeds/packages/lang/golang
 git clone https://github.com/sbwml/packages_lang_golang -b 26.x feeds/packages/lang/golang
