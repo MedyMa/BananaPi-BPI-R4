@@ -40,7 +40,6 @@ git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
 git clone --depth=1 https://github.com/1522042029/luci-app-socat
 # git clone --depth=1 https://github.com/Siriling/5G-Modem-Support
-# merge_package https://github.com/kenzok8/jell jell/luci-app-fan
 # merge_package https://github.com/DHDAXCW/dhdaxcw-app dhdaxcw-app/luci-app-adguardhome
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-fan
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-sfp-status
@@ -69,6 +68,11 @@ popd
 # rm -rf package/firmware/wireless-regdb/Makefile
 # cp -f $GITHUB_WORKSPACE/patches/filogic/500-tx_power.patch package/firmware/wireless-regdb/patches/500-tx_power.patch
 # cp -f $GITHUB_WORKSPACE/patches/filogic/regdb.Makefile package/firmware/wireless-regdb/Makefile
+
+# BPi-R4 SFP on openwrt-25.12 can fall back to very low effective link speed
+# when the USXGMII PCS polarity is left at the default board-agnostic setting.
+cp -f $GITHUB_WORKSPACE/patches/filogic/995-bpi-r4-sfp-usxgmii-polarity.patch \
+	target/linux/mediatek/patches-6.12/995-arm64-dts-mediatek-mt7988a-bpi-r4-fix-usxgmii-polarity.patch
     
 # Shrink the BPI-R4 U-Boot autoboot wait so boot time is not dominated by a 30s delay.
 patch_makefile_dep \
