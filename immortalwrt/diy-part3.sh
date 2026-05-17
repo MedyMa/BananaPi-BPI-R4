@@ -12,6 +12,14 @@ function merge_package(){
     rm -rf $repo
 }
 
+patch_makefile_dep() {
+    local file_path="$1"
+    local old_text="$2"
+    local new_text="$3"
+
+    [ -f "$file_path" ] || return 0
+    grep -qF "$old_text" "$file_path" || return 0
+    sed -i "s|$old_text|$new_text|g" "$
 
 rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/luci/applications/luci-app-argon-config
