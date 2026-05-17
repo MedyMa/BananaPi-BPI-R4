@@ -58,5 +58,11 @@ popd
 # rm -rf package/firmware/wireless-regdb/Makefile
 # cp -f $GITHUB_WORKSPACE/patches/filogic/500-tx_power.patch package/firmware/wireless-regdb/patches/500-tx_power.patch
 # cp -f $GITHUB_WORKSPACE/patches/filogic/regdb.Makefile package/firmware/wireless-regdb/Makefile
-
+    
+# Shrink the BPI-R4 U-Boot autoboot wait so boot time is not dominated by a 30s delay.
+patch_makefile_dep \
+    package/boot/uboot-mediatek/patches/450-add-bpi-r4.patch \
+    'CONFIG_BOOTDELAY=30' \
+    'CONFIG_BOOTDELAY=10'
+    
 ./scripts/feeds update -a
