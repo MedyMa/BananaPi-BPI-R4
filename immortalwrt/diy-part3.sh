@@ -73,6 +73,12 @@ popd
 # when the USXGMII PCS polarity is left at the default board-agnostic setting.
 cp -f $GITHUB_WORKSPACE/patches/filogic/995-bpi-r4-sfp-usxgmii-polarity.patch \
 	target/linux/mediatek/patches-6.12/995-arm64-dts-mediatek-mt7988a-bpi-r4-fix-usxgmii-polarity.patch
+
+# Some BPi-R4 SFP links come up without carrier on 25.12 until they are retrained.
+mkdir -p target/linux/mediatek/filogic/base-files/etc/hotplug.d/iface
+cp -f $GITHUB_WORKSPACE/patches/filogic/99-bpi-r4-sfp-retrain \
+    target/linux/mediatek/filogic/base-files/etc/hotplug.d/iface/99-bpi-r4-sfp-retrain
+chmod 0755 target/linux/mediatek/filogic/base-files/etc/hotplug.d/iface/99-bpi-r4-sfp-retrain
     
 # Shrink the BPI-R4 U-Boot autoboot wait so boot time is not dominated by a 30s delay.
 patch_makefile_dep \
