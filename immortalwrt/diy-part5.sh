@@ -15,10 +15,21 @@ patch_makefile_dep() {
     local file_path="$1"
     local old_text="$2"
     local new_text="$3"
+    local perl_status
 
     [ -f "$file_path" ] || return 0
     grep -qF "$old_text" "$file_path" || return 0
-    sed -i "s|$old_text|$new_text|g" "$file_path"
+
+    PATCH_OLD_TEXT="$old_text" PATCH_NEW_TEXT="$new_text" \
+        perl -0pi -e 'BEGIN { $old = $ENV{"PATCH_OLD_TEXT"}; $new = $ENV{"PATCH_NEW_TEXT"}; }
+            $count = s/\Q$old\E/$new/g;
+            END { exit($count > 0 ? 0 : 2); }' "$file_path"
+    perl_status=$?
+
+    [ "$perl_status" -eq 0 ] || {
+        echo "Failed to apply literal patch to $file_path" >&2
+        return "$perl_status"
+      }
 }
 
 rm -rf feeds/luci/themes/luci-theme-argon
