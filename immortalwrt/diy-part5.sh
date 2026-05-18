@@ -125,5 +125,9 @@ patch_makefile_dep \
     package/mtk/drivers/mt_wifi7/Makefile \
     'if [ "$$(CONFIG_MTK_WIFI7_SKU_TYPE)" = "BE13000_255" ] ; then \' \
     'if [ "$$(CONFIG_MTK_WIFI7_SKU_TYPE)" = "BE13000_255" ] || [ "$$(CONFIG_MTK_WIFI7_SKU_TYPE)" = "BE19000" ] ; then \'    
+patch_makefile_dep \
+    package/mtk/drivers/mt_wifi7/Makefile \
+    'if [ "$$(CONFIG_MTK_WIFI7_2ADIE_TRIBAND)" = "y" ] ; then \' \
+    'if [ "$$(CONFIG_MTK_WIFI7_2ADIE_TRIBAND)" = "y" ] && [ -f $(1)/etc/wireless/mediatek/mt7990.b1.dat ] ; then \'
     
 ./scripts/feeds install -a
