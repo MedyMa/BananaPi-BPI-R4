@@ -4,6 +4,26 @@ on:
   schedule:
     - cron: 0 17 * * *
   workflow_dispatch:
+    inputs:
+      be14_state:
+        description: Physical BE14 state during device validation
+        required: false
+        default: unknown
+        type: choice
+        options:
+          - unknown
+          - inserted
+          - removed
+      sfp_patch_experiment:
+        description: BPI-R4 SFP vendor patch experiment mode
+        required: false
+        default: keep
+        type: choice
+        options:
+          - keep
+          - drop-2702
+          - drop-2602-2701-2702
+          - drop-2601-2602-2701-2702
 
 permissions:
   actions: write
@@ -12,6 +32,7 @@ permissions:
 env:
   REPO_URL: https://github.com/padavanonly/immortalwrt-mt798x-6.6
   REPO_BRANCH: mt798x-mt799x-6.6-mtwifi
+  BPI_R4_BE14_STATE: unknown
   BPI_R4_SFP_PATCH_EXPERIMENT: keep
   CONFIG_FILE: immortalwrt/MT7988/defconfig
   DIY_P1_SH: immortalwrt/diy-part5.sh
@@ -26,7 +47,7 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Maximize build space
       uses: easimon/maximize-build-space@v10
@@ -40,6 +61,36 @@ jobs:
         
     - name: Check out the project branch
       uses: actions/checkout@v6.0.2
+
+    - name: Resolve experiment metadata
+      shell: bash
+      run: |
+        be14_state="$BPI_R4_BE14_STATE"
+        sfp_patch_experiment="$BPI_R4_SFP_PATCH_EXPERIMENT"
+
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          be14_state='${{ inputs.be14_state }}'
+          sfp_patch_experiment='${{ inputs.sfp_patch_experiment }}'
+        fi
+
+        flavor="$OPENWRT_FLAVOR"
+        if [ "$be14_state" != "unknown" ] || [ "$sfp_patch_experiment" != "keep" ]; then
+          flavor="${flavor}-${be14_state}-${sfp_patch_experiment}"
+        fi
+
+        echo "BPI_R4_BE14_STATE=$be14_state" >> "$GITHUB_ENV"
+        echo "BPI_R4_SFP_PATCH_EXPERIMENT=$sfp_patch_experiment" >> "$GITHUB_ENV"
+        echo "OPENWRT_FLAVOR=$flavor" >> "$GITHUB_ENV"
+
+        {
+          echo "## BPI-R4 Experiment Selection"
+          echo ""
+          echo "- BE14 state: $be14_state"
+          echo "- SFP patch experiment: $sfp_patch_experiment"
+          echo "- Flavor label: $flavor"
+          echo ""
+          echo "Expected manual matrix: 2 BE14 states x 4 patch modes"
+        } >> "$GITHUB_STEP_SUMMARY"
 
     - name: Initialize the compilation environment
       env:
@@ -253,6 +304,8 @@ jobs:
         echo "📥 固件下载" >> release.txt
         echo "Target flavor: ${{ env.OPENWRT_FLAVOR }}" >> release.txt
         echo "Source branch: ${{ env.REPO_BRANCH }}" >> release.txt
+        echo "BE14 validation state: ${{ env.BPI_R4_BE14_STATE }}" >> release.txt
+        echo "SFP patch experiment: ${{ env.BPI_R4_SFP_PATCH_EXPERIMENT }}" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
         
     - name: Publish to release
