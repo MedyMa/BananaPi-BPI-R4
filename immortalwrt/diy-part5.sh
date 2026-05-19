@@ -32,6 +32,47 @@ patch_makefile_dep() {
       }
 }
 
+remove_patch_if_present() {
+    local patch_path="$1"
+
+    [ -f "$patch_path" ] || return 0
+    rm -f "$patch_path"
+}
+
+apply_bpi_r4_sfp_patch_experiment() {
+    local patch_dir="target/linux/mediatek/patches-6.6"
+    local mode="${BPI_R4_SFP_PATCH_EXPERIMENT:-keep}"
+
+    [ -d "$patch_dir" ] || return 0
+
+    case "$mode" in
+        keep)
+            echo "BPI-R4 SFP patch experiment: keep vendor timing patches"
+            ;;
+        drop-2702)
+            echo "BPI-R4 SFP patch experiment: removing 999-2702 only"
+            remove_patch_if_present "$patch_dir/999-2702-net-ethernet-mtk_eth_soc-revise-xgmac-force-mode.patch"
+            ;;
+        drop-2602-2701-2702)
+            echo "BPI-R4 SFP patch experiment: removing 999-2602, 999-2701 and 999-2702"
+            remove_patch_if_present "$patch_dir/999-2602-net-pcs-mtk_usxgmii-add-pextp-reset.patch"
+            remove_patch_if_present "$patch_dir/999-2701-net-ethernet-mtk_eth_soc-remove-pextp-reset.patch"
+            remove_patch_if_present "$patch_dir/999-2702-net-ethernet-mtk_eth_soc-revise-xgmac-force-mode.patch"
+            ;;
+        drop-2601-2602-2701-2702)
+            echo "BPI-R4 SFP patch experiment: removing 999-2601, 999-2602, 999-2701 and 999-2702"
+            remove_patch_if_present "$patch_dir/999-2601-net-pcs-mtk-lynxi-add-pextp-reset.patch"
+            remove_patch_if_present "$patch_dir/999-2602-net-pcs-mtk_usxgmii-add-pextp-reset.patch"
+            remove_patch_if_present "$patch_dir/999-2701-net-ethernet-mtk_eth_soc-remove-pextp-reset.patch"
+            remove_patch_if_present "$patch_dir/999-2702-net-ethernet-mtk_eth_soc-revise-xgmac-force-mode.patch"
+            ;;
+        *)
+            echo "Unknown BPI_R4_SFP_PATCH_EXPERIMENT mode: $mode" >&2
+            return 1
+            ;;
+    esac
+}
+
 rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/luci/applications/luci-app-argon-config
 rm -rf feeds/luci/applications/luci-app-passwall
