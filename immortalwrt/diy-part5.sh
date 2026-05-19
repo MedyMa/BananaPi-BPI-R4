@@ -73,6 +73,17 @@ rm -rf package/libs/xcrypt
 cp -a immortalwrt-core/package/libs/xcrypt package/libs/
 rm -rf immortalwrt-core
 
+# Restore ImmortalWrt's status overview helpers and override tempinfo for mt_wifi7.
+git clone --depth=1 --filter=blob:none --sparse -b openwrt-24.10 https://github.com/immortalwrt/immortalwrt.git immortalwrt-autocore
+git -C immortalwrt-autocore sparse-checkout set package/emortal/autocore
+mkdir -p package/emortal
+rm -rf package/emortal/autocore
+cp -a immortalwrt-autocore/package/emortal/autocore package/emortal/
+cp -f $GITHUB_WORKSPACE/scripts/tempinfo package/emortal/autocore/files/tempinfo
+chmod 0755 package/emortal/autocore/files/tempinfo
+rm -rf immortalwrt-autocore
+
+
 # add luci-app-mosdns
 rm -rf feeds/packages/lang/golang
 git clone https://github.com/sbwml/packages_lang_golang -b 26.x feeds/packages/lang/golang
@@ -96,6 +107,10 @@ popd
 # BPi-R4 SFP on openwrt-24.10 can still need an explicit USXGMII RX polarity hint.
 cp -f $GITHUB_WORKSPACE/patches/filogic/995-bpi-r4-sfp-usxgmii-polarity-24.10.patch \
     target/linux/mediatek/patches-6.6/995-arm64-dts-mediatek-mt7988a-bpi-r4-fix-usxgmii-polarity.patch
+
+# Vendor mt7988a.dtsi still leaves LVTS disabled, which hides CPU thermal_zone0.
+cp -f $GITHUB_WORKSPACE/patches/filogic/lvts_enable.patch \
+    target/linux/mediatek/patches-6.6/996-arm64-dts-mediatek-mt7988a-enable-lvts.patch
 
 # Retry BPi-R4 SFP links once after netifd brings the device up.
 mkdir -p target/linux/mediatek/filogic/base-files/etc/hotplug.d/iface
