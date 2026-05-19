@@ -27,7 +27,6 @@ sparse_checkout_copy() {
     local source_path="$3"
     local dest_path="$4"
     local checkout_dir="$5"
-
     rm -rf "$checkout_dir"
     git clone --depth=1 --filter=blob:none --sparse -b "$repo_branch" "$repo_url" "$checkout_dir"
     git -C "$checkout_dir" sparse-checkout set "$source_path"
@@ -100,6 +99,12 @@ sparse_checkout_copy \
 sparse_checkout_copy \
     https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
     mt798x-mt799x-6.6-mtwifi \
+    target/linux/mediatek/patches-6.6/999-2713-net-ethernet-mtk_eth_soc-refactor-SER-monitor.patch \
+    target/linux/mediatek/patches-6.6/999-2713-net-ethernet-mtk_eth_soc-refactor-SER-monitor.patch \
+    vendor-mtk-hnat-patch-2713
+sparse_checkout_copy \
+    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
+    mt798x-mt799x-6.6-mtwifi \
     target/linux/mediatek/patches-6.6/999-2741-mtkhnat-add-support-for-virtual-interface-a.patch \
     target/linux/mediatek/patches-6.6/999-2741-mtkhnat-add-support-for-virtual-interface-a.patch \
     vendor-mtk-hnat-patch-2741
@@ -130,9 +135,27 @@ sparse_checkout_copy \
 sparse_checkout_copy \
     https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
     mt798x-mt799x-6.6-mtwifi \
+    target/linux/mediatek/patches-6.6/999-2747-crypto-eth-inline.patch \
+    target/linux/mediatek/patches-6.6/999-2747-crypto-eth-inline.patch \
+    vendor-mtk-hnat-patch-2747-crypto
+sparse_checkout_copy \
+    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
+    mt798x-mt799x-6.6-mtwifi \
+    target/linux/mediatek/patches-6.6/999-2747-net-ethernet-mtk_eth_soc-add-proprietary-SER-flow.patch \
+    target/linux/mediatek/patches-6.6/999-2747-net-ethernet-mtk_eth_soc-add-proprietary-SER-flow.patch \
+    vendor-mtk-hnat-patch-2747-ser
+sparse_checkout_copy \
+    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
+    mt798x-mt799x-6.6-mtwifi \
     target/linux/mediatek/patches-6.6/999-3020-flow-offload-add-mtkhnat-macvlan-support.patch \
     target/linux/mediatek/patches-6.6/999-3020-flow-offload-add-mtkhnat-macvlan-support.patch \
     vendor-mtk-hnat-patch-3020
+sparse_checkout_copy \
+    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
+    mt798x-mt799x-6.6-mtwifi \
+    target/linux/mediatek/patches-6.6/999-3007-net-ethernet-mtk_ppe-add-roaming-handler.patch \
+    target/linux/mediatek/patches-6.6/999-3007-net-ethernet-mtk_ppe-add-roaming-handler.patch \
+    vendor-mtk-hnat-patch-3007
 sparse_checkout_copy \
     https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
     mt798x-mt799x-6.6-mtwifi \
@@ -154,9 +177,35 @@ sparse_checkout_copy \
 sparse_checkout_copy \
     https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
     mt798x-mt799x-6.6-mtwifi \
+    target/linux/mediatek/patches-6.6/9999-reset.patch \
+    target/linux/mediatek/patches-6.6/9999-reset.patch \
+    vendor-mtk-hnat-patch-9999
+sparse_checkout_copy \
+    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
+    mt798x-mt799x-6.6-mtwifi \
     target/linux/mediatek/patches-6.6/99999-hnat-extdevice-fix-fdberr.patch \
     target/linux/mediatek/patches-6.6/99999-hnat-extdevice-fix-fdberr.patch \
     vendor-mtk-hnat-patch-99999
+
+if ! grep -q 'KernelPackage/mediatek_hnat' target/linux/mediatek/modules.mk; then
+cat >> target/linux/mediatek/modules.mk <<'EOF'
+
+define KernelPackage/mediatek_hnat
+    SUBMENU:=Network Devices
+    TITLE:=MediaTek hardware NAT support
+    DEPENDS:=@TARGET_mediatek +kmod-nf-conntrack +kmod-ipt-nat
+    KCONFIG:=CONFIG_NET_MEDIATEK_HNAT
+    FILES:=$(LINUX_DIR)/drivers/net/ethernet/mediatek/mtk_hnat/mtkhnat.ko
+    AUTOLOAD:=$(call AutoProbe,mtkhnat)
+endef
+
+define KernelPackage/mediatek_hnat/description
+    MediaTek hardware NAT support for the NETSYS/PPE offload path.
+endef
+
+$(eval $(call KernelPackage,mediatek_hnat))
+EOF
+fi
 
 # The current 24.10-based tree lacks the xcrypt package block that defines libcrypt-compat.
 sparse_checkout_copy \
