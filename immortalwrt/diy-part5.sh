@@ -29,48 +29,7 @@ patch_makefile_dep() {
     [ "$perl_status" -eq 0 ] || {
         echo "Failed to apply literal patch to $file_path" >&2
         return "$perl_status"
-      }
-}
-
-remove_patch_if_present() {
-    local patch_path="$1"
-
-    [ -f "$patch_path" ] || return 0
-    rm -f "$patch_path"
-}
-
-apply_bpi_r4_sfp_patch_experiment() {
-    local patch_dir="target/linux/mediatek/patches-6.6"
-    local mode="${BPI_R4_SFP_PATCH_EXPERIMENT:-keep}"
-
-    [ -d "$patch_dir" ] || return 0
-
-    case "$mode" in
-        keep)
-            echo "BPI-R4 SFP patch experiment: keep vendor timing patches"
-            ;;
-        drop-2702)
-            echo "BPI-R4 SFP patch experiment: removing 999-2702 only"
-            remove_patch_if_present "$patch_dir/999-2702-net-ethernet-mtk_eth_soc-revise-xgmac-force-mode.patch"
-            ;;
-        drop-2602-2701-2702)
-            echo "BPI-R4 SFP patch experiment: removing 999-2602, 999-2701 and 999-2702"
-            remove_patch_if_present "$patch_dir/999-2602-net-pcs-mtk_usxgmii-add-pextp-reset.patch"
-            remove_patch_if_present "$patch_dir/999-2701-net-ethernet-mtk_eth_soc-remove-pextp-reset.patch"
-            remove_patch_if_present "$patch_dir/999-2702-net-ethernet-mtk_eth_soc-revise-xgmac-force-mode.patch"
-            ;;
-        drop-2601-2602-2701-2702)
-            echo "BPI-R4 SFP patch experiment: removing 999-2601, 999-2602, 999-2701 and 999-2702"
-            remove_patch_if_present "$patch_dir/999-2601-net-pcs-mtk-lynxi-add-pextp-reset.patch"
-            remove_patch_if_present "$patch_dir/999-2602-net-pcs-mtk_usxgmii-add-pextp-reset.patch"
-            remove_patch_if_present "$patch_dir/999-2701-net-ethernet-mtk_eth_soc-remove-pextp-reset.patch"
-            remove_patch_if_present "$patch_dir/999-2702-net-ethernet-mtk_eth_soc-revise-xgmac-force-mode.patch"
-            ;;
-        *)
-            echo "Unknown BPI_R4_SFP_PATCH_EXPERIMENT mode: $mode" >&2
-            return 1
-            ;;
-    esac
+    }
 }
 
 rm -rf feeds/luci/themes/luci-theme-argon
@@ -96,9 +55,9 @@ git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
 # git clone --depth=1 https://github.com/Siriling/5G-Modem-Support
 # merge_package https://github.com/DHDAXCW/dhdaxcw-app dhdaxcw-app/luci-app-adguardhome
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-fan
-merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-sfp-status
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-adguardhome
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-modemband
+merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-sfp-status
 merge_package https://github.com/kenzok8/jell jell/wrtbwmon
 # merge_package "-b Immortalwrt https://github.com/shidahuilang/openwrt-package" openwrt-package/relevance/ddnsto
 # merge_package "-b Immortalwrt https://github.com/shidahuilang/openwrt-package" openwrt-package/luci-app-ddnsto
@@ -124,7 +83,6 @@ cp -f $GITHUB_WORKSPACE/scripts/tempinfo package/emortal/autocore/files/tempinfo
 chmod 0755 package/emortal/autocore/files/tempinfo
 rm -rf immortalwrt-autocore
 
-
 # add luci-app-mosdns
 rm -rf feeds/packages/lang/golang
 git clone https://github.com/sbwml/packages_lang_golang -b 26.x feeds/packages/lang/golang
@@ -145,11 +103,11 @@ popd
 # cp -f $GITHUB_WORKSPACE/patches/filogic/regdb.Makefile package/firmware/wireless-regdb/Makefile
 # merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/package/mtk/applications/mtkhqos_util
 
+# Do not inject the stale LVTS patch here; it targets the wrong source layout and breaks kernel prepare.
+
 # BPi-R4 SFP on openwrt-24.10 can still need an explicit USXGMII RX polarity hint.
 cp -f $GITHUB_WORKSPACE/patches/filogic/995-bpi-r4-sfp-usxgmii-polarity-24.10.patch \
     target/linux/mediatek/patches-6.6/995-arm64-dts-mediatek-mt7988a-bpi-r4-fix-usxgmii-polarity.patch
-
-# Do not inject the stale LVTS patch here; it targets the wrong source layout and breaks kernel prepare.
 
 # Retry BPi-R4 SFP links once after netifd brings the device up.
 mkdir -p target/linux/mediatek/filogic/base-files/etc/hotplug.d/iface
@@ -184,5 +142,4 @@ patch_makefile_dep \
     'CONFIG_BOOTDELAY=30' \
     'CONFIG_BOOTDELAY=10'
 
-    
 ./scripts/feeds install -a
