@@ -149,9 +149,7 @@ popd
 cp -f $GITHUB_WORKSPACE/patches/filogic/995-bpi-r4-sfp-usxgmii-polarity-24.10.patch \
     target/linux/mediatek/patches-6.6/995-arm64-dts-mediatek-mt7988a-bpi-r4-fix-usxgmii-polarity.patch
 
-# Vendor mt7988a.dtsi still leaves LVTS disabled, which hides CPU thermal_zone0.
-cp -f $GITHUB_WORKSPACE/patches/filogic/lvts_enable.patch \
-    target/linux/mediatek/patches-6.6/996-arm64-dts-mediatek-mt7988a-enable-lvts.patch
+# Do not inject the stale LVTS patch here; it targets the wrong source layout and breaks kernel prepare.
 
 # Retry BPi-R4 SFP links once after netifd brings the device up.
 mkdir -p target/linux/mediatek/filogic/base-files/etc/hotplug.d/iface
