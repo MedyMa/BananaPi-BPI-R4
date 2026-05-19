@@ -57,8 +57,6 @@ git clone --depth=1 https://github.com/nikkinikki-org/OpenWrt-nikki
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
 git clone --depth=1 https://github.com/1522042029/luci-app-socat
-# git clone --depth=1 https://github.com/Siriling/5G-Modem-Support
-# merge_package https://github.com/DHDAXCW/dhdaxcw-app dhdaxcw-app/luci-app-adguardhome
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-fan
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-sfp-status
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-adguardhome
@@ -84,6 +82,81 @@ sparse_checkout_copy \
     dl/datconf-757f9679.tar.bz2 \
     dl/datconf-757f9679.tar.bz2 \
     vendor-mtk-dl
+
+# MTK HNAT is not present in the upstream 24.10 mediatek target, but the
+# imported MTK WiFi/WARP stack selects and depends on it.
+sparse_checkout_copy \
+    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
+    mt798x-mt799x-6.6-mtwifi \
+    target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_hnat \
+    target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_hnat \
+    vendor-mtk-hnat
+sparse_checkout_copy \
+    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
+    mt798x-mt799x-6.6-mtwifi \
+    target/linux/mediatek/files-6.6/include/net/ra_nat.h \
+    target/linux/mediatek/files-6.6/include/net/ra_nat.h \
+    vendor-mtk-hnat-header
+sparse_checkout_copy \
+    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
+    mt798x-mt799x-6.6-mtwifi \
+    target/linux/mediatek/patches-6.6/999-2741-mtkhnat-add-support-for-virtual-interface-a.patch \
+    target/linux/mediatek/patches-6.6/999-2741-mtkhnat-add-support-for-virtual-interface-a.patch \
+    vendor-mtk-hnat-patch-2741
+sparse_checkout_copy \
+    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
+    mt798x-mt799x-6.6-mtwifi \
+    target/linux/mediatek/patches-6.6/999-2742-mtkhnat-tnl-interface-offload-check.patch.patch \
+    target/linux/mediatek/patches-6.6/999-2742-mtkhnat-tnl-interface-offload-check.patch.patch \
+    vendor-mtk-hnat-patch-2742
+sparse_checkout_copy \
+    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
+    mt798x-mt799x-6.6-mtwifi \
+    target/linux/mediatek/patches-6.6/999-2743-mtkhnat-ipv6-fix-pskb-expand-head-limitatio.patch \
+    target/linux/mediatek/patches-6.6/999-2743-mtkhnat-ipv6-fix-pskb-expand-head-limitatio.patch \
+    vendor-mtk-hnat-patch-2743
+sparse_checkout_copy \
+    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
+    mt798x-mt799x-6.6-mtwifi \
+    target/linux/mediatek/patches-6.6/999-2745-mtkhnat-add-mtkhnat-driver-support.patch \
+    target/linux/mediatek/patches-6.6/999-2745-mtkhnat-add-mtkhnat-driver-support.patch \
+    vendor-mtk-hnat-patch-2745
+sparse_checkout_copy \
+    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
+    mt798x-mt799x-6.6-mtwifi \
+    target/linux/mediatek/patches-6.6/999-2746-mtkhnat-add-support-ppe-flow-check-interrupt.patch \
+    target/linux/mediatek/patches-6.6/999-2746-mtkhnat-add-support-ppe-flow-check-interrupt.patch \
+    vendor-mtk-hnat-patch-2746
+sparse_checkout_copy \
+    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
+    mt798x-mt799x-6.6-mtwifi \
+    target/linux/mediatek/patches-6.6/999-3020-flow-offload-add-mtkhnat-macvlan-support.patch \
+    target/linux/mediatek/patches-6.6/999-3020-flow-offload-add-mtkhnat-macvlan-support.patch \
+    vendor-mtk-hnat-patch-3020
+sparse_checkout_copy \
+    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
+    mt798x-mt799x-6.6-mtwifi \
+    target/linux/mediatek/patches-6.6/9991-dsa-hnat.patch \
+    target/linux/mediatek/patches-6.6/9991-dsa-hnat.patch \
+    vendor-mtk-hnat-patch-9991
+sparse_checkout_copy \
+    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
+    mt798x-mt799x-6.6-mtwifi \
+    target/linux/mediatek/patches-6.6/9992-dsa-exthnat-fix.patch \
+    target/linux/mediatek/patches-6.6/9992-dsa-exthnat-fix.patch \
+    vendor-mtk-hnat-patch-9992
+sparse_checkout_copy \
+    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
+    mt798x-mt799x-6.6-mtwifi \
+    target/linux/mediatek/patches-6.6/9996-ext-hnat.patch \
+    target/linux/mediatek/patches-6.6/9996-ext-hnat.patch \
+    vendor-mtk-hnat-patch-9996
+sparse_checkout_copy \
+    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
+    mt798x-mt799x-6.6-mtwifi \
+    target/linux/mediatek/patches-6.6/99999-hnat-extdevice-fix-fdberr.patch \
+    target/linux/mediatek/patches-6.6/99999-hnat-extdevice-fix-fdberr.patch \
+    vendor-mtk-hnat-patch-99999
 
 # The current 24.10-based tree lacks the xcrypt package block that defines libcrypt-compat.
 sparse_checkout_copy \
