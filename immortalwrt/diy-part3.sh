@@ -2,8 +2,8 @@
 
 # Merge_package
 function merge_package(){
-    repo=`echo $1 | rev | cut -d'/' -f 1 | rev`
-    pkg=`echo $2 | rev | cut -d'/' -f 1 | rev`
+    repo="${1##*/}"
+    pkg="${2##*/}"
     # find package/ -follow -name $pkg -not -path "package/openwrt-packages/*" | xargs -rt rm -rf
     git clone --depth=1 --single-branch $1
     [ -d package/openwrt-packages ] || mkdir -p package/openwrt-packages
@@ -26,10 +26,18 @@ sparse_checkout_copy() {
     local repo_branch="$2"
     local source_path="$3"
     local dest_path="$4"
-    local checkout_dir="$5"
-    rm -rf "$checkout_dir"
+    local checkout_prefix="$5"
+    local temp_root="${TMPDIR:-/tmp}"
+    local checkout_dir
+
+    if [ -n "$checkout_prefix" ]; then
+        checkout_dir="$(mktemp -d "$temp_root/${checkout_prefix}.XXXXXX")"
+    else
+        checkout_dir="$(mktemp -d "$temp_root/sparse-checkout.XXXXXX")"
+    fi
+
     git clone --depth=1 --filter=blob:none --sparse -b "$repo_branch" "$repo_url" "$checkout_dir"
-    git -C "$checkout_dir" sparse-checkout set "$source_path"
+    git -C "$checkout_dir" sparse-checkout set --skip-checks "$source_path"
 
     rm -rf "$dest_path"
     mkdir -p "$(dirname "$dest_path")"
@@ -265,5 +273,3 @@ patch_makefile_dep \
     package/boot/uboot-mediatek/patches/450-add-bpi-r4.patch \
     'CONFIG_BOOTDELAY=30' \
     'CONFIG_BOOTDELAY=10'
-    
-./scripts/feeds update -a
