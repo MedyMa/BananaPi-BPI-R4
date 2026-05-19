@@ -130,8 +130,5 @@ patch_makefile_dep \
     'CONFIG_BOOTDELAY=30' \
     'CONFIG_BOOTDELAY=10'
 
-# The mt_wifi7 packaging logic only aliases mt7990.b1.dat for BE13000_255,
-# but this tree maps Eagle to BE19000 and later unconditionally edits mt7990.b1.dat.
-
     
 ./scripts/feeds install -a
