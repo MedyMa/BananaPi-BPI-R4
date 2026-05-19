@@ -1,0 +1,92 @@
+#!/bin/sh
+
+. /etc/openwrt_release
+
+IEEE_PATH="/sys/class/ieee80211"
+THERMAL_PATH="/sys/class/thermal"
+NET_PATH="/sys/class/net"
+
+get_standard_wifi_temp() {
+	case "$DISTRIB_TARGET" in
+	ipq40xx/*|ipq806x/*)
+		awk '{printf("%.1f°C ", $0 / 1000)}' "$IEEE_PATH"/phy*/device/hwmon/hwmon*/temp1_input 2>"/dev/null" | awk '$1=$1'
+		;;
+	mediatek/mt7622)
+		awk '{printf("%.1f°C ", $0 / 1000)}' "$IEEE_PATH"/wl*/hwmon*/temp1_input 2>"/dev/null" | awk '$1=$1'
+		;;
+	*)
+		awk '{printf("%.1f°C ", $0 / 1000)}' "$IEEE_PATH"/phy*/hwmon*/temp1_input 2>"/dev/null" | awk '$1=$1'
+		;;
+	esac
+}
+
+get_mt_wifi7_iface_list() {
+	if command -v iw >/dev/null 2>&1; then
+		iw dev 2>/dev/null | awk '
+			$1 ~ /^phy#/ { phy = $1; next }
+			$1 == "Interface" && !seen[phy]++ { print $2 }
+		'
+		return
+	fi
+
+	for _iface in ra0 rax0 rai0 rae0; do
+		[ -d "$NET_PATH/$_iface" ] && echo "$_iface"
+	done
+}
+
+get_mt_wifi7_temp() {
+	_mt_seen=""
+	_mt_wifi=""
+
+	for _mt_iface in $(get_mt_wifi7_iface_list); do
+		case " $_mt_seen " in
+		*" $_mt_iface "*)
+			continue
+			;;
+		esac
+		_mt_seen="$_mt_seen $_mt_iface"
+
+		_mt_output="$(iwpriv "$_mt_iface" stat 2>/dev/null)"
+		_mt_temp="$(printf '%s\n' "$_mt_output" | sed -n 's/.*CurrentTemperature[[:space:]]*=[[:space:]]*\(-\{0,1\}[0-9]\+\).*/\1/p' | sed -n '1p')"
+
+		if [ -z "$_mt_temp" ]; then
+			_mt_output="$(iwpriv "$_mt_iface" set get_thermal_sensor=0 2>&1)"
+			_mt_temp="$(printf '%s\n' "$_mt_output" | sed -n 's/.*TMP Value = \(-\{0,1\}[0-9]\+\).*/\1/p' | sed -n '1p')"
+		fi
+
+		[ -n "$_mt_temp" ] || continue
+		_mt_wifi="${_mt_wifi:+$_mt_wifi }${_mt_iface}:${_mt_temp}°C"
+	done
+
+	[ -n "$_mt_wifi" ] || return 1
+	printf '%s' "$_mt_wifi"
+}
+
+wifi_temp="$(get_standard_wifi_temp)"
+
+# MediaTek vendor WiFi 7 does not expose the standard phy*/hwmon temp path.
+if [ -z "$wifi_temp" ] && command -v iwpriv >/dev/null 2>&1; then
+	wifi_temp="$(get_mt_wifi7_temp)"
+fi
+
+case "$DISTRIB_TARGET" in
+	ipq40xx/*)
+		if [ -e "$IEEE_PATH/phy0/hwmon0/temp1_input" ]; then
+			mt76_temp="$(awk -F ': ' '{print $2}' "$IEEE_PATH/phy0/hwmon0/temp1_input" 2>"/dev/null")°C"
+		fi
+		[ -z "$mt76_temp" ] || wifi_temp="${wifi_temp:+$wifi_temp }$mt76_temp"
+		;;
+	*)
+		cpu_temp="$(awk '{printf("%.1f°C", $0 / 1000)}' "$THERMAL_PATH/thermal_zone0/temp" 2>"/dev/null")"
+		;;
+	esac
+
+if [ -n "$cpu_temp" ] && [ -z "$wifi_temp" ]; then
+	echo -n "CPU: $cpu_temp"
+elif [ -z "$cpu_temp" ] && [ -n "$wifi_temp" ]; then
+	echo -n "WiFi: $wifi_temp"
+elif [ -n "$cpu_temp" ] && [ -n "$wifi_temp" ]; then
+	echo -n "CPU: $cpu_temp, WiFi: $wifi_temp"
+else
+	echo -n "No temperature info"
+fi
