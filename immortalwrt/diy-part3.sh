@@ -21,6 +21,23 @@ patch_makefile_dep() {
     sed -i "s|$old_text|$new_text|g" "$file_path"
 }
 
+sparse_checkout_copy() {
+    local repo_url="$1"
+    local repo_branch="$2"
+    local source_path="$3"
+    local dest_path="$4"
+    local checkout_dir="$5"
+
+    rm -rf "$checkout_dir"
+    git clone --depth=1 --filter=blob:none --sparse -b "$repo_branch" "$repo_url" "$checkout_dir"
+    git -C "$checkout_dir" sparse-checkout set "$source_path"
+
+    rm -rf "$dest_path"
+    mkdir -p "$(dirname "$dest_path")"
+    cp -a "$checkout_dir/$source_path" "$dest_path"
+    rm -rf "$checkout_dir"
+}
+
 
 rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/luci/applications/luci-app-argon-config
@@ -50,6 +67,41 @@ merge_package https://github.com/kenzok8/jell jell/wrtbwmon
 merge_package "-b ddnsto-beta https://github.com/linkease/nas-packages-luci" nas-packages-luci/luci/luci-app-ddnsto
 merge_package "-b ddnsto-beta https://github.com/linkease/nas-packages" nas-packages/network/services/ddnsto
 popd
+
+# Import the MTK vendor 6.6 package tree that is not shipped in ImmortalWrt openwrt-24.10.
+sparse_checkout_copy \
+    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
+    mt798x-mt799x-6.6-mtwifi \
+    package/mtk \
+    package/mtk \
+    vendor-mtk
+
+# datconf is selected by the MT7988 defconfig and expects its vendor tarball to
+# already exist under dl/ because the package Makefile has no source URL.
+sparse_checkout_copy \
+    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
+    mt798x-mt799x-6.6-mtwifi \
+    dl/datconf-757f9679.tar.bz2 \
+    dl/datconf-757f9679.tar.bz2 \
+    vendor-mtk-dl
+
+# The current 24.10-based tree lacks the xcrypt package block that defines libcrypt-compat.
+sparse_checkout_copy \
+    https://github.com/immortalwrt/immortalwrt \
+    openwrt-25.12 \
+    package/libs/xcrypt \
+    package/libs/xcrypt \
+    immortalwrt-core
+
+# Restore ImmortalWrt's status overview helpers and override tempinfo for mt_wifi7.
+sparse_checkout_copy \
+    https://github.com/immortalwrt/immortalwrt \
+    openwrt-24.10 \
+    package/emortal/autocore \
+    package/emortal/autocore \
+    immortalwrt-autocore
+cp -f $GITHUB_WORKSPACE/scripts/tempinfo package/emortal/autocore/files/tempinfo
+chmod 0755 package/emortal/autocore/files/tempinfo
 
 # add luci-app-mosdns
 rm -rf feeds/packages/lang/golang
