@@ -21,6 +21,33 @@ patch_makefile_dep() {
     sed -i "s|$old_text|$new_text|g" "$file_path"
 }
 
+patch_literal_block() {
+    local file_path="$1"
+    local old_text="$2"
+    local new_text="$3"
+    local perl_status
+
+    [ -f "$file_path" ] || return 0
+
+    PATCH_NEW_TEXT="$new_text" \
+        perl -0ne 'BEGIN { $new = $ENV{"PATCH_NEW_TEXT"}; }
+            exit(index($_, $new) >= 0 ? 0 : 1);' "$file_path"
+    if [ "$?" -eq 0 ]; then
+        return 0
+    fi
+
+    PATCH_OLD_TEXT="$old_text" PATCH_NEW_TEXT="$new_text" \
+        perl -0pi -e 'BEGIN { $old = $ENV{"PATCH_OLD_TEXT"}; $new = $ENV{"PATCH_NEW_TEXT"}; }
+            $count = s/\Q$old\E/$new/g;
+            END { exit($count > 0 ? 0 : 2); }' "$file_path"
+    perl_status=$?
+
+    [ "$perl_status" -eq 0 ] || {
+        echo "Failed to apply literal block patch to $file_path" >&2
+        return "$perl_status"
+    }
+}
+
 sparse_checkout_copy() {
     local repo_url="$1"
     local repo_branch="$2"
@@ -249,6 +276,13 @@ sparse_checkout_copy_many \
     target/linux/mediatek/patches-6.6/999-3005-netfilter-add-DEV_PATH_MTK_WDMA-path-to-xt_FLOWOFFLO.patch \
     target/linux/mediatek/patches-6.6/999-3007-net-ethernet-mtk_ppe-add-roaming-handler.patch \
     target/linux/mediatek/patches-6.6/999-3007-net-ethernet-mtk_ppe-add-roaming-handler.patch
+
+# linux-6.6.139 still keeps mtk_ppe_update_mtu() between deinit and start, so
+# rebase the imported roaming patch hunk to the current header layout.
+patch_literal_block \
+    target/linux/mediatek/patches-6.6/999-3007-net-ethernet-mtk_ppe-add-roaming-handler.patch \
+    $'@@ -350,6 +350,8 @@ struct mtk_ppe {\n struct mtk_ppe *mtk_ppe_init(struct mtk_eth *eth, void __iomem *base, int index);\n \n void mtk_ppe_deinit(struct mtk_eth *eth);\n+int mtk_ppe_roaming_start(struct mtk_eth *eth);\n+int mtk_ppe_roaming_stop(struct mtk_eth *eth);\n void mtk_ppe_start(struct mtk_ppe *ppe);\n int mtk_ppe_stop(struct mtk_ppe *ppe);\n int mtk_ppe_prepare_reset(struct mtk_ppe *ppe);' \
+    $'@@ -350,7 +350,9 @@ struct mtk_ppe {\n struct mtk_ppe *mtk_ppe_init(struct mtk_eth *eth, void __iomem *base, int index);\n \n void mtk_ppe_deinit(struct mtk_eth *eth);\n+int mtk_ppe_roaming_start(struct mtk_eth *eth);\n+int mtk_ppe_roaming_stop(struct mtk_eth *eth);\n void mtk_ppe_update_mtu(struct mtk_ppe *ppe, int mtu);\n void mtk_ppe_start(struct mtk_ppe *ppe);\n int mtk_ppe_stop(struct mtk_ppe *ppe);\n int mtk_ppe_prepare_reset(struct mtk_ppe *ppe);'
 
 if ! grep -q 'KernelPackage/mediatek_hnat' target/linux/mediatek/modules.mk; then
 cat >> target/linux/mediatek/modules.mk <<'EOF'
