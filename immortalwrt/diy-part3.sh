@@ -137,6 +137,9 @@ sparse_checkout_copy \
 # already exist under dl/ because the package Makefile has no source URL.
 # MTK HNAT is not present in the upstream 24.10 mediatek target, but the
 # imported MTK WiFi/WARP stack selects and depends on it.
+# The vendor HNAT patches sit on top of a contiguous mtk_eth_soc patch train
+# plus companion debug/reset sources. Cherry-picking later patches without that
+# base breaks 24.10 kernel patch application.
 sparse_checkout_copy_many \
     https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
     mt798x-mt799x-6.6-mtwifi \
@@ -144,10 +147,42 @@ sparse_checkout_copy_many \
     partial \
     dl/datconf-757f9679.tar.bz2 \
     dl/datconf-757f9679.tar.bz2 \
+    target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_eth_dbg.c \
+    target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_eth_dbg.c \
+    target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_eth_dbg.h \
+    target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_eth_dbg.h \
+    target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_eth_reset.c \
+    target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_eth_reset.c \
+    target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_eth_reset.h \
+    target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_eth_reset.h \
     target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_hnat \
     target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_hnat \
     target/linux/mediatek/files-6.6/include/net/ra_nat.h \
     target/linux/mediatek/files-6.6/include/net/ra_nat.h \
+    target/linux/mediatek/patches-6.6/999-2700-net-ethernet-mtk_eth_soc-add-mdio-reset-delay.patch \
+    target/linux/mediatek/patches-6.6/999-2700-net-ethernet-mtk_eth_soc-add-mdio-reset-delay.patch \
+    target/linux/mediatek/patches-6.6/999-2701-net-ethernet-mtk_eth_soc-remove-pextp-reset.patch \
+    target/linux/mediatek/patches-6.6/999-2701-net-ethernet-mtk_eth_soc-remove-pextp-reset.patch \
+    target/linux/mediatek/patches-6.6/999-2702-net-ethernet-mtk_eth_soc-revise-xgmac-force-mode.patch \
+    target/linux/mediatek/patches-6.6/999-2702-net-ethernet-mtk_eth_soc-revise-xgmac-force-mode.patch \
+    target/linux/mediatek/patches-6.6/999-2704-net-ethernet-mtk_eth_soc-revise-mdc-divider-configur.patch \
+    target/linux/mediatek/patches-6.6/999-2704-net-ethernet-mtk_eth_soc-revise-mdc-divider-configur.patch \
+    target/linux/mediatek/patches-6.6/999-2705-net-ethernet-mtk_eth_soc-support-proprietary-debugfs.patch \
+    target/linux/mediatek/patches-6.6/999-2705-net-ethernet-mtk_eth_soc-support-proprietary-debugfs.patch \
+    target/linux/mediatek/patches-6.6/999-2706-net-ethernet-mtk_eth_soc-support-forced-reset-contro.patch \
+    target/linux/mediatek/patches-6.6/999-2706-net-ethernet-mtk_eth_soc-support-forced-reset-contro.patch \
+    target/linux/mediatek/patches-6.6/999-2707-net-ethernet-mtk_eth_soc-add-hw-dump-for-forced-rese.patch \
+    target/linux/mediatek/patches-6.6/999-2707-net-ethernet-mtk_eth_soc-add-hw-dump-for-forced-rese.patch \
+    target/linux/mediatek/patches-6.6/999-2708-net-ethernet-mtk_eth_soc-support-ethernet-passive-mu.patch \
+    target/linux/mediatek/patches-6.6/999-2708-net-ethernet-mtk_eth_soc-support-ethernet-passive-mu.patch \
+    target/linux/mediatek/patches-6.6/999-2709-net-ethernet-mtk_eth_soc-fix-panic-issue-with-napi_enable.patch \
+    target/linux/mediatek/patches-6.6/999-2709-net-ethernet-mtk_eth_soc-fix-panic-issue-with-napi_enable.patch \
+    target/linux/mediatek/patches-6.6/999-2710-net-ethernet-mtk_eth_soc-add-rss-lro-reg.patch \
+    target/linux/mediatek/patches-6.6/999-2710-net-ethernet-mtk_eth_soc-add-rss-lro-reg.patch \
+    target/linux/mediatek/patches-6.6/999-2711-net-ethernet-mtk_eth_soc-add-rss-support.patch \
+    target/linux/mediatek/patches-6.6/999-2711-net-ethernet-mtk_eth_soc-add-rss-support.patch \
+    target/linux/mediatek/patches-6.6/999-2712-net-ethernet-mtk_eth_soc-add-lro-support.patch \
+    target/linux/mediatek/patches-6.6/999-2712-net-ethernet-mtk_eth_soc-add-lro-support.patch \
     target/linux/mediatek/patches-6.6/999-2713-net-ethernet-mtk_eth_soc-refactor-SER-monitor.patch \
     target/linux/mediatek/patches-6.6/999-2713-net-ethernet-mtk_eth_soc-refactor-SER-monitor.patch \
     target/linux/mediatek/patches-6.6/999-2741-mtkhnat-add-support-for-virtual-interface-a.patch \
