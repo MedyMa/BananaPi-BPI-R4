@@ -27,6 +27,21 @@ sparse_checkout_copy() {
     local source_path="$3"
     local dest_path="$4"
     local checkout_prefix="$5"
+    local clone_mode="${6:-partial}"
+    local checkout_dir
+
+    checkout_dir="$(sparse_checkout_init "$repo_url" "$repo_branch" "$checkout_prefix" "$clone_mode")"
+    git -C "$checkout_dir" sparse-checkout set --skip-checks "$source_path"
+
+    sparse_checkout_copy_from_dir "$checkout_dir" "$source_path" "$dest_path"
+    rm -rf "$checkout_dir"
+}
+
+sparse_checkout_init() {
+    local repo_url="$1"
+    local repo_branch="$2"
+    local checkout_prefix="$3"
+    local clone_mode="${4:-partial}"
     local temp_root="${TMPDIR:-/tmp}"
     local checkout_dir
 
@@ -36,12 +51,49 @@ sparse_checkout_copy() {
         checkout_dir="$(mktemp -d "$temp_root/sparse-checkout.XXXXXX")"
     fi
 
-    git clone --depth=1 --filter=blob:none --sparse -b "$repo_branch" "$repo_url" "$checkout_dir"
-    git -C "$checkout_dir" sparse-checkout set --skip-checks "$source_path"
+    if [ "$clone_mode" = "full" ]; then
+        git clone --depth=1 --sparse -b "$repo_branch" "$repo_url" "$checkout_dir"
+    else
+        git clone --depth=1 --filter=blob:none --sparse -b "$repo_branch" "$repo_url" "$checkout_dir"
+    fi
+
+    printf '%s\n' "$checkout_dir"
+}
+
+sparse_checkout_copy_from_dir() {
+    local checkout_dir="$1"
+    local source_path="$2"
+    local dest_path="$3"
 
     rm -rf "$dest_path"
     mkdir -p "$(dirname "$dest_path")"
     cp -a "$checkout_dir/$source_path" "$dest_path"
+}
+
+sparse_checkout_copy_many() {
+    local repo_url="$1"
+    local repo_branch="$2"
+    local checkout_prefix="$3"
+    local clone_mode="${4:-partial}"
+    local checkout_dir
+    local source_paths=()
+    local dest_paths=()
+    local index
+
+    shift 4
+    while [ "$#" -gt 0 ]; do
+        source_paths+=("$1")
+        dest_paths+=("$2")
+        shift 2
+    done
+
+    checkout_dir="$(sparse_checkout_init "$repo_url" "$repo_branch" "$checkout_prefix" "$clone_mode")"
+    git -C "$checkout_dir" sparse-checkout set --skip-checks "${source_paths[@]}"
+
+    for index in "${!source_paths[@]}"; do
+        sparse_checkout_copy_from_dir "$checkout_dir" "${source_paths[$index]}" "${dest_paths[$index]}"
+    done
+
     rm -rf "$checkout_dir"
 }
 
@@ -83,117 +135,49 @@ sparse_checkout_copy \
 
 # datconf is selected by the MT7988 defconfig and expects its vendor tarball to
 # already exist under dl/ because the package Makefile has no source URL.
-sparse_checkout_copy \
-    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
-    mt798x-mt799x-6.6-mtwifi \
-    dl/datconf-757f9679.tar.bz2 \
-    dl/datconf-757f9679.tar.bz2 \
-    vendor-mtk-dl
-
 # MTK HNAT is not present in the upstream 24.10 mediatek target, but the
 # imported MTK WiFi/WARP stack selects and depends on it.
-sparse_checkout_copy \
+sparse_checkout_copy_many \
     https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
     mt798x-mt799x-6.6-mtwifi \
+    vendor-mtk-assets \
+    partial \
+    dl/datconf-757f9679.tar.bz2 \
+    dl/datconf-757f9679.tar.bz2 \
     target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_hnat \
     target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_hnat \
-    vendor-mtk-hnat
-sparse_checkout_copy \
-    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
-    mt798x-mt799x-6.6-mtwifi \
     target/linux/mediatek/files-6.6/include/net/ra_nat.h \
     target/linux/mediatek/files-6.6/include/net/ra_nat.h \
-    vendor-mtk-hnat-header
-sparse_checkout_copy \
-    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
-    mt798x-mt799x-6.6-mtwifi \
     target/linux/mediatek/patches-6.6/999-2713-net-ethernet-mtk_eth_soc-refactor-SER-monitor.patch \
     target/linux/mediatek/patches-6.6/999-2713-net-ethernet-mtk_eth_soc-refactor-SER-monitor.patch \
-    vendor-mtk-hnat-patch-2713
-sparse_checkout_copy \
-    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
-    mt798x-mt799x-6.6-mtwifi \
     target/linux/mediatek/patches-6.6/999-2741-mtkhnat-add-support-for-virtual-interface-a.patch \
     target/linux/mediatek/patches-6.6/999-2741-mtkhnat-add-support-for-virtual-interface-a.patch \
-    vendor-mtk-hnat-patch-2741
-sparse_checkout_copy \
-    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
-    mt798x-mt799x-6.6-mtwifi \
     target/linux/mediatek/patches-6.6/999-2742-mtkhnat-tnl-interface-offload-check.patch.patch \
     target/linux/mediatek/patches-6.6/999-2742-mtkhnat-tnl-interface-offload-check.patch.patch \
-    vendor-mtk-hnat-patch-2742
-sparse_checkout_copy \
-    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
-    mt798x-mt799x-6.6-mtwifi \
     target/linux/mediatek/patches-6.6/999-2743-mtkhnat-ipv6-fix-pskb-expand-head-limitatio.patch \
     target/linux/mediatek/patches-6.6/999-2743-mtkhnat-ipv6-fix-pskb-expand-head-limitatio.patch \
-    vendor-mtk-hnat-patch-2743
-sparse_checkout_copy \
-    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
-    mt798x-mt799x-6.6-mtwifi \
     target/linux/mediatek/patches-6.6/999-2745-mtkhnat-add-mtkhnat-driver-support.patch \
     target/linux/mediatek/patches-6.6/999-2745-mtkhnat-add-mtkhnat-driver-support.patch \
-    vendor-mtk-hnat-patch-2745
-sparse_checkout_copy \
-    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
-    mt798x-mt799x-6.6-mtwifi \
     target/linux/mediatek/patches-6.6/999-2746-mtkhnat-add-support-ppe-flow-check-interrupt.patch \
     target/linux/mediatek/patches-6.6/999-2746-mtkhnat-add-support-ppe-flow-check-interrupt.patch \
-    vendor-mtk-hnat-patch-2746
-sparse_checkout_copy \
-    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
-    mt798x-mt799x-6.6-mtwifi \
     target/linux/mediatek/patches-6.6/999-2747-crypto-eth-inline.patch \
     target/linux/mediatek/patches-6.6/999-2747-crypto-eth-inline.patch \
-    vendor-mtk-hnat-patch-2747-crypto
-sparse_checkout_copy \
-    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
-    mt798x-mt799x-6.6-mtwifi \
     target/linux/mediatek/patches-6.6/999-2747-net-ethernet-mtk_eth_soc-add-proprietary-SER-flow.patch \
     target/linux/mediatek/patches-6.6/999-2747-net-ethernet-mtk_eth_soc-add-proprietary-SER-flow.patch \
-    vendor-mtk-hnat-patch-2747-ser
-sparse_checkout_copy \
-    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
-    mt798x-mt799x-6.6-mtwifi \
     target/linux/mediatek/patches-6.6/999-3020-flow-offload-add-mtkhnat-macvlan-support.patch \
     target/linux/mediatek/patches-6.6/999-3020-flow-offload-add-mtkhnat-macvlan-support.patch \
-    vendor-mtk-hnat-patch-3020
-sparse_checkout_copy \
-    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
-    mt798x-mt799x-6.6-mtwifi \
     target/linux/mediatek/patches-6.6/999-3007-net-ethernet-mtk_ppe-add-roaming-handler.patch \
     target/linux/mediatek/patches-6.6/999-3007-net-ethernet-mtk_ppe-add-roaming-handler.patch \
-    vendor-mtk-hnat-patch-3007
-sparse_checkout_copy \
-    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
-    mt798x-mt799x-6.6-mtwifi \
     target/linux/mediatek/patches-6.6/9991-dsa-hnat.patch \
     target/linux/mediatek/patches-6.6/9991-dsa-hnat.patch \
-    vendor-mtk-hnat-patch-9991
-sparse_checkout_copy \
-    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
-    mt798x-mt799x-6.6-mtwifi \
     target/linux/mediatek/patches-6.6/9992-dsa-exthnat-fix.patch \
     target/linux/mediatek/patches-6.6/9992-dsa-exthnat-fix.patch \
-    vendor-mtk-hnat-patch-9992
-sparse_checkout_copy \
-    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
-    mt798x-mt799x-6.6-mtwifi \
     target/linux/mediatek/patches-6.6/9996-ext-hnat.patch \
     target/linux/mediatek/patches-6.6/9996-ext-hnat.patch \
-    vendor-mtk-hnat-patch-9996
-sparse_checkout_copy \
-    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
-    mt798x-mt799x-6.6-mtwifi \
     target/linux/mediatek/patches-6.6/9999-reset.patch \
     target/linux/mediatek/patches-6.6/9999-reset.patch \
-    vendor-mtk-hnat-patch-9999
-sparse_checkout_copy \
-    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
-    mt798x-mt799x-6.6-mtwifi \
     target/linux/mediatek/patches-6.6/99999-hnat-extdevice-fix-fdberr.patch \
-    target/linux/mediatek/patches-6.6/99999-hnat-extdevice-fix-fdberr.patch \
-    vendor-mtk-hnat-patch-99999
+    target/linux/mediatek/patches-6.6/99999-hnat-extdevice-fix-fdberr.patch
 
 if ! grep -q 'KernelPackage/mediatek_hnat' target/linux/mediatek/modules.mk; then
 cat >> target/linux/mediatek/modules.mk <<'EOF'
@@ -221,7 +205,8 @@ sparse_checkout_copy \
     openwrt-25.12 \
     package/libs/xcrypt \
     package/libs/xcrypt \
-    immortalwrt-core
+    immortalwrt-core \
+    full
 
 # Restore ImmortalWrt's status overview helpers and override tempinfo for mt_wifi7.
 sparse_checkout_copy \
@@ -229,7 +214,8 @@ sparse_checkout_copy \
     openwrt-24.10 \
     package/emortal/autocore \
     package/emortal/autocore \
-    immortalwrt-autocore
+    immortalwrt-autocore \
+    full
 cp -f $GITHUB_WORKSPACE/scripts/tempinfo package/emortal/autocore/files/tempinfo
 chmod 0755 package/emortal/autocore/files/tempinfo
 
