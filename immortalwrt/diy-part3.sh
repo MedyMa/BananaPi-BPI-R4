@@ -250,13 +250,11 @@ sparse_checkout_copy_many \
     target/linux/mediatek/patches-6.6/9996-ext-hnat.patch \
     target/linux/mediatek/patches-6.6/9996-ext-hnat.patch \
     target/linux/mediatek/patches-6.6/9999-reset.patch \
-    target/linux/mediatek/patches-6.6/9999-reset.patch \
-    target/linux/mediatek/patches-6.6/99999-hnat-extdevice-fix-fdberr.patch \
-    target/linux/mediatek/patches-6.6/99999-hnat-extdevice-fix-fdberr.patch
+    target/linux/mediatek/patches-6.6/9999-reset.patch
 
 # The openwrt-24.10-6.6 branch carries the 3000-series PPE patches rebased onto
-# the upstream 24.10 kernel layout, including a roaming-handler variant that
-# does not depend on the extra mtwifi-only ftnetlink patch train.
+# the upstream 24.10 kernel layout, plus the ext-hnat FDB fix rebased for
+# linux-6.6.139 without the extra mtwifi-only ftnetlink patch train.
 sparse_checkout_copy_many \
     https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
     openwrt-24.10-6.6 \
@@ -275,7 +273,9 @@ sparse_checkout_copy_many \
     target/linux/mediatek/patches-6.6/999-3005-netfilter-add-DEV_PATH_MTK_WDMA-path-to-xt_FLOWOFFLO.patch \
     target/linux/mediatek/patches-6.6/999-3005-netfilter-add-DEV_PATH_MTK_WDMA-path-to-xt_FLOWOFFLO.patch \
     target/linux/mediatek/patches-6.6/999-3007-net-ethernet-mtk_ppe-add-roaming-handler.patch \
-    target/linux/mediatek/patches-6.6/999-3007-net-ethernet-mtk_ppe-add-roaming-handler.patch
+    target/linux/mediatek/patches-6.6/999-3007-net-ethernet-mtk_ppe-add-roaming-handler.patch \
+    target/linux/mediatek/patches-6.6/9999-fix-ext-hnat-with-fdb-error.patch \
+    target/linux/mediatek/patches-6.6/99999-hnat-extdevice-fix-fdberr.patch
 
 # linux-6.6.139 still keeps mtk_ppe_update_mtu() between deinit and start, so
 # rebase the imported roaming patch hunk to the current header layout.
