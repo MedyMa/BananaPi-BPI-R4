@@ -19,6 +19,9 @@ CONFIG_IPV6=y
 CONFIG_DRIVER_11AC_SUPPORT=y
 CONFIG_DRIVER_11AX_SUPPORT=y
 CONFIG_DRIVER_11BE_SUPPORT=y
+# Keep the upstream mt76/mt7996 path out of the vendor WiFi7 build.
+# CONFIG_PACKAGE_kmod-mt7996-firmware is not set
+# CONFIG_PACKAGE_kmod-mt7996-233-firmware is not set
 
 # Keep the nftables firewall / IPv6 userspace explicit.
 CONFIG_PACKAGE_firewall4=y
