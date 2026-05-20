@@ -288,7 +288,26 @@ mkdir -p target/linux/mediatek/filogic/base-files/etc/hotplug.d/iface
 cp -f $GITHUB_WORKSPACE/patches/filogic/99-bpi-r4-sfp-retrain \
     target/linux/mediatek/filogic/base-files/etc/hotplug.d/iface/99-bpi-r4-sfp-retrain
 chmod 0755 target/linux/mediatek/filogic/base-files/etc/hotplug.d/iface/99-bpi-r4-sfp-retrain
-    
+
+    # openwrt-24.10 compatibility fixes for floating packages feed metadata.
+patch_makefile_dep \
+    feeds/packages/lang/python/python-ubus/Makefile \
+    'PKG_BUILD_DEPENDS:=python-setuptools/host' \
+    'PKG_BUILD_DEPENDS:=python3/host'
+patch_makefile_dep \
+    package/feeds/packages/python-ubus/Makefile \
+    'PKG_BUILD_DEPENDS:=python-setuptools/host' \
+    'PKG_BUILD_DEPENDS:=python3/host'
+
+patch_makefile_dep \
+    feeds/packages/admin/zabbix/Makefile \
+    'libnetsnmp-ssl' \
+    'libnetsnmp'
+patch_makefile_dep \
+    package/feeds/packages/zabbix/Makefile \
+    'libnetsnmp-ssl' \
+    'libnetsnmp'
+
 # Shrink the BPI-R4 U-Boot autoboot wait so boot time is not dominated by a 30s delay.
 patch_makefile_dep \
     package/boot/uboot-mediatek/patches/450-add-bpi-r4.patch \
