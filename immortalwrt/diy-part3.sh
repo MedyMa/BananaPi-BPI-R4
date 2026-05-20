@@ -185,6 +185,18 @@ sparse_checkout_copy_many \
     target/linux/mediatek/patches-6.6/999-2712-net-ethernet-mtk_eth_soc-add-lro-support.patch \
     target/linux/mediatek/patches-6.6/999-2713-net-ethernet-mtk_eth_soc-refactor-SER-monitor.patch \
     target/linux/mediatek/patches-6.6/999-2713-net-ethernet-mtk_eth_soc-refactor-SER-monitor.patch \
+    target/linux/mediatek/patches-6.6/999-2735-netfilter-nf_flow_table-support-hw-offload-through-v.patch \
+    target/linux/mediatek/patches-6.6/999-2735-netfilter-nf_flow_table-support-hw-offload-through-v.patch \
+    target/linux/mediatek/patches-6.6/999-2736-net-8021q-support-hardware-flow-table-offload.patch \
+    target/linux/mediatek/patches-6.6/999-2736-net-8021q-support-hardware-flow-table-offload.patch \
+    target/linux/mediatek/patches-6.6/999-2737-net-bridge-support-hardware-flow-table-offload.patch \
+    target/linux/mediatek/patches-6.6/999-2737-net-bridge-support-hardware-flow-table-offload.patch \
+    target/linux/mediatek/patches-6.6/999-2738-net-pppoe-support-hardware-flow-table-offload.patch \
+    target/linux/mediatek/patches-6.6/999-2738-net-pppoe-support-hardware-flow-table-offload.patch \
+    target/linux/mediatek/patches-6.6/999-2739-net-dsa-support-hardware-flow-table-offload.patch \
+    target/linux/mediatek/patches-6.6/999-2739-net-dsa-support-hardware-flow-table-offload.patch \
+    target/linux/mediatek/patches-6.6/999-2740-net-macvlan-support-hardware-flow-table-offload.patch \
+    target/linux/mediatek/patches-6.6/999-2740-net-macvlan-support-hardware-flow-table-offload.patch \
     target/linux/mediatek/patches-6.6/999-2741-mtkhnat-add-support-for-virtual-interface-a.patch \
     target/linux/mediatek/patches-6.6/999-2741-mtkhnat-add-support-for-virtual-interface-a.patch \
     target/linux/mediatek/patches-6.6/999-2742-mtkhnat-tnl-interface-offload-check.patch.patch \
@@ -243,7 +255,7 @@ sparse_checkout_copy \
     immortalwrt-core \
     full
 
-# openwrt-24.10 already ships autocore; only override tempinfo for mt_wifi7.
+# Restore ImmortalWrt's status overview helpers and override tempinfo for mt_wifi7.
 sparse_checkout_copy \
     https://github.com/immortalwrt/immortalwrt \
     openwrt-24.10 \
@@ -251,7 +263,8 @@ sparse_checkout_copy \
     package/emortal/autocore \
     immortalwrt-autocore \
     full
-cp -f $GITHUB_WORKSPACE/scripts/tempinfo package/emortal/autocore/files/tempinfo
+
+cp -f "$GITHUB_WORKSPACE/scripts/tempinfo" package/emortal/autocore/files/tempinfo
 chmod 0755 package/emortal/autocore/files/tempinfo
 
 # add luci-app-mosdns
@@ -289,7 +302,7 @@ cp -f $GITHUB_WORKSPACE/patches/filogic/99-bpi-r4-sfp-retrain \
     target/linux/mediatek/filogic/base-files/etc/hotplug.d/iface/99-bpi-r4-sfp-retrain
 chmod 0755 target/linux/mediatek/filogic/base-files/etc/hotplug.d/iface/99-bpi-r4-sfp-retrain
 
-    # openwrt-24.10 compatibility fixes for floating packages feed metadata.
+# openwrt-24.10 compatibility fixes for floating packages feed metadata.
 patch_makefile_dep \
     feeds/packages/lang/python/python-ubus/Makefile \
     'PKG_BUILD_DEPENDS:=python-setuptools/host' \
@@ -307,7 +320,7 @@ patch_makefile_dep \
     package/feeds/packages/zabbix/Makefile \
     'libnetsnmp-ssl' \
     'libnetsnmp'
-
+       
 # Shrink the BPI-R4 U-Boot autoboot wait so boot time is not dominated by a 30s delay.
 patch_makefile_dep \
     package/boot/uboot-mediatek/patches/450-add-bpi-r4.patch \
