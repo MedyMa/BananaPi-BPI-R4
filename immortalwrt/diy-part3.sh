@@ -244,6 +244,13 @@ sparse_checkout_copy \
     full
 
 # openwrt-24.10 already ships autocore; only override tempinfo for mt_wifi7.
+sparse_checkout_copy \
+    https://github.com/immortalwrt/immortalwrt \
+    openwrt-24.10 \
+    package/emortal/autocore \
+    package/emortal/autocore \
+    immortalwrt-autocore \
+    full
 cp -f $GITHUB_WORKSPACE/scripts/tempinfo package/emortal/autocore/files/tempinfo
 chmod 0755 package/emortal/autocore/files/tempinfo
 
