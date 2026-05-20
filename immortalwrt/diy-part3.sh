@@ -274,6 +274,10 @@ sparse_checkout_copy_many \
     target/linux/mediatek/patches-6.6/999-3005-netfilter-add-DEV_PATH_MTK_WDMA-path-to-xt_FLOWOFFLO.patch \
     target/linux/mediatek/patches-6.6/999-3007-net-ethernet-mtk_ppe-add-roaming-handler.patch \
     target/linux/mediatek/patches-6.6/999-3007-net-ethernet-mtk_ppe-add-roaming-handler.patch \
+    target/linux/mediatek/patches-6.6/999-3008-net-ethernet-mtk_ppe-enable-CS0_PIPE-and-SRH_CACHE_F.patch \
+    target/linux/mediatek/patches-6.6/999-3008-net-ethernet-mtk_ppe-enable-CS0_PIPE-and-SRH_CACHE_F.patch \
+    target/linux/mediatek/patches-6.6/999-3009-net-ethernet-mtk_ppe-fix-typo-for-enabling-MIB-cache.patch \
+    target/linux/mediatek/patches-6.6/999-3009-net-ethernet-mtk_ppe-fix-typo-for-enabling-MIB-cache.patch \
     target/linux/mediatek/patches-6.6/9997-hnat.patch \
     target/linux/mediatek/patches-6.6/9997-hnat.patch \
     target/linux/mediatek/patches-6.6/9999-fix-ext-hnat-with-fdb-error.patch \
