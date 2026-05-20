@@ -139,7 +139,10 @@ sparse_checkout_copy \
 # imported MTK WiFi/WARP stack selects and depends on it.
 # The vendor HNAT patches sit on top of a contiguous mtk_eth_soc patch train
 # plus companion debug/reset sources. Cherry-picking later patches without that
-# base breaks 24.10 kernel patch application.
+# base breaks 24.10 kernel patch application. Keep the main asset import on the
+# mtwifi branch for WARP/HNAT support, but source the 3000-series PPE QoS and
+# roaming patches from the 24.10-rebased branch below; the mtwifi variant of
+# 999-3007 expects extra ftnetlink changes and no longer applies cleanly.
 sparse_checkout_copy_many \
     https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
     mt798x-mt799x-6.6-mtwifi \
@@ -213,8 +216,6 @@ sparse_checkout_copy_many \
     target/linux/mediatek/patches-6.6/999-2747-net-ethernet-mtk_eth_soc-add-proprietary-SER-flow.patch \
     target/linux/mediatek/patches-6.6/999-3020-flow-offload-add-mtkhnat-macvlan-support.patch \
     target/linux/mediatek/patches-6.6/999-3020-flow-offload-add-mtkhnat-macvlan-support.patch \
-    target/linux/mediatek/patches-6.6/999-3007-net-ethernet-mtk_ppe-add-roaming-handler.patch \
-    target/linux/mediatek/patches-6.6/999-3007-net-ethernet-mtk_ppe-add-roaming-handler.patch \
     target/linux/mediatek/patches-6.6/9991-dsa-hnat.patch \
     target/linux/mediatek/patches-6.6/9991-dsa-hnat.patch \
     target/linux/mediatek/patches-6.6/9992-dsa-exthnat-fix.patch \
@@ -225,6 +226,29 @@ sparse_checkout_copy_many \
     target/linux/mediatek/patches-6.6/9999-reset.patch \
     target/linux/mediatek/patches-6.6/99999-hnat-extdevice-fix-fdberr.patch \
     target/linux/mediatek/patches-6.6/99999-hnat-extdevice-fix-fdberr.patch
+
+# The openwrt-24.10-6.6 branch carries the 3000-series PPE patches rebased onto
+# the upstream 24.10 kernel layout, including a roaming-handler variant that
+# does not depend on the extra mtwifi-only ftnetlink patch train.
+sparse_checkout_copy_many \
+    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
+    openwrt-24.10-6.6 \
+    vendor-mtk-2410-ppe \
+    partial \
+    target/linux/mediatek/patches-6.6/999-3000-netfilter-add-bridging-support-to-xt_FLOWOFFLOAD.patch \
+    target/linux/mediatek/patches-6.6/999-3000-netfilter-add-bridging-support-to-xt_FLOWOFFLOAD.patch \
+    target/linux/mediatek/patches-6.6/999-3001-net-ethernet-mtk_ppe-change-to-internal-ppe-debugfs.patch \
+    target/linux/mediatek/patches-6.6/999-3001-net-ethernet-mtk_ppe-change-to-internal-ppe-debugfs.patch \
+    target/linux/mediatek/patches-6.6/999-3002-net-ethernet-mtk_ppe-keep-sp-in-the-info1.patch \
+    target/linux/mediatek/patches-6.6/999-3002-net-ethernet-mtk_ppe-keep-sp-in-the-info1.patch \
+    target/linux/mediatek/patches-6.6/999-3003-net-ethernet-mtk_ppe-change-to-internal-QoS-mode.patch \
+    target/linux/mediatek/patches-6.6/999-3003-net-ethernet-mtk_ppe-change-to-internal-QoS-mode.patch \
+    target/linux/mediatek/patches-6.6/999-3004-netfilter-add-DSCP-learning-flow-to-xt_FLOWOFFLOAD.patch \
+    target/linux/mediatek/patches-6.6/999-3004-netfilter-add-DSCP-learning-flow-to-xt_FLOWOFFLOAD.patch \
+    target/linux/mediatek/patches-6.6/999-3005-netfilter-add-DEV_PATH_MTK_WDMA-path-to-xt_FLOWOFFLO.patch \
+    target/linux/mediatek/patches-6.6/999-3005-netfilter-add-DEV_PATH_MTK_WDMA-path-to-xt_FLOWOFFLO.patch \
+    target/linux/mediatek/patches-6.6/999-3007-net-ethernet-mtk_ppe-add-roaming-handler.patch \
+    target/linux/mediatek/patches-6.6/999-3007-net-ethernet-mtk_ppe-add-roaming-handler.patch
 
 if ! grep -q 'KernelPackage/mediatek_hnat' target/linux/mediatek/modules.mk; then
 cat >> target/linux/mediatek/modules.mk <<'EOF'
@@ -297,7 +321,7 @@ elif [ -d target/linux/mediatek/patches-6.6 ]; then
 fi
 
 # Some BPi-R4 SFP links come up without carrier until they are retrained once.
-mkdir -p target/linux/mediatek/filogic/base-files/etc/hotplug.d/iface   
+mkdir -p target/linux/mediatek/filogic/base-files/etc/hotplug.d/iface
 cp -f $GITHUB_WORKSPACE/patches/filogic/99-bpi-r4-sfp-retrain \
     target/linux/mediatek/filogic/base-files/etc/hotplug.d/iface/99-bpi-r4-sfp-retrain
 chmod 0755 target/linux/mediatek/filogic/base-files/etc/hotplug.d/iface/99-bpi-r4-sfp-retrain
@@ -320,7 +344,6 @@ patch_makefile_dep \
     package/feeds/packages/zabbix/Makefile \
     'libnetsnmp-ssl' \
     'libnetsnmp'
-       
 # Shrink the BPI-R4 U-Boot autoboot wait so boot time is not dominated by a 30s delay.
 patch_makefile_dep \
     package/boot/uboot-mediatek/patches/450-add-bpi-r4.patch \
