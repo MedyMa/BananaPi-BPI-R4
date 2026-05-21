@@ -60,10 +60,20 @@ apply_wireless_regdb_overlay() {
 }
 
 apply_wifi_mlo_uci_backport() {
-    local anchor="package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/supplicant.uc"
+    local legacy_anchor="package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/supplicant.uc"
+    local shell_anchor="package/network/config/wifi-scripts/files/lib/netifd/hostapd.sh"
 
-    [ -f "$anchor" ] || return 0
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/996-wifi-scripts-add-mlo-uci-passthrough.patch"
+    if [ -f "$legacy_anchor" ]; then
+        apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/996-wifi-scripts-add-mlo-uci-passthrough.patch"
+        return 0
+    fi
+
+    if [ -f "$shell_anchor" ]; then
+        apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/996-wifi-scripts-add-mlo-uci-passthrough-24.10.patch"
+        return 0
+    fi
+
+    return 0
 }
 
 rm -rf feeds/luci/themes/luci-theme-argon
