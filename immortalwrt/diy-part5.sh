@@ -109,23 +109,13 @@ merge_package "-b ddnsto-beta https://github.com/linkease/nas-packages-luci" nas
 merge_package "-b ddnsto-beta https://github.com/linkease/nas-packages" nas-packages/network/services/ddnsto
 popd
 
-# The current 24.10-based tree lacks the xcrypt package block that defines libcrypt-compat.
-git clone --depth=1 --filter=blob:none --sparse -b openwrt-25.12 https://github.com/immortalwrt/immortalwrt.git immortalwrt-core
-git -C immortalwrt-core sparse-checkout set package/libs/xcrypt
-mkdir -p package/libs
-rm -rf package/libs/xcrypt
-cp -a immortalwrt-core/package/libs/xcrypt package/libs/
-rm -rf immortalwrt-core
-
 # Restore ImmortalWrt's status overview helpers and override tempinfo for mt_wifi7.
 git clone --depth=1 --filter=blob:none --sparse -b openwrt-24.10 https://github.com/immortalwrt/immortalwrt.git immortalwrt-autocore
 git -C immortalwrt-autocore sparse-checkout set package/emortal/autocore
 mkdir -p package/emortal
 rm -rf package/emortal/autocore
 cp -a immortalwrt-autocore/package/emortal/autocore package/emortal/
-cp -f $GITHUB_WORKSPACE/scripts/tempinfo package/emortal/autocore/files/tempinfo
-chmod 0755 package/emortal/autocore/files/tempinfo
-rm -rf immortalwrt-autocore
+
 
 # add luci-app-mosdns
 rm -rf feeds/packages/lang/golang
