@@ -68,6 +68,33 @@ sparse_checkout_copy_from_dir() {
     cp -a "$checkout_dir/$source_path" "$dest_path"
 }
 
+sparse_checkout_copy_many() {
+    local repo_url="$1"
+    local repo_branch="$2"
+    local checkout_prefix="$3"
+    local clone_mode="${4:-partial}"
+    local checkout_dir
+    local source_paths=()
+    local dest_paths=()
+    local index
+
+    shift 4
+    while [ "$#" -gt 0 ]; do
+        source_paths+=("$1")
+        dest_paths+=("$2")
+        shift 2
+    done
+
+    checkout_dir="$(sparse_checkout_init "$repo_url" "$repo_branch" "$checkout_prefix" "$clone_mode")"
+    git -C "$checkout_dir" sparse-checkout set --skip-checks "${source_paths[@]}"
+
+    for index in "${!source_paths[@]}"; do
+        sparse_checkout_copy_from_dir "$checkout_dir" "${source_paths[$index]}" "${dest_paths[$index]}"
+    done
+
+    rm -rf "$checkout_dir"
+}
+
 apply_workspace_patch() {
     local patch_file="$1"
 
@@ -128,14 +155,21 @@ EOF
 }
 
 apply_wifi_mlo_uci_backport() {
-    local anchor="package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/supplicant.uc"
+    local legacy_anchor="package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/supplicant.uc"
+    local shell_anchor="package/network/config/wifi-scripts/files/lib/netifd/hostapd.sh"
 
-    if [ ! -f "$anchor" ]; then
-        echo "Missing wifi-scripts ucode anchor after feeds install: $anchor" >&2
-        return 1
+    if [ -f "$legacy_anchor" ]; then
+        apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/996-wifi-scripts-add-mlo-uci-passthrough.patch"
+        return 0
     fi
 
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/996-wifi-scripts-add-mlo-uci-passthrough.patch"
+    if [ -f "$shell_anchor" ]; then
+        apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/996-wifi-scripts-add-mlo-uci-passthrough-24.10.patch"
+        return 0
+    fi
+
+    echo "Missing wifi-scripts anchor after feeds install: $legacy_anchor or $shell_anchor" >&2
+    return 1
 }
 
 mtk_public_root="${MTK_PUBLIC_FEEDS_PATH:-$GITHUB_WORKSPACE/mtk-openwrt-feeds-public}"
@@ -170,6 +204,23 @@ merge_package https://github.com/kenzok8/jell jell/wrtbwmon
 merge_package "-b ddnsto-beta https://github.com/linkease/nas-packages-luci" nas-packages-luci/luci/luci-app-ddnsto
 merge_package "-b ddnsto-beta https://github.com/linkease/nas-packages" nas-packages/network/services/ddnsto
 popd
+
+# Import the MTK-specific LuCI QoS / HNAT apps from the vendor package tree.
+sparse_checkout_copy_many \
+    https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
+    mt798x-mt799x-6.6-mtwifi \
+    vendor-mtk-luci-public \
+    partial \
+    package/mtk/applications/luci-app-eqos-mtk \
+    package/openwrt-packages/luci-app-eqos-mtk \
+    package/mtk/applications/luci-app-turboacc-mtk \
+    package/openwrt-packages/luci-app-turboacc-mtk
+
+# ImmortalWrt 24.10 ships tc as tc-tiny/tc-full rather than a plain tc package.
+patch_makefile_dep \
+    package/openwrt-packages/luci-app-eqos-mtk/Makefile \
+    '+wget-ssl +tc +kmod-sched-core +kmod-ifb +ebtables-legacy-utils +ebtables-legacy  @!PACKAGE_luci-app-eqos' \
+    '+wget-ssl +tc-full +kmod-sched-core +kmod-ifb +ebtables-legacy-utils +ebtables-legacy  @!PACKAGE_luci-app-eqos'
 
 # The MTK public route is applied after feeds install so that wifi-scripts,
 # hostapd and mt76 already exist in the tree and can be patched in place.
