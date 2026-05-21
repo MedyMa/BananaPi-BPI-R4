@@ -1,0 +1,32 @@
+diff --git a/package/network/config/wifi-scripts/files-ucode/usr/share/schema/wireless.wifi-iface.json b/package/network/config/wifi-scripts/files-ucode/usr/share/schema/wireless.wifi-iface.json
+index c32a491..4f35f1d 100644
+--- a/package/network/config/wifi-scripts/files-ucode/usr/share/schema/wireless.wifi-iface.json
++++ b/package/network/config/wifi-scripts/files-ucode/usr/share/schema/wireless.wifi-iface.json
+@@ -386,6 +386,13 @@
+ 				"type": "string"
+ 			}
+ 		},
++		"wpa_supplicant_options": {
++			"description": "Additional raw wpa_supplicant network options to be added",
++			"type": "array",
++			"items": {
++				"type": "string"
++			}
++		},
+ 		"hs20": {
+ 			"description": "Enable Hotspot 2.0 support",
+ 			"type": "boolean"
+diff --git a/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/supplicant.uc b/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/supplicant.uc
+index 7104357..db85ae4 100644
+--- a/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/supplicant.uc
++++ b/package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/supplicant.uc
+@@ -208,6 +208,9 @@ function setup_sta(data, config) {
+ 		'bssid_blacklist', 'bssid_whitelist', 'erp',
+ 		'dpp_connector', 'dpp_csign', 'dpp_netaccesskey',
+ 	]);
++
++	for (let raw in config.wpa_supplicant_options)
++		network_append_raw(raw);
+ }
+ 
+ 
