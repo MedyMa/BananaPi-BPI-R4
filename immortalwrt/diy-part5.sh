@@ -32,6 +32,40 @@ patch_makefile_dep() {
     }
 }
 
+apply_workspace_patch() {
+    local patch_file="$1"
+
+    [ -f "$patch_file" ] || return 0
+
+    if git apply --ignore-space-change --ignore-whitespace --reverse --check "$patch_file" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    git apply --ignore-space-change --ignore-whitespace "$patch_file"
+}
+
+apply_wireless_regdb_overlay() {
+    local regdb_dir="package/firmware/wireless-regdb"
+
+    [ -d "$regdb_dir" ] || return 0
+
+    rm -f "$regdb_dir"/patches/*.patch
+    mkdir -p "$regdb_dir/patches"
+    cp -f "$GITHUB_WORKSPACE/patches/filogic/500-world-regd-5GHz.patch" \
+        "$regdb_dir/patches/500-world-regd-5GHz.patch"
+    cp -f "$GITHUB_WORKSPACE/patches/filogic/600-custom-change-txpower-and-dfs.patch" \
+        "$regdb_dir/patches/600-custom-change-txpower-and-dfs.patch"
+    cp -f "$GITHUB_WORKSPACE/patches/filogic/regdb.Makefile" \
+        "$regdb_dir/Makefile"
+}
+
+apply_wifi_mlo_uci_backport() {
+    local anchor="package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/supplicant.uc"
+
+    [ -f "$anchor" ] || return 0
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/996-wifi-scripts-add-mlo-uci-passthrough.patch"
+}
+
 rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/luci/applications/luci-app-argon-config
 rm -rf feeds/luci/applications/luci-app-passwall
@@ -96,11 +130,9 @@ git clone --depth=1  https://github.com/vernesong/OpenClash
 git config core.sparsecheckout true
 popd
 
-# wireless-regdb modification
-# rm -rf package/firmware/wireless-regdb/patches/*.*
-# rm -rf package/firmware/wireless-regdb/Makefile
-# cp -f $GITHUB_WORKSPACE/patches/filogic/500-tx_power.patch package/firmware/wireless-regdb/patches/500-tx_power.patch
-# cp -f $GITHUB_WORKSPACE/patches/filogic/regdb.Makefile package/firmware/wireless-regdb/Makefile
+# wireless-regdb / wifi-scripts MLO compatibility overrides
+apply_wireless_regdb_overlay
+apply_wifi_mlo_uci_backport
 # merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/package/mtk/applications/mtkhqos_util
 
 # Do not inject the stale LVTS patch here; it targets the wrong source layout and breaks kernel prepare.
