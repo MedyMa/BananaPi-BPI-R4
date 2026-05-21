@@ -187,6 +187,43 @@ ensure_shared_mod_def0_patch() {
         "$patch_dir/996-net-phy-sfp-support-shared-mod-def0-gpio.patch"
 }
 
+refresh_public_hnat_patches() {
+    local patch_dir="$1"
+    local checkout_dir
+    local ext_fix_src="target/linux/mediatek/patches-6.6/9999-fix-ext-hnat-with-fdb-error.patch"
+
+    [ -d "$patch_dir" ] || return 0
+    [ -f "$patch_dir/9997-hnat.patch" ] || return 0
+
+    checkout_dir="$(sparse_checkout_init \
+        https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
+        openwrt-24.10-6.6 \
+        vendor-mtk-2410-public-hnat \
+        partial)"
+    git -C "$checkout_dir" sparse-checkout set --skip-checks \
+        target/linux/mediatek/patches-6.6/9997-hnat.patch \
+        "$ext_fix_src"
+
+    sparse_checkout_copy_from_dir \
+        "$checkout_dir" \
+        target/linux/mediatek/patches-6.6/9997-hnat.patch \
+        "$patch_dir/9997-hnat.patch"
+
+    if [ -f "$patch_dir/9999-fix-ext-hnat-with-fdb-error.patch" ]; then
+        sparse_checkout_copy_from_dir \
+            "$checkout_dir" \
+            "$ext_fix_src" \
+            "$patch_dir/9999-fix-ext-hnat-with-fdb-error.patch"
+    elif [ -f "$patch_dir/99999-hnat-extdevice-fix-fdberr.patch" ]; then
+        sparse_checkout_copy_from_dir \
+            "$checkout_dir" \
+            "$ext_fix_src" \
+            "$patch_dir/99999-hnat-extdevice-fix-fdberr.patch"
+    fi
+
+    rm -rf "$checkout_dir"
+}
+
 mtk_public_root="${MTK_PUBLIC_FEEDS_PATH:-$GITHUB_WORKSPACE/mtk-openwrt-feeds-public}"
 
 [ -d "$mtk_public_root/autobuild/unified/filogic/24.10" ] || {
@@ -246,6 +283,10 @@ apply_patch_series \
 sync_tree \
     "$mtk_public_root/autobuild/unified/filogic/24.10/files/target/linux/mediatek" \
     target/linux/mediatek
+# The MTK public 24.10 tree can still carry an older 9997 HNAT patch that no
+# longer applies cleanly to linux-6.6.139. Refresh it from the rebased
+# openwrt-24.10-6.6 branch before the kernel patch phase.
+refresh_public_hnat_patches target/linux/mediatek/patches-6.6
 inject_mediatek_hnat_package
 
 apply_patch_series \
