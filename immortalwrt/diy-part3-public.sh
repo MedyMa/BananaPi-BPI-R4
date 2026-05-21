@@ -330,18 +330,9 @@ popd
 
 apply_wifi_mlo_uci_backport || exit 1
 
-# BPi-R4 SFP can fall back to a broken link on both 24.10 and 25.12 when the
 # USXGMII PCS polarity is left at the default board-agnostic setting.
-if [ -d target/linux/mediatek/patches-6.12 ]; then
-    cp -f "$GITHUB_WORKSPACE/patches/filogic/995-bpi-r4-sfp-usxgmii-polarity.patch" \
-        target/linux/mediatek/patches-6.12/995-arm64-dts-mediatek-mt7988a-bpi-r4-fix-usxgmii-polarity.patch
-elif [ -d target/linux/mediatek/patches-6.6 ]; then
-    cp -f "$GITHUB_WORKSPACE/patches/filogic/995-bpi-r4-sfp-usxgmii-polarity-24.10.patch" \
-        target/linux/mediatek/patches-6.6/995-arm64-dts-mediatek-mt7988a-bpi-r4-fix-usxgmii-polarity.patch
-    # MTK vendor trees also carry a shared MOD_DEF0 fix for the passive SFP mux.
-    # Inject it only when the imported public patch stack does not already provide it.
-    ensure_shared_mod_def0_patch target/linux/mediatek/patches-6.6
-fi
+cp -f "$GITHUB_WORKSPACE/patches/filogic/995-bpi-r4-sfp-usxgmii-polarity-24.10.patch" \
+    target/linux/mediatek/patches-6.6/995-arm64-dts-mediatek-mt7988a-bpi-r4-fix-usxgmii-polarity.patch
 
 mkdir -p target/linux/mediatek/filogic/base-files/etc/hotplug.d/iface
 cp -f "$GITHUB_WORKSPACE/patches/filogic/99-bpi-r4-sfp-retrain" \
