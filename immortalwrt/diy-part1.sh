@@ -21,50 +21,6 @@ patch_makefile_dep() {
     sed -i "s|$old_text|$new_text|g" "$file_path"
 }
 
-apply_workspace_patch() {
-    local patch_file="$1"
-
-    [ -f "$patch_file" ] || return 0
-
-    if git apply --ignore-space-change --ignore-whitespace --reverse --check "$patch_file" >/dev/null 2>&1; then
-        return 0
-    fi
-
-    git apply --ignore-space-change --ignore-whitespace "$patch_file"
-}
-
-apply_wireless_regdb_overlay() {
-    local regdb_dir="package/firmware/wireless-regdb"
-
-    [ -d "$regdb_dir" ] || return 0
-
-    rm -f "$regdb_dir"/patches/*.patch
-    mkdir -p "$regdb_dir/patches"
-    cp -f "$GITHUB_WORKSPACE/patches/filogic/500-world-regd-5GHz.patch" \
-        "$regdb_dir/patches/500-world-regd-5GHz.patch"
-    cp -f "$GITHUB_WORKSPACE/patches/filogic/600-custom-change-txpower-and-dfs.patch" \
-        "$regdb_dir/patches/600-custom-change-txpower-and-dfs.patch"
-    cp -f "$GITHUB_WORKSPACE/patches/filogic/regdb.Makefile" \
-        "$regdb_dir/Makefile"
-}
-
-apply_wifi_mlo_uci_backport() {
-    local legacy_anchor="package/network/config/wifi-scripts/files-ucode/usr/share/ucode/wifi/supplicant.uc"
-    local shell_anchor="package/network/config/wifi-scripts/files/lib/netifd/hostapd.sh"
-
-    if [ -f "$legacy_anchor" ]; then
-        apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/996-wifi-scripts-add-mlo-uci-passthrough.patch"
-        return 0
-    fi
-
-    if [ -f "$shell_anchor" ]; then
-        apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/996-wifi-scripts-add-mlo-uci-passthrough-24.10.patch"
-        return 0
-    fi
-
-    return 0
-}
-
 rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/luci/applications/luci-app-argon-config
 rm -rf feeds/luci/applications/luci-app-passwall
@@ -110,9 +66,6 @@ git clone --depth=1  https://github.com/vernesong/OpenClash
 git config core.sparsecheckout true
 popd
 
-# wireless-regdb / wifi-scripts MLO compatibility overrides
-apply_wireless_regdb_overlay
-apply_wifi_mlo_uci_backport
 # merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/package/mtk/applications/mtkhqos_util
 
 # BPi-R4 SFP on openwrt-24.10 can still need an explicit USXGMII RX polarity hint.
