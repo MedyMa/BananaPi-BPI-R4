@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Modify default IP
-sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generate
+sed -i 's/192.168.6.1/192.168.2.1/g' package/base-files/files/bin/config_generate
 
 # Workaround: GCC 14 + musl fortify "always_inline memset: target specific option mismatch" in mbedtls
 # Root cause: When building for aarch64_cortex-a53 with GCC 14, TARGET_CFLAGS includes
