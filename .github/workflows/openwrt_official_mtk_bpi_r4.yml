@@ -1,0 +1,197 @@
+name: openwrt_official_mtk_bpi_r4
+
+on:
+  workflow_dispatch:
+    inputs:
+      autobuild_branch:
+        description: Official MediaTek autobuild branch
+        required: true
+        default: filogic-mac80211-mt7988_rfb-mt7996
+        type: choice
+        options:
+          - filogic-mac80211-mt7988_rfb-mt7996
+          - filogic-mac80211-mt7988_rfb-mt7992
+          - filogic
+      build_bootloader:
+        description: Build official bootloader and ATF
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: openwrt-official-mtk-bpi-r4
+  cancel-in-progress: true
+
+env:
+  TZ: Asia/Shanghai
+  OPENWRT_REPO_URL: https://git.openwrt.org/openwrt/openwrt.git
+  OPENWRT_REPO_BRANCH: openwrt-24.10
+  OPENWRT_COMMIT: 58a0211f8201ab622b7b11d31629d6d755bd6526
+  MTK_FEEDS_REPO_URL: https://git01.mediatek.com/openwrt/feeds/mtk-openwrt-feeds
+  MTK_FEEDS_REPO_BRANCH: master
+  MTK_FEEDS_COMMIT: d700864a98353c5e344277177f574c30a6d7159d
+
+jobs:
+  build:
+    name: Build Official MTK OpenWrt 24.10 for BPI-R4
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Free disk space
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          set -euo pipefail
+          sudo apt-get -qq purge \
+            azure-cli \
+            ghc* \
+            zulu* \
+            hhvm \
+            llvm* \
+            firefox \
+            powershell \
+            openjdk* \
+            dotnet* \
+            google* \
+            mysql* \
+            php* \
+            android* \
+            moby* \
+            snapd || true
+          sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
+          sudo apt-get -qq autoremove --purge || true
+          sudo apt-get -qq clean
+          df -h
+
+      - name: Initialize build environment
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          set -euo pipefail
+          sudo apt-get -qq update
+          sudo apt-get -qq install \
+            build-essential \
+            clang \
+            flex \
+            bison \
+            g++ \
+            gawk \
+            gcc-multilib \
+            g++-multilib \
+            gettext \
+            git \
+            libncurses-dev \
+            libssl-dev \
+            python3-distutils \
+            python3-setuptools \
+            rsync \
+            swig \
+            unzip \
+            zlib1g-dev \
+            file \
+            wget
+          sudo timedatectl set-timezone "$TZ"
+          df -h
+
+      - name: Clone OpenWrt source
+        run: |
+          set -euo pipefail
+          git clone --single-branch --branch "$OPENWRT_REPO_BRANCH" "$OPENWRT_REPO_URL" openwrt
+          git -C openwrt checkout "$OPENWRT_COMMIT"
+          git -C openwrt log --oneline -1
+
+      - name: Clone MediaTek feeds
+        run: |
+          set -euo pipefail
+          git clone --single-branch --branch "$MTK_FEEDS_REPO_BRANCH" "$MTK_FEEDS_REPO_URL" mtk-openwrt-feeds
+          git -C mtk-openwrt-feeds checkout "$MTK_FEEDS_COMMIT"
+          git -C mtk-openwrt-feeds log --oneline -1
+
+      - name: Write feed revision pins
+        run: |
+          set -euo pipefail
+          cat > mtk-openwrt-feeds/autobuild/unified/feed_revision <<'EOF'
+          luci d88390be4ec9722cb427fee03368fc8c8582627d
+          routing 178a40d321d6c11f18528f34777f4e24ce62b19a
+          packages 72d6156c5d88519bb390cd7fb3e2f80e9e106082
+          EOF
+          cat mtk-openwrt-feeds/autobuild/unified/feed_revision
+
+      - name: Record build metadata
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/logs
+          cat > artifacts/logs/build-metadata.txt <<EOF
+          openwrt_repo=$OPENWRT_REPO_URL
+          openwrt_branch=$OPENWRT_REPO_BRANCH
+          openwrt_commit=$OPENWRT_COMMIT
+          mtk_feeds_repo=$MTK_FEEDS_REPO_URL
+          mtk_feeds_branch=$MTK_FEEDS_REPO_BRANCH
+          mtk_feeds_commit=$MTK_FEEDS_COMMIT
+          autobuild_branch=${{ inputs.autobuild_branch }}
+          build_bootloader=${{ inputs.build_bootloader }}
+          EOF
+
+      - name: Run official MediaTek autobuild
+        run: |
+          set -euo pipefail
+          cd openwrt
+          build_args=("${{ inputs.autobuild_branch }}" "log_file=make")
+          if [ "${{ inputs.build_bootloader }}" = "true" ]; then
+            build_args=("${{ inputs.autobuild_branch }}" "bootloader=1" "log_file=make")
+          fi
+          bash ../mtk-openwrt-feeds/autobuild/unified/autobuild.sh "${build_args[@]}" 2>&1 | tee ../artifacts/logs/autobuild-console.log
+
+      - name: Collect build logs
+        if: always()
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/logs/openwrt
+          if [ -f openwrt/.config ]; then
+            cp openwrt/.config artifacts/logs/openwrt/
+          fi
+          if [ -f openwrt/feeds.conf.default ]; then
+            cp openwrt/feeds.conf.default artifacts/logs/openwrt/
+          fi
+          if [ -d openwrt/.ab ]; then
+            cp -a openwrt/.ab artifacts/logs/openwrt/
+          fi
+          if [ -d openwrt/log ]; then
+            cp -a openwrt/log artifacts/logs/openwrt/
+          fi
+          cp mtk-openwrt-feeds/autobuild/unified/feed_revision artifacts/logs/openwrt/
+
+      - name: Stage firmware artifacts
+        if: success()
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/firmware/autobuild_release
+          mkdir -p artifacts/firmware/bin-targets
+          cp -a openwrt/autobuild_release/. artifacts/firmware/autobuild_release/
+          cp -a openwrt/bin/targets/mediatek/filogic/. artifacts/firmware/bin-targets/
+          find artifacts/firmware -type f | sort > artifacts/logs/firmware-files.txt
+          sed -n '1,200p' artifacts/logs/firmware-files.txt
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: official-bpi-r4-openwrt24.10-logs-${{ github.run_number }}
+          path: artifacts/logs
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Upload firmware artifacts
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: official-bpi-r4-openwrt24.10-${{ github.run_number }}
+          path: artifacts/firmware
+          if-no-files-found: error
+          retention-days: 14
