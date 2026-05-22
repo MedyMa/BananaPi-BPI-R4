@@ -1,0 +1,56 @@
+diff --git a/arch/arm64/boot/dts/mediatek/mt7988a-rfb-eth1-aqr.dtso b/arch/arm64/boot/dts/mediatek/mt7988a-rfb-eth1-aqr.dtso
+index c471b9e..f5e0ed3 100644
+--- a/arch/arm64/boot/dts/mediatek/mt7988a-rfb-eth1-aqr.dtso
++++ b/arch/arm64/boot/dts/mediatek/mt7988a-rfb-eth1-aqr.dtso
+@@ -23,9 +23,6 @@
+ 				reg = <0>;
+ 				compatible = "ethernet-phy-ieee802.3-c45";
+ 				firmware-name = "AQR-G4_v5.7.0-AQR_EVB_Generic_X3410_StdCfg_MDISwap_USX_ID46316_VER2140.cld";
+-				reset-gpios = <&pio 72 GPIO_ACTIVE_LOW>;
+-				reset-assert-us = <100000>;
+-				reset-deassert-us = <221000>;
+ 			};
+ 		};
+ 	};
+diff --git a/arch/arm64/boot/dts/mediatek/mt7988a-rfb-eth1-cux3410.dtso b/arch/arm64/boot/dts/mediatek/mt7988a-rfb-eth1-cux3410.dtso
+index 6ba8e95..77ae803 100644
+--- a/arch/arm64/boot/dts/mediatek/mt7988a-rfb-eth1-cux3410.dtso
++++ b/arch/arm64/boot/dts/mediatek/mt7988a-rfb-eth1-cux3410.dtso
+@@ -24,9 +24,6 @@
+ 				reg = <0>;
+ 				compatible = "ethernet-phy-ieee802.3-c45";
+ 				firmware-name = "AQR-G4_v5.7.0-AQR_EVB_Generic_X3410_StdCfg_MDISwap_USX_ID46316_VER2148.cld";
+-				reset-gpios = <&pio 72 GPIO_ACTIVE_LOW>;
+-				reset-assert-us = <100000>;
+-				reset-deassert-us = <221000>;
+ 
+ 				leds {
+ 					#address-cells = <1>;
+diff --git a/arch/arm64/boot/dts/mediatek/mt7988a-rfb-eth2-aqr.dtso b/arch/arm64/boot/dts/mediatek/mt7988a-rfb-eth2-aqr.dtso
+index 1490f05..1259eda 100644
+--- a/arch/arm64/boot/dts/mediatek/mt7988a-rfb-eth2-aqr.dtso
++++ b/arch/arm64/boot/dts/mediatek/mt7988a-rfb-eth2-aqr.dtso
+@@ -23,9 +23,6 @@
+ 				reg = <8>;
+ 				compatible = "ethernet-phy-ieee802.3-c45";
+ 				firmware-name = "AQR-G4_v5.7.0-AQR_EVB_Generic_X3410_StdCfg_MDISwap_USX_ID46316_VER2140.cld";
+-				reset-gpios = <&pio 71 GPIO_ACTIVE_LOW>;
+-				reset-assert-us = <100000>;
+-				reset-deassert-us = <221000>;
+ 			};
+ 		};
+ 	};
+diff --git a/arch/arm64/boot/dts/mediatek/mt7988a-rfb-eth2-cux3410.dtso b/arch/arm64/boot/dts/mediatek/mt7988a-rfb-eth2-cux3410.dtso
+index 4926b6a..da02961 100644
+--- a/arch/arm64/boot/dts/mediatek/mt7988a-rfb-eth2-cux3410.dtso
++++ b/arch/arm64/boot/dts/mediatek/mt7988a-rfb-eth2-cux3410.dtso
+@@ -23,9 +23,6 @@
+ 				reg = <8>;
+ 				compatible = "ethernet-phy-ieee802.3-c45";
+ 				firmware-name = "AQR-G4_v5.7.0-AQR_EVB_Generic_X3410_StdCfg_MDISwap_USX_ID46316_VER2148.cld";
+-				reset-gpios = <&pio 71 GPIO_ACTIVE_LOW>;
+-				reset-assert-us = <100000>;
+-				reset-deassert-us = <221000>;
+ 
+ 				leds {
+ 					#address-cells = <1>;
