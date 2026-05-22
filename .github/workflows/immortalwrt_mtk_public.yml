@@ -47,7 +47,7 @@ jobs:
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
-          sudo -E apt-get -qq update
+        sudo -E apt-get -qq update
         sudo -E apt-get -qq install build-essential clang flex g++ gawk gcc-multilib gettext \
           git libncurses5-dev libssl-dev python3-setuptools rsync unzip zlib1g-dev swig libpython3-dev aria2 jq subversion qemu-utils ccache rename libelf-dev
           purge_packages="$(dpkg-query -W -f='${binary:Package}\n' | grep -E '^(azure-cli|ghc.*|zulu.*|hhvm|llvm.*|firefox|powershell|openjdk.*|dotnet.*|google.*|mysql.*|php.*|android.*|speedtest-cli)$' || true)"
