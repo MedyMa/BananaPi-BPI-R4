@@ -283,6 +283,9 @@ apply_patch_series \
 sync_tree \
     "$mtk_public_root/autobuild/unified/filogic/24.10/files/target/linux/mediatek" \
     target/linux/mediatek
+# linux-6.6.139 already carries the PMA-based 2.5G/5G + EEE phylib support,
+# so the older MTK public backport now rejects and must be dropped.
+rm -f target/linux/mediatek/patches-6.6/999-1700-v6.8-net-phy-2p5g-eee-backport-read-support-link-mode-from-PMA.patch
 # The MTK public 24.10 tree can still carry an older 9997 HNAT patch that no
 # longer applies cleanly to linux-6.6.139. Refresh it from the rebased
 # openwrt-24.10-6.6 branch before the kernel patch phase.
