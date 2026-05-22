@@ -73,9 +73,6 @@ git clone --depth=1  https://github.com/vernesong/OpenClash
 git config core.sparsecheckout true
 popd
 
-# BPi-R4 SFP on openwrt-24.10 can still need an explicit USXGMII RX polarity hint.
-cp -f $GITHUB_WORKSPACE/patches/filogic/995-bpi-r4-sfp-usxgmii-polarity-24.10.patch \
-    target/linux/mediatek/patches-6.6/995-arm64-dts-mediatek-mt7988a-bpi-r4-fix-usxgmii-polarity.patch
 ./scripts/feeds update -a
 
 # openwrt-24.10 compatibility fixes for floating packages feed metadata.

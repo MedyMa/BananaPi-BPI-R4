@@ -333,10 +333,6 @@ popd
 
 apply_wifi_mlo_uci_backport || exit 1
 
-# USXGMII PCS polarity is left at the default board-agnostic setting.
-cp -f "$GITHUB_WORKSPACE/patches/filogic/995-bpi-r4-sfp-usxgmii-polarity-24.10.patch" \
-    target/linux/mediatek/patches-6.6/995-arm64-dts-mediatek-mt7988a-bpi-r4-fix-usxgmii-polarity.patch
-
 patch_makefile_dep \
     feeds/packages/lang/python/python-ubus/Makefile \
     'PKG_BUILD_DEPENDS:=python-setuptools/host' \
