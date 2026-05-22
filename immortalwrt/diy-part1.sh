@@ -66,17 +66,10 @@ git clone --depth=1  https://github.com/vernesong/OpenClash
 git config core.sparsecheckout true
 popd
 
-# merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/package/mtk/applications/mtkhqos_util
-
 # BPi-R4 SFP on openwrt-24.10 can still need an explicit USXGMII RX polarity hint.
 cp -f $GITHUB_WORKSPACE/patches/filogic/995-bpi-r4-sfp-usxgmii-polarity-24.10.patch \
     target/linux/mediatek/patches-6.6/995-arm64-dts-mediatek-mt7988a-bpi-r4-fix-usxgmii-polarity.patch
 
-# Retry BPi-R4 SFP links once after netifd brings the device up.
-mkdir -p target/linux/mediatek/filogic/base-files/etc/hotplug.d/iface
-cp -f $GITHUB_WORKSPACE/patches/filogic/99-bpi-r4-sfp-retrain \
-    target/linux/mediatek/filogic/base-files/etc/hotplug.d/iface/99-bpi-r4-sfp-retrain
-chmod 0755 target/linux/mediatek/filogic/base-files/etc/hotplug.d/iface/99-bpi-r4-sfp-retrain
 
 ./scripts/feeds update -a
 
