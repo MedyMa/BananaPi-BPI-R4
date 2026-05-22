@@ -290,6 +290,11 @@ rm -f target/linux/mediatek/patches-6.6/999-1700-v6.8-net-phy-2p5g-eee-backport-
 # longer applies cleanly to linux-6.6.139. Refresh it from the rebased
 # openwrt-24.10-6.6 branch before the kernel patch phase.
 refresh_public_hnat_patches target/linux/mediatek/patches-6.6
+# The public 999-2003 patch still targets older AQR overlay contents and
+# rejects on the current 24.10 tree. Replace it with the rebased local copy.
+[ -f "$GITHUB_WORKSPACE/patches/filogic/999-2003-arm64-dts-mt7988-use-software-reset-for-aqr-10gphy-24.10.patch" ] && \
+    cp -f "$GITHUB_WORKSPACE/patches/filogic/999-2003-arm64-dts-mt7988-use-software-reset-for-aqr-10gphy-24.10.patch" \
+        target/linux/mediatek/patches-6.6/999-2003-arm64-dts-mt7988-use-software-reset-for-aqr-10gphy.patch
 inject_mediatek_hnat_package
 
 apply_patch_series \
