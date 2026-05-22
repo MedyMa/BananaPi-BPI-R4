@@ -337,11 +337,6 @@ apply_wifi_mlo_uci_backport || exit 1
 cp -f "$GITHUB_WORKSPACE/patches/filogic/995-bpi-r4-sfp-usxgmii-polarity-24.10.patch" \
     target/linux/mediatek/patches-6.6/995-arm64-dts-mediatek-mt7988a-bpi-r4-fix-usxgmii-polarity.patch
 
-mkdir -p target/linux/mediatek/filogic/base-files/etc/hotplug.d/iface
-cp -f "$GITHUB_WORKSPACE/patches/filogic/99-bpi-r4-sfp-retrain" \
-    target/linux/mediatek/filogic/base-files/etc/hotplug.d/iface/99-bpi-r4-sfp-retrain
-chmod 0755 target/linux/mediatek/filogic/base-files/etc/hotplug.d/iface/99-bpi-r4-sfp-retrain
-
 patch_makefile_dep \
     feeds/packages/lang/python/python-ubus/Makefile \
     'PKG_BUILD_DEPENDS:=python-setuptools/host' \
