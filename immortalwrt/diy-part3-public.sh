@@ -126,6 +126,23 @@ sync_tree() {
     cp -a "$source_dir"/. "$dest_dir"/
 }
 
+normalize_public_mt7988_10gphy_dtso() {
+    local dtso_dir="target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek"
+    local dtso_file
+
+    [ -d "$dtso_dir" ] || return 0
+
+    for dtso_file in \
+        "$dtso_dir/mt7988a-rfb-eth1-aqr.dtso" \
+        "$dtso_dir/mt7988a-rfb-eth1-cux3410.dtso" \
+        "$dtso_dir/mt7988a-rfb-eth2-aqr.dtso" \
+        "$dtso_dir/mt7988a-rfb-eth2-cux3410.dtso"
+    do
+        [ -f "$dtso_file" ] || continue
+        sed -i '/reset-gpios[[:space:]]*=/d;/reset-assert-us[[:space:]]*=/d;/reset-deassert-us[[:space:]]*=/d' "$dtso_file"
+    done
+}
+
 inject_mediatek_hnat_package() {
     local target_file="package/kernel/linux/modules/netdevices.mk"
 
@@ -290,11 +307,10 @@ rm -f target/linux/mediatek/patches-6.6/999-1700-v6.8-net-phy-2p5g-eee-backport-
 # longer applies cleanly to linux-6.6.139. Refresh it from the rebased
 # openwrt-24.10-6.6 branch before the kernel patch phase.
 refresh_public_hnat_patches target/linux/mediatek/patches-6.6
-# The public 999-2003 patch still targets older AQR overlay contents and
-# rejects on the current 24.10 tree. Replace it with the rebased local copy.
-[ -f "$GITHUB_WORKSPACE/patches/filogic/999-2003-arm64-dts-mt7988-use-software-reset-for-aqr-10gphy-24.10.patch" ] && \
-    cp -f "$GITHUB_WORKSPACE/patches/filogic/999-2003-arm64-dts-mt7988-use-software-reset-for-aqr-10gphy-24.10.patch" \
-        target/linux/mediatek/patches-6.6/999-2003-arm64-dts-mt7988-use-software-reset-for-aqr-10gphy.patch
+# The MTK public tree now carries these MT7988 10G PHY overlays directly under
+# files-6.6, so normalize them in place and drop the stale quilt patch.
+normalize_public_mt7988_10gphy_dtso
+rm -f target/linux/mediatek/patches-6.6/999-2003-arm64-dts-mt7988-use-software-reset-for-aqr-10gphy.patch
 inject_mediatek_hnat_package
 
 apply_patch_series \
