@@ -35,14 +35,57 @@ get_mt_wifi7_iface_list() {
 		fi
 	fi
 
-	for _iface in ra0 rax0 rai0 rae0; do
+	for _iface in ra0 rai0 rax0 rae0; do
 		[ -d "$NET_PATH/$_iface" ] && echo "$_iface"
 	done
+}
+
+get_mt_wifi7_band_label() {
+	_mt_iface="$1"
+	_mt_freq=""
+
+	if command -v iwinfo >/dev/null 2>&1; then
+		_mt_freq="$(iwinfo "$_mt_iface" info 2>/dev/null | sed -n 's/.*Channel:[[:space:]]*[0-9]\+[[:space:]]*(\([0-9.]\+\)[[:space:]]GHz).*/\1/p' | sed -n '1p')"
+
+		case "$_mt_freq" in
+		2.*)
+			echo "2.4G"
+			return
+			;;
+		5.*)
+			echo "5G"
+			return
+			;;
+		6.*)
+			echo "6G"
+			return
+			;;
+		esac
+	fi
+
+	case "$_mt_iface" in
+	rai*)
+		echo "5G"
+		;;
+	rax*)
+		echo "6G"
+		;;
+	ra[0-9]*)
+		echo "2.4G"
+		;;
+	*)
+		echo "$_mt_iface"
+		;;
+	esac
 }
 
 get_mt_wifi7_temp() {
 	_mt_seen=""
 	_mt_wifi=""
+	_mt_wifi_24g=""
+	_mt_wifi_5g=""
+	_mt_wifi_6g=""
+	_mt_wifi_other=""
 
 	for _mt_iface in $(get_mt_wifi7_iface_list); do
 		case " $_mt_seen " in
@@ -61,7 +104,28 @@ get_mt_wifi7_temp() {
 		fi
 
 		[ -n "$_mt_temp" ] || continue
-		_mt_wifi="${_mt_wifi:+$_mt_wifi }${_mt_iface}:${_mt_temp}°C"
+		_mt_label="$(get_mt_wifi7_band_label "$_mt_iface")"
+		_mt_entry="${_mt_label}:${_mt_temp}°C"
+
+		case "$_mt_label" in
+		2.4G)
+			_mt_wifi_24g="${_mt_wifi_24g:+$_mt_wifi_24g }$_mt_entry"
+			;;
+		5G)
+			_mt_wifi_5g="${_mt_wifi_5g:+$_mt_wifi_5g }$_mt_entry"
+			;;
+		6G)
+			_mt_wifi_6g="${_mt_wifi_6g:+$_mt_wifi_6g }$_mt_entry"
+			;;
+		*)
+			_mt_wifi_other="${_mt_wifi_other:+$_mt_wifi_other }$_mt_entry"
+			;;
+		esac
+	done
+
+	for _mt_group in "$_mt_wifi_24g" "$_mt_wifi_5g" "$_mt_wifi_6g" "$_mt_wifi_other"; do
+		[ -n "$_mt_group" ] || continue
+		_mt_wifi="${_mt_wifi:+$_mt_wifi }$_mt_group"
 	done
 
 	[ -n "$_mt_wifi" ] || return 1
