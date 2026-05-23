@@ -1,0 +1,17 @@
+diff --git a/package/system/rpcd/patches/0002-iwinfo-Improve-EHT-DCM-support.patch b/package/system/rpcd/patches/0002-iwinfo-Improve-EHT-DCM-support.patch
+index fd9974a..f242c1f 100644
+--- a/package/system/rpcd/patches/0002-iwinfo-Improve-EHT-DCM-support.patch
++++ b/package/system/rpcd/patches/0002-iwinfo-Improve-EHT-DCM-support.patch
+@@ -1,8 +1,10 @@
+ --- a/iwinfo.c
+ +++ b/iwinfo.c
+-@@ -498,6 +498,7 @@ rpc_iwinfo_add_rateinfo(struct
++@@ -498,6 +498,9 @@ rpc_iwinfo_add_rateinfo(struct
+  		blobmsg_add_u32(&buf, "mcs", r->mcs);
+  		blobmsg_add_u32(&buf, "nss", r->nss);
++		if (r->mhz_hi)
++			blobmsg_add_u32(&buf, "mhz_hi", r->mhz_hi);
+  		blobmsg_add_u32(&buf, "eht_gi", r->eht_gi);
+ +		blobmsg_add_u32(&buf, "eht_dcm", r->eht_dcm);
+  	}
+
