@@ -133,6 +133,9 @@ patch_makefile_dep \
 
 ./scripts/feeds install -a
 
+[ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1000-luci-status-overview-wifi7-mlo.patch"
+
 [ -f package/network/utils/iwinfo/src/iwinfo_mtk.c ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/998-iwinfo-mtk-fix-6ghz-reporting.patch"
 
