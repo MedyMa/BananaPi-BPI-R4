@@ -21,12 +21,18 @@ get_standard_wifi_temp() {
 }
 
 get_mt_wifi7_iface_list() {
+	local _iw_ifaces=""
+
 	if command -v iw >/dev/null 2>&1; then
-		iw dev 2>/dev/null | awk '
+		_iw_ifaces="$(iw dev 2>/dev/null | awk '
 			$1 ~ /^phy#/ { phy = $1; next }
 			$1 == "Interface" && !seen[phy]++ { print $2 }
-		'
-		return
+		')"
+
+		if [ -n "$_iw_ifaces" ]; then
+			printf '%s\n' "$_iw_ifaces"
+			return
+		fi
 	fi
 
 	for _iface in ra0 rax0 rai0 rae0; do
