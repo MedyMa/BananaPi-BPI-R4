@@ -1,0 +1,68 @@
+diff --git a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
+index f486c36..e65bd8b 100644
+--- a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
++++ b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
+@@ -346,6 +346,7 @@ var CBIWifiFrequencyValue = form.Value.extend({
+ 			// Create a list of HT modes based on device capabilities
+ 			const htmodelist = L.toArray(wifidevs ? wifidevs.getHTModes() : null)
+ 				.reduce(function(o, v) { o[v] = true; return o; }, {});
++			const allow2gAc = (uci.get('wireless', section_id, 'vendor_vht') == '1' || htmodelist.VHT20 || htmodelist.VHT40);
+ 
+ 			this.htmodes = {
+ 				'': [ '', '-', { available: true } ],
+@@ -357,18 +358,21 @@ var CBIWifiFrequencyValue = form.Value.extend({
+ 					'VHT20', '20 MHz', { available: htmodelist.VHT20 },
+ 					'VHT40', '40 MHz', { available: htmodelist.VHT40 },
+ 					'VHT80', '80 MHz', { available: htmodelist.VHT80 },
++					'VHT80_80', '80+80 MHz', { available: htmodelist.VHT80_80 },
+ 					'VHT160', '160 MHz', { available: htmodelist.VHT160 }
+ 				],
+ 				'ax': [
+ 					'HE20', '20 MHz', { available: htmodelist.HE20 },
+ 					'HE40', '40 MHz', { available: htmodelist.HE40 },
+ 					'HE80', '80 MHz', { available: htmodelist.HE80 },
++					'HE80_80', '80+80 MHz', { available: htmodelist.HE80_80 },
+ 					'HE160', '160 MHz', { available: htmodelist.HE160 }
+ 				],
+ 				'be': [
+ 					'EHT20', '20 MHz', { available: htmodelist.EHT20 },
+ 					'EHT40', '40 MHz', { available: htmodelist.EHT40 },
+ 					'EHT80', '80 MHz', { available: htmodelist.EHT80 },
++					'EHT80_80', '80+80 MHz', { available: htmodelist.EHT80_80 },
+ 					'EHT160', '160 MHz', { available: htmodelist.EHT160 },
+ 					'EHT320', '320 MHz', { available: htmodelist.EHT320 }
+ 				]
+@@ -387,7 +391,8 @@ var CBIWifiFrequencyValue = form.Value.extend({
+ 					'5g', '5 GHz', { available: this.channels['5g'].length > 3 }
+ 				],
+ 				'ac': [
+-					'5g', '5 GHz', { available: true }
++					'2g', '2.4 GHz', { available: allow2gAc && this.channels['2g'].length > 3 },
++					'5g', '5 GHz', { available: this.channels['5g'].length > 3 }
+ 				],
+ 				'ax': [
+ 					'2g', '2.4 GHz', { available: this.channels['2g'].length > 3 },
+@@ -478,11 +483,11 @@ var CBIWifiFrequencyValue = form.Value.extend({
+ 		this.setValues(mode, this.modes);
+ 
+ 		// Determine mode based on htmode value
+-		if (/EHT20|EHT40|EHT80|EHT160|EHT320/.test(htval))
++		if (/EHT20|EHT40|EHT80|EHT80_80|EHT160|EHT320/.test(htval))
+ 			mode.value = 'be';		
+-		else if (/HE20|HE40|HE80|HE160/.test(htval))
++		else if (/HE20|HE40|HE80|HE80_80|HE160/.test(htval))
+ 			mode.value = 'ax';
+-		else if (/VHT20|VHT40|VHT80|VHT160/.test(htval))
++		else if (/VHT20|VHT40|VHT80|VHT80_80|VHT160/.test(htval))
+ 			mode.value = 'ac';
+ 		else if (/HT20|HT40/.test(htval))
+ 			mode.value = 'n';
+@@ -710,7 +715,7 @@ return view.extend({
+ 			else if (name && (ipv4 ?? ipv6))
+ 				hint = `${'%h'.format(name)} <span class="hide-xs">(${ipv4 || ipv6})</span>`;
+ 			else
+-				hint = name || ipv4 || ipv6 || '?';
++				hint = name || ipv4 || ipv6 || bss.mac;
+ 
+ 			let row = [
+ 				E('span', {
