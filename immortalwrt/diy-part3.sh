@@ -115,11 +115,20 @@ patch_makefile_dep \
     'CONFIG_BOOTDELAY=30' \
     'CONFIG_BOOTDELAY=10'
 
+patch_makefile_dep \
+    package/emortal/autocore/Makefile \
+    '+(TARGET_mediatek||TARGET_mvebu):mhz' \
+    '+(TARGET_mediatek||TARGET_mvebu):mhz \
+    +TARGET_mediatek:wireless-tools'
+
 [ -f target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a.dtsi ] && \
 	apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/lvts_enable.patch"
 
-[ -f package/emortal/autocore/Makefile ] && \
-	apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1000-autocore-padavanonly-mediatek-telemetry-24.10.patch"
+[ -f "$GITHUB_WORKSPACE/scripts/cpuinfo" ] && \
+	install -m 0755 "$GITHUB_WORKSPACE/scripts/cpuinfo" package/emortal/autocore/files/generic/cpuinfo
+
+[ -f "$GITHUB_WORKSPACE/scripts/tempinfo" ] && \
+	install -m 0755 "$GITHUB_WORKSPACE/scripts/tempinfo" package/emortal/autocore/files/arm/tempinfo
 
 ./scripts/feeds install -a
 
