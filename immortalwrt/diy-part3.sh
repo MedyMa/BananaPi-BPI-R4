@@ -115,6 +115,12 @@ patch_makefile_dep \
     'CONFIG_BOOTDELAY=30' \
     'CONFIG_BOOTDELAY=10'
 
+[ -f target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a.dtsi ] && \
+	apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/lvts_enable.patch"
+
+[ -f package/emortal/autocore/Makefile ] && \
+	apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1000-autocore-padavanonly-mediatek-telemetry-24.10.patch"
+
 ./scripts/feeds install -a
 
 [ -f package/network/utils/iwinfo/src/iwinfo_mtk.c ] && \
