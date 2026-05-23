@@ -138,3 +138,8 @@ patch_makefile_dep \
 
 [ -f feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/999-luci-wireless-mtk-mode-matrix.patch"
+
+patch_makefile_dep \
+    feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js \
+    "\t\t\t\thint = name || ipv4 || ipv6 || '?';" \
+    "\t\t\t\thint = (name == '?' ? null : name) || ipv4 || ipv6 || bss.mac;"
