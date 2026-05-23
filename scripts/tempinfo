@@ -79,7 +79,7 @@ case "$DISTRIB_TARGET" in
 	*)
 		cpu_temp="$(awk '{printf("%.1f°C", $0 / 1000)}' "$THERMAL_PATH/thermal_zone0/temp" 2>"/dev/null")"
 		;;
-	esac
+esac
 
 if [ -n "$cpu_temp" ] && [ -z "$wifi_temp" ]; then
 	echo -n "CPU: $cpu_temp"

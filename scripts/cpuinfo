@@ -1,28 +1,76 @@
 #!/bin/sh
 
-cpu_arch="$(cat "/proc/cpuinfo" | grep "model name" | sed -n "1p" | awk -F ': ' '{print $2}')"
-[ -z "${cpu_arch}" ] && cpu_arch="ARMv8 Processor"
-cpu_cores="$(cat "/proc/cpuinfo" | grep "processor" | wc -l)"
+CPUINFO_PATH="/proc/cpuinfo"
+CPUFREQ_PATH="/sys/devices/system/cpu/cpufreq"
+THERMAL_PATH="/sys/class/thermal"
+
+read_cpufreq() {
+	local policy="$1"
+	local path
+
+	for path in \
+		"$CPUFREQ_PATH/policy${policy}/scaling_cur_freq" \
+		"$CPUFREQ_PATH/policy${policy}/cpuinfo_cur_freq"
+	do
+		[ -e "$path" ] || continue
+		awk '{printf("%.fMHz", $0 / 1000)}' "$path" 2>"/dev/null"
+		return 0
+	done
+
+	return 1
+}
+
+cpu_arch="$(awk -F ': ' '/model name/ {print $2}' "$CPUINFO_PATH" | head -n1)"
+[ -n "$cpu_arch" ] || cpu_arch="ARMv8 Processor"
+cpu_cores="$(grep -c "processor" "$CPUINFO_PATH")"
 
 if grep -q "bcm27xx" "/etc/openwrt_release"; then
-	cpu_freq="$(expr $(vcgencmd measure_clock arm | awk -F '=' '{print $2}') / 1000000)Mhz"
+	cpu_freq="$(( $(vcgencmd measure_clock arm | awk -F '=' '{print $2}') / 1000000 ))Mhz"
 elif grep -q "bcm53xx" "/etc/openwrt_release"; then
 	cpu_freq="$(nvram get clkfreq | awk -F ',' '{print $1}')MHz"
+elif grep -q "mediatek" "/etc/openwrt_release"; then
+	cpu_freq="$(read_cpufreq 0)"
+	big_cpu_freq="$(read_cpufreq 4)"
+	if [ -n "$big_cpu_freq" ] && [ "$big_cpu_freq" = "$cpu_freq" ]; then
+		big_cpu_freq=""
+	elif [ -n "$big_cpu_freq" ]; then
+		big_cpu_freq="${big_cpu_freq} "
+	fi
+elif grep -q "mvebu/cortexa72" "/etc/openwrt_release"; then
+	cpu_freq="$(read_cpufreq 0)"
+	big_cpu_freq="$(read_cpufreq 2)"
+	if [ -n "$big_cpu_freq" ] && [ "$big_cpu_freq" = "$cpu_freq" ]; then
+		big_cpu_freq=""
+	elif [ -n "$big_cpu_freq" ]; then
+		big_cpu_freq="${big_cpu_freq} "
+	fi
 elif grep -q "mvebu" "/etc/openwrt_release"; then
-	cpu_freq="$(cat "/proc/cpuinfo" | grep "BogoMIPS" | sed -n "1p" | awk -F ': ' '{print $2}')MHz"
+	cpu_freq="$(awk -F ': ' '/BogoMIPS/ {print $2}' "$CPUINFO_PATH" | head -n1)MHz"
 else
-	cpu_freq="$(expr $(cat /sys/devices/system/cpu/cpufreq/policy0/cpuinfo_cur_freq) / 1000)MHz"
-	big_cpu_freq="$(expr $(cat /sys/devices/system/cpu/cpufreq/policy4/cpuinfo_cur_freq 2>"/dev/null") / 1000 2>"/dev/null")"
-	[ -n "${big_cpu_freq}" ] && big_cpu_freq="${big_cpu_freq}MHz "
+	cpu_freq="$(read_cpufreq 0)"
 fi
 
-if grep -q "ipq" "/etc/openwrt_release"; then
-	echo -n "${cpu_arch} x ${cpu_cores} (${cpu_freq})"
-else
-	if grep -q "bcm27xx" "/etc/openwrt_release"; then
-		cpu_temp="$(vcgencmd measure_temp | awk -F '=' '{print $2}' | awk -F "'" '{print $1}')°C"
+if grep -Eq "ipq|mediatek" "/etc/openwrt_release"; then
+	if [ -n "$big_cpu_freq$cpu_freq" ]; then
+		echo -n "${cpu_arch} x ${cpu_cores} (${big_cpu_freq}${cpu_freq})"
 	else
-		cpu_temp="$(awk "BEGIN{printf (\"%.1f\n\",$(cat /sys/class/thermal/thermal_zone0/temp)/1000) }")°C"
+		echo -n "${cpu_arch} x ${cpu_cores}"
 	fi
+	exit 0
+fi
+
+if grep -q "bcm27xx" "/etc/openwrt_release"; then
+	cpu_temp="$(vcgencmd measure_temp | awk -F '=' '{print $2}' | awk -F "'" '{print $1}')°C"
+else
+	cpu_temp="$(awk '{printf("%.1f°C", $0 / 1000)}' "$THERMAL_PATH/thermal_zone0/temp" 2>"/dev/null")"
+fi
+
+if [ -n "$cpu_temp" ] && [ -n "$big_cpu_freq$cpu_freq" ]; then
 	echo -n "${cpu_arch} x ${cpu_cores} (${big_cpu_freq}${cpu_freq}, ${cpu_temp})"
+elif [ -n "$big_cpu_freq$cpu_freq" ]; then
+	echo -n "${cpu_arch} x ${cpu_cores} (${big_cpu_freq}${cpu_freq})"
+elif [ -n "$cpu_temp" ]; then
+	echo -n "${cpu_arch} x ${cpu_cores} (${cpu_temp})"
+else
+	echo -n "${cpu_arch} x ${cpu_cores}"
 fi
