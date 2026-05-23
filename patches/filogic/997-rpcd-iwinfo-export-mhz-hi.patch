@@ -1,5 +1,5 @@
 diff --git a/package/system/rpcd/patches/0002-iwinfo-Improve-EHT-DCM-support.patch b/package/system/rpcd/patches/0002-iwinfo-Improve-EHT-DCM-support.patch
-index fd9974a..f242c1f 100644
+index fd9974a..f3f47cf 100644
 --- a/package/system/rpcd/patches/0002-iwinfo-Improve-EHT-DCM-support.patch
 +++ b/package/system/rpcd/patches/0002-iwinfo-Improve-EHT-DCM-support.patch
 @@ -1,8 +1,10 @@
@@ -14,4 +14,3 @@ index fd9974a..f242c1f 100644
   		blobmsg_add_u32(&buf, "eht_gi", r->eht_gi);
  +		blobmsg_add_u32(&buf, "eht_dcm", r->eht_dcm);
   	}
-
