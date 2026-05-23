@@ -122,7 +122,8 @@ patch_makefile_dep \
     +TARGET_mediatek:wireless-tools'
 
 [ -f target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a.dtsi ] && \
-	apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/lvts_enable.patch"
+	sed -i '/lvts: lvts@1100a000 {/,/^[[:space:]]*};/ { /status = "disabled";/d; }' \
+		target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a.dtsi
 
 [ -f "$GITHUB_WORKSPACE/scripts/cpuinfo" ] && \
 	install -m 0755 "$GITHUB_WORKSPACE/scripts/cpuinfo" package/emortal/autocore/files/generic/cpuinfo
