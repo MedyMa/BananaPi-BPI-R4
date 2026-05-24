@@ -127,6 +127,16 @@ patch_makefile_dep \
 	sed -i 's/^LINUX_KERNEL_HASH-6\.6\.[0-9]* =.*$/LINUX_KERNEL_HASH-6.6.104 = 2a772f9d661afabaaddcdfd1116239acb2d943377aceab9e0baed2b7a915e36a/' include/kernel-6.6
 }
 
+# Fix backport patch 823-v6.12-0003 for kernel 6.6.104:
+# Between 6.6.95 and 6.6.104, u-boot-env.c changed __le32 *crc32_addr to
+# uint32_t *crc32_addr (dropping le32_to_cpu), so hunk #3 context no longer matches.
+[ -f target/linux/generic/backport-6.6/823-v6.12-0003-nvmem-layouts-add-U-Boot-env-layout.patch ] && \
+	sed -i \
+		-e 's/^-\t__le32 \*crc32_addr;/-\tuint32_t *crc32_addr;/' \
+		-e 's/^-\tcrc32_addr = (__le32 \*)(buf + crc32_offset);/-\tcrc32_addr = (uint32_t *)(buf + crc32_offset);/' \
+		-e 's/^-\tcrc32 = le32_to_cpu(\*crc32_addr);/-\tcrc32 = *crc32_addr;/' \
+		target/linux/generic/backport-6.6/823-v6.12-0003-nvmem-layouts-add-U-Boot-env-layout.patch
+
 [ -f target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a.dtsi ] && {
 	# Enable LVTS thermal sensor
 	sed -i '/lvts: lvts@1100a000 {/,/^[[:space:]]*};/ { /status = "disabled";/d; }' \
