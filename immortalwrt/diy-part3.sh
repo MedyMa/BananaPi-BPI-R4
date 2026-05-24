@@ -151,6 +151,12 @@ patch_makefile_dep \
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1002-luci-status-overview-rate-mhz-hi.patch"
 
+# Allow RTL8672/RTL9601C locked GPON ONT sticks (Chinese ISP modules) that
+# return all-zero EEPROM to be accepted as standard SFP, fixing the error:
+#   sfp sfp1: module is not supported - phys id 0x00 0x00
+[ -f drivers/net/phy/sfp.c ] && \
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/997-sfp-rtl8672-accept-zero-phys-id-24.10.patch"
+
 patch_makefile_dep \
     feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js \
     "\t\t\t\thint = name || ipv4 || ipv6 || '?';" \
