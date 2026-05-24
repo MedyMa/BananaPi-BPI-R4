@@ -121,9 +121,21 @@ patch_makefile_dep \
     '+(TARGET_mediatek||TARGET_mvebu):mhz \
     +TARGET_mediatek:wireless-tools'
 
-[ -f target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a.dtsi ] && \
+# Upgrade kernel to 6.6.104 (MTK MP4.2 reference release, sha256 from kernel.org)
+[ -f include/kernel-6.6 ] && {
+	sed -i 's/^LINUX_VERSION-6\.6 = \..*$/LINUX_VERSION-6.6 = .104/' include/kernel-6.6
+	sed -i 's/^LINUX_KERNEL_HASH-6\.6\.[0-9]* =.*$/LINUX_KERNEL_HASH-6.6.104 = 2a772f9d661afabaaddcdfd1116239acb2d943377aceab9e0baed2b7a915e36a/' include/kernel-6.6
+}
+
+[ -f target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a.dtsi ] && {
+	# Enable LVTS thermal sensor
 	sed -i '/lvts: lvts@1100a000 {/,/^[[:space:]]*};/ { /status = "disabled";/d; }' \
 		target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a.dtsi
+	# Increase MDIO drive strength from 8mA to 10mA for GMAC1 and GMAC2 AQR113C 10G PHY
+	# (MTK upstream patch 1010; required for reliable 10G link at high frequencies)
+	sed -i '/groups = "mdc_mdio0";/{N; s/drive-strength = <MTK_DRIVE_8mA>/drive-strength = <MTK_DRIVE_10mA>/}' \
+		target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a.dtsi
+}
 
 [ -f "$GITHUB_WORKSPACE/scripts/cpuinfo" ] && \
 	install -m 0755 "$GITHUB_WORKSPACE/scripts/cpuinfo" package/emortal/autocore/files/generic/cpuinfo
