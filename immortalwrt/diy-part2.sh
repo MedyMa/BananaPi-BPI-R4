@@ -22,7 +22,7 @@ fi
 # Replaces stock mt76 / mac80211 / wifi-scripts with MTK's WiFi7 release.
 # Only these WiFi packages are touched; all other feeds/packages unchanged.
 git clone --depth=1 \
-    https://git01.mediatek.com/plugins/gitiles/openwrt/feeds/mtk-openwrt-feeds \
+    https://git01.mediatek.com/openwrt/feeds/mtk-openwrt-feeds.git \
     /tmp/mtk-openwrt-feeds
 
 MTK_BASE="/tmp/mtk-openwrt-feeds/autobuild/unified/filogic/mac80211/24.10"
