@@ -123,3 +123,81 @@ patch_makefile_dep \
 
 [ -f feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1003-luci-wireless-mtk-mlo-ofdma-controls.patch"
+
+# ── BPI-R4 LED + BE14000 WiFi fixes ─────────────────────────────────────────
+# The upstream immortalwrt openwrt-24.10 DTS defines the B LED (GPIO 63) with
+# LED_FUNCTION_WPS, which only activates during WPS setup – invisible after
+# normal boot.  The G LED (GPIO 79) uses 'default-state = "on"' which can be
+# lost when the mtwifi vendor driver re-initialises GPIO ordering.
+#
+# Preferred path: apply the workspace patch which rewrites the LED section to:
+#   G (GPIO 79) -> default-on (system status, always lit)
+#   B (GPIO 63) -> heartbeat  (system-alive blink; mtwifi takes over for WiFi)
+#   SSD (GPIO 10) -> disk-activity (NVMe/eMMC I/O blink – verify GPIO 10 for
+#                    your board revision against BPI-R4-Main schematic H2)
+#
+# Fallback path (sed): in case the DTS content drifts between immortalwrt
+# commits, a targeted sed run makes the same changes without needing exact
+# context lines.
+
+BPI_R4_DTSI="target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4.dtsi"
+
+if [ -f "$BPI_R4_DTSI" ]; then
+    if apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/998-bpi-r4-be14000-leds-fix.patch" 2>/dev/null; then
+        echo "INFO: BPI-R4 LED DTS patch applied successfully."
+    else
+        echo "WARN: DTS patch did not apply cleanly; falling back to sed fixups."
+        # G LED: swap default-state for explicit default-on trigger
+        sed -i \
+            's/^\(\s*\)default-state = "on";/\1linux,default-trigger = "default-on";/' \
+            "$BPI_R4_DTSI"
+        # B LED: change WPS function and add heartbeat trigger
+        sed -i \
+            's/LED_FUNCTION_WPS/LED_FUNCTION_INDICATOR/' \
+            "$BPI_R4_DTSI"
+        sed -i \
+            's/^\(\s*\)default-state = "off";/\1linux,default-trigger = "heartbeat";/' \
+            "$BPI_R4_DTSI"
+        # Add SSD LED node after the closing brace of led-blue if not present
+        if ! grep -q 'led-ssd' "$BPI_R4_DTSI"; then
+            sed -i '/gpios = <&pio 63 GPIO_ACTIVE_HIGH>;/{n; s/.*/\t\t};\n\n\t\tled-ssd {\n\t\t\tlabel = "green:ssd";\n\t\t\tfunction = LED_FUNCTION_DISK;\n\t\t\tcolor = <LED_COLOR_ID_GREEN>;\n\t\t\tgpios = <\&pio 10 GPIO_ACTIVE_HIGH>;\n\t\t\tlinux,default-trigger = "disk-activity";\n\t\t};/}' \
+                "$BPI_R4_DTSI" 2>/dev/null || true
+        fi
+    fi
+fi
+
+# Deploy a uci-defaults script so LED sysfs names are wired to the correct
+# OpenWrt system LED config entries on first boot.  This is a belt-and-
+# suspenders measure: even if the DTS labels drift, the LEDs are reachable
+# by their known sysfs names once the gpio-leds driver binds.
+mkdir -p package/base-files/files/etc/uci-defaults
+cat > package/base-files/files/etc/uci-defaults/91_bpi-r4-leds << 'EOF'
+#!/bin/sh
+# BPI-R4 H2 connector LED defaults – applied once on first boot.
+
+# G (green, GPIO 79) – always-on status LED
+uci -q delete system.led_status 2>/dev/null
+uci set system.led_status=led
+uci set system.led_status.name='Status'
+uci set system.led_status.sysfs='green:status'
+uci set system.led_status.trigger='default-on'
+
+# B (blue, GPIO 63) – heartbeat until mtwifi takes over for WiFi activity
+uci -q delete system.led_wifi 2>/dev/null
+uci set system.led_wifi=led
+uci set system.led_wifi.name='WiFi'
+uci set system.led_wifi.sysfs='blue:indicator'
+uci set system.led_wifi.trigger='heartbeat'
+
+# SSD (GPIO 10) – disk activity, blinks on NVMe / eMMC I/O
+uci -q delete system.led_ssd 2>/dev/null
+uci set system.led_ssd=led
+uci set system.led_ssd.name='SSD'
+uci set system.led_ssd.sysfs='green:ssd'
+uci set system.led_ssd.trigger='disk-activity'
+
+uci commit system
+exit 0
+EOF
+chmod +x package/base-files/files/etc/uci-defaults/91_bpi-r4-leds
+# ─────────────────────────────────────────────────────────────────────────────
