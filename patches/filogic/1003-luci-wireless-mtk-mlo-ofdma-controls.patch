@@ -82,25 +82,25 @@ index f486c36..2705479 100644
  					o.default = o.disabled;
  
 +					if (isMtkMac80211) {
-+						o = ss.taboption('advanced', form.Flag, '_mtk_dl_ofdma', _('DL OFDMA'), _('MediaTek scheduler bitmap bit0. Controls downlink OFDMA transmission.'));
++						o = ss.taboption('advanced', form.Flag, '_mtk_dl_ofdma', _('DL OFDMA'), _('MediaTek 调度位图 bit0，控制下行 OFDMA 传输。'));
 +						o.rmempty = false;
 +						o.cfgvalue = section_id => (getMtkMuOnOff(section_id) & 0x1) ? '1' : '0';
 +						o.write = (section_id, value) => setMtkMuBit(section_id, 0, value == '1');
 +						o.remove = section_id => setMtkMuBit(section_id, 0, false);
 +
-+						o = ss.taboption('advanced', form.Flag, '_mtk_ul_ofdma', _('UL OFDMA'), _('MediaTek scheduler bitmap bit1. Controls uplink OFDMA transmission.'));
++						o = ss.taboption('advanced', form.Flag, '_mtk_ul_ofdma', _('UL OFDMA'), _('MediaTek 调度位图 bit1，控制上行 OFDMA 传输。'));
 +						o.rmempty = false;
 +						o.cfgvalue = section_id => (getMtkMuOnOff(section_id) & 0x2) ? '1' : '0';
 +						o.write = (section_id, value) => setMtkMuBit(section_id, 1, value == '1');
 +						o.remove = section_id => setMtkMuBit(section_id, 1, false);
 +
-+						o = ss.taboption('advanced', form.Flag, '_mtk_dl_mumimo', _('DL MU-MIMO'), _('MediaTek scheduler bitmap bit2. Controls downlink MU-MIMO transmission.'));
++						o = ss.taboption('advanced', form.Flag, '_mtk_dl_mumimo', _('DL MU-MIMO'), _('MediaTek 调度位图 bit2，控制下行 MU-MIMO 传输。'));
 +						o.rmempty = false;
 +						o.cfgvalue = section_id => (getMtkMuOnOff(section_id) & 0x4) ? '1' : '0';
 +						o.write = (section_id, value) => setMtkMuBit(section_id, 2, value == '1');
 +						o.remove = section_id => setMtkMuBit(section_id, 2, false);
 +
-+						o = ss.taboption('advanced', form.Flag, '_mtk_ul_mumimo', _('UL MU-MIMO'), _('MediaTek scheduler bitmap bit3. Controls uplink MU-MIMO transmission.'));
++						o = ss.taboption('advanced', form.Flag, '_mtk_ul_mumimo', _('UL MU-MIMO'), _('MediaTek 调度位图 bit3，控制上行 MU-MIMO 传输。'));
 +						o.rmempty = false;
 +						o.cfgvalue = section_id => (getMtkMuOnOff(section_id) & 0x8) ? '1' : '0';
 +						o.write = (section_id, value) => setMtkMuBit(section_id, 3, value == '1');
@@ -116,7 +116,7 @@ index f486c36..2705479 100644
  					o.default = o.enabled;
 +
 +					if (isMtkMac80211 && /^EHT/.test(uci.get('wireless', radioNet.getWifiDeviceName(), 'htmode') || '')) {
-+						o = ss.taboption('advanced', form.Flag, '_mtk_mlo', _('MLO'), _('Enable MediaTek Multi-Link Operation for this AP. This option is shown only when the radio is already saved in BE/EHT mode.'));
++						o = ss.taboption('advanced', form.Flag, '_mtk_mlo', _('MLO'), _('为当前 AP 启用 MediaTek 多链路聚合（MLO）。仅当无线已保存为 BE/EHT 模式时显示此选项。'));
 +						o.depends('mode', 'ap');
 +						o.depends('mode', 'ap-wds');
 +						o.rmempty = false;
