@@ -22,13 +22,13 @@ SSD (GPIO 10): Add disk-activity LED node.  GPIO 10 is derived from the
   block-layer I/O (NVMe or eMMC).
 ---
  .../boot/dts/mediatek/mt7988a-bananapi-bpi-r4.dtsi | 15 +++++++++++----
- 1 file changed, 11 insertions(+), 4 deletions(-)
+ 1 file changed, 11 insertions(+), 3 deletions(-)
 
 diff --git a/target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4.dtsi b/target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4.dtsi
 --- a/target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4.dtsi
 +++ b/target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4.dtsi
-@@ -1,14 +1,21 @@
- 		led-green {
+@@ -64,14 +64,22 @@
+ 		led_green: led-green {
  			function = LED_FUNCTION_STATUS;
  			color = <LED_COLOR_ID_GREEN>;
  			gpios = <&pio 79 GPIO_ACTIVE_HIGH>;
@@ -36,7 +36,7 @@ diff --git a/target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988
 +			linux,default-trigger = "default-on";
  		};
 
- 		led-blue {
+ 		led_blue: led-blue {
 -			function = LED_FUNCTION_WPS;
 +			function = LED_FUNCTION_INDICATOR;
  			color = <LED_COLOR_ID_BLUE>;
@@ -45,7 +45,7 @@ diff --git a/target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988
 +			linux,default-trigger = "heartbeat";
 +		};
 +
-+		led-ssd {
++		led_ssd: led-ssd {
 +			label = "green:ssd";
 +			function = LED_FUNCTION_DISK;
 +			color = <LED_COLOR_ID_GREEN>;
