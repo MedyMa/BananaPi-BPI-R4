@@ -1,0 +1,55 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: MedyMa build <build@bpi-r4>
+Date: Mon, 01 Jan 2024 00:00:00 +0000
+Subject: [PATCH] arm64: dts: mt7988a-bananapi-bpi-r4: fix LEDs for mtwifi/BE14000
+
+Fix the GPIO LED definitions for the BPI-R4 H2 front-panel header:
+
+G (green, GPIO 79): Replace 'default-state = "on"' with an explicit
+  'linux,default-trigger = "default-on"' so the LED stays lit even when
+  the mtwifi vendor driver re-initialises GPIOs after the leds-gpio driver.
+
+B (blue, GPIO 63): Change from LED_FUNCTION_WPS (requires a WPS event to
+  activate) to LED_FUNCTION_INDICATOR with a 'heartbeat' trigger so it
+  blinks as a visible system-alive indicator regardless of WiFi state.
+  When CONFIG_MTK_WIFI7_LED_CONTROL_SUPPORT is active the driver will later
+  take over GPIO 63 for WiFi activity; the heartbeat default keeps the LED
+  useful on first boot before WiFi initialises.
+
+SSD (GPIO 10): Add disk-activity LED node.  GPIO 10 is derived from the
+  BPI-R4-Main V1.1 schematic H2 connector -- verify against your board
+  revision before shipping.  The disk-activity trigger fires on any
+  block-layer I/O (NVMe or eMMC).
+---
+ .../boot/dts/mediatek/mt7988a-bananapi-bpi-r4.dtsi | 15 +++++++++++----
+ 1 file changed, 11 insertions(+), 4 deletions(-)
+
+diff --git a/target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4.dtsi b/target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4.dtsi
+--- a/target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4.dtsi
++++ b/target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4.dtsi
+@@ -1,14 +1,21 @@
+ 		led-green {
+ 			function = LED_FUNCTION_STATUS;
+ 			color = <LED_COLOR_ID_GREEN>;
+ 			gpios = <&pio 79 GPIO_ACTIVE_HIGH>;
+-			default-state = "on";
++			linux,default-trigger = "default-on";
+ 		};
+
+ 		led-blue {
+-			function = LED_FUNCTION_WPS;
++			function = LED_FUNCTION_INDICATOR;
+ 			color = <LED_COLOR_ID_BLUE>;
+ 			gpios = <&pio 63 GPIO_ACTIVE_HIGH>;
+-			default-state = "off";
++			linux,default-trigger = "heartbeat";
++		};
++
++		led-ssd {
++			label = "green:ssd";
++			function = LED_FUNCTION_DISK;
++			color = <LED_COLOR_ID_GREEN>;
++			gpios = <&pio 10 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "disk-activity";
+ 		};
+ 	};
