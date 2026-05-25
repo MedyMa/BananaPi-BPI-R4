@@ -33,6 +33,19 @@ apply_workspace_patch() {
     git apply --ignore-space-change --ignore-whitespace "$patch_file"
 }
 
+bpi_r4_led_dts_is_desired() {
+    local dtsi_path="$1"
+
+    [ -f "$dtsi_path" ] || return 1
+
+    grep -q 'linux,default-trigger = "default-on";' "$dtsi_path" &&
+    grep -q 'function = LED_FUNCTION_INDICATOR;' "$dtsi_path" &&
+    grep -q 'linux,default-trigger = "heartbeat";' "$dtsi_path" &&
+    grep -q 'led-ssd {' "$dtsi_path" &&
+    grep -q 'label = "green:ssd";' "$dtsi_path" &&
+    grep -q 'linux,default-trigger = "disk-activity";' "$dtsi_path"
+}
+
 rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/luci/applications/luci-app-argon-config
 rm -rf feeds/luci/applications/luci-app-passwall
@@ -145,6 +158,8 @@ BPI_R4_DTSI="target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988
 if [ -f "$BPI_R4_DTSI" ]; then
     if apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/998-bpi-r4-be14000-leds-fix.patch" 2>/dev/null; then
         echo "INFO: BPI-R4 LED DTS patch applied successfully."
+    elif bpi_r4_led_dts_is_desired "$BPI_R4_DTSI"; then
+        echo "INFO: BPI-R4 LED DTS already matches the desired layout; skipping patch."
     else
         echo "WARN: DTS patch did not apply cleanly; falling back to sed fixups."
         # G LED: swap default-state for explicit default-on trigger
@@ -162,6 +177,13 @@ if [ -f "$BPI_R4_DTSI" ]; then
         if ! grep -q 'led-ssd' "$BPI_R4_DTSI"; then
             sed -i '/gpios = <&pio 63 GPIO_ACTIVE_HIGH>;/{n; s/.*/\t\t};\n\n\t\tled-ssd {\n\t\t\tlabel = "green:ssd";\n\t\t\tfunction = LED_FUNCTION_DISK;\n\t\t\tcolor = <LED_COLOR_ID_GREEN>;\n\t\t\tgpios = <\&pio 10 GPIO_ACTIVE_HIGH>;\n\t\t\tlinux,default-trigger = "disk-activity";\n\t\t};/}' \
                 "$BPI_R4_DTSI" 2>/dev/null || true
+        fi
+
+        if bpi_r4_led_dts_is_desired "$BPI_R4_DTSI"; then
+            echo "INFO: BPI-R4 LED DTS sed fallback completed successfully."
+        else
+            echo "ERROR: BPI-R4 LED DTS still does not match the desired layout after sed fallback." >&2
+            exit 1
         fi
     fi
 fi
