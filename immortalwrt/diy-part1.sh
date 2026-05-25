@@ -46,6 +46,54 @@ bpi_r4_led_dts_is_desired() {
     grep -q 'linux,default-trigger = "disk-activity";' "$dtsi_path"
 }
 
+bpi_r4_fix_led_dts() {
+    local dtsi_path="$1"
+
+    [ -f "$dtsi_path" ] || return 1
+
+    perl -0pi -e '
+        $ok_green = s@\n([ \t]*)(?:\w+:\s*)?led-green\s*\{.*?\n\1\};@
+\n$1led_green: led-green {
+$1\tfunction = LED_FUNCTION_STATUS;
+$1\tcolor = <LED_COLOR_ID_GREEN>;
+$1\tgpios = <&pio 79 GPIO_ACTIVE_HIGH>;
+$1\tlinux,default-trigger = "default-on";
+$1};@s;
+
+        $ok_blue = s@\n([ \t]*)(?:\w+:\s*)?led-blue\s*\{.*?\n\1\};@
+\n$1led_blue: led-blue {
+$1\tfunction = LED_FUNCTION_INDICATOR;
+$1\tcolor = <LED_COLOR_ID_BLUE>;
+$1\tgpios = <&pio 63 GPIO_ACTIVE_HIGH>;
+$1\tlinux,default-trigger = "heartbeat";
+$1};@s;
+
+        if (/\n([ \t]*)(?:\w+:\s*)?led-ssd\s*\{.*?\n\1\};/s) {
+            $ok_ssd = s@\n([ \t]*)(?:\w+:\s*)?led-ssd\s*\{.*?\n\1\};@
+\n$1led_ssd: led-ssd {
+$1\tlabel = "green:ssd";
+$1\tfunction = LED_FUNCTION_DISK;
+$1\tcolor = <LED_COLOR_ID_GREEN>;
+$1\tgpios = <&pio 10 GPIO_ACTIVE_HIGH>;
+$1\tlinux,default-trigger = "disk-activity";
+$1};@s;
+        }
+        else {
+            $ok_ssd = s@(\n([ \t]*)(?:\w+:\s*)?led-blue\s*\{.*?\n\2\};)@$1
+
+$2led_ssd: led-ssd {
+$2\tlabel = "green:ssd";
+$2\tfunction = LED_FUNCTION_DISK;
+$2\tcolor = <LED_COLOR_ID_GREEN>;
+$2\tgpios = <&pio 10 GPIO_ACTIVE_HIGH>;
+$2\tlinux,default-trigger = "disk-activity";
+$2};@s;
+        }
+
+        END { exit(($ok_green && $ok_blue && $ok_ssd) ? 0 : 1); }
+    ' "$dtsi_path"
+}
+
 rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/luci/applications/luci-app-argon-config
 rm -rf feeds/luci/applications/luci-app-passwall
@@ -121,10 +169,9 @@ patch_makefile_dep \
     'CONFIG_BOOTDELAY=10'
 
 ./scripts/feeds install -a
-
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1000-luci-status-overview-wifi7-mlo.patch"
-    
+
 [ -f feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1001-luci-network-wireless-station-hints.patch"
 
@@ -133,7 +180,7 @@ patch_makefile_dep \
 
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1002-luci-status-overview-rate-mhz-hi.patch"    
-
+    
 [ -f feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1003-luci-wireless-mtk-mlo-ofdma-controls.patch"
 
@@ -161,28 +208,16 @@ if [ -f "$BPI_R4_DTSI" ]; then
     elif bpi_r4_led_dts_is_desired "$BPI_R4_DTSI"; then
         echo "INFO: BPI-R4 LED DTS already matches the desired layout; skipping patch."
     else
-        echo "WARN: DTS patch did not apply cleanly; falling back to sed fixups."
-        # G LED: swap default-state for explicit default-on trigger
-        sed -i \
-            's/^\(\s*\)default-state = "on";/\1linux,default-trigger = "default-on";/' \
-            "$BPI_R4_DTSI"
-        # B LED: change WPS function and add heartbeat trigger
-        sed -i \
-            's/LED_FUNCTION_WPS/LED_FUNCTION_INDICATOR/' \
-            "$BPI_R4_DTSI"
-        sed -i \
-            's/^\(\s*\)default-state = "off";/\1linux,default-trigger = "heartbeat";/' \
-            "$BPI_R4_DTSI"
-        # Add SSD LED node after the closing brace of led-blue if not present
-        if ! grep -q 'led-ssd' "$BPI_R4_DTSI"; then
-            sed -i '/gpios = <&pio 63 GPIO_ACTIVE_HIGH>;/{n; s/.*/\t\t};\n\n\t\tled-ssd {\n\t\t\tlabel = "green:ssd";\n\t\t\tfunction = LED_FUNCTION_DISK;\n\t\t\tcolor = <LED_COLOR_ID_GREEN>;\n\t\t\tgpios = <\&pio 10 GPIO_ACTIVE_HIGH>;\n\t\t\tlinux,default-trigger = "disk-activity";\n\t\t};/}' \
-                "$BPI_R4_DTSI" 2>/dev/null || true
+        echo "WARN: DTS patch did not apply cleanly; falling back to perl node rewrite."
+        if bpi_r4_fix_led_dts "$BPI_R4_DTSI"; then
+            echo "INFO: BPI-R4 LED DTS perl rewrite completed successfully."
+        else
+            echo "ERROR: BPI-R4 LED DTS perl rewrite failed to match one or more nodes." >&2
+            exit 1
         fi
 
-        if bpi_r4_led_dts_is_desired "$BPI_R4_DTSI"; then
-            echo "INFO: BPI-R4 LED DTS sed fallback completed successfully."
-        else
-            echo "ERROR: BPI-R4 LED DTS still does not match the desired layout after sed fallback." >&2
+        if ! bpi_r4_led_dts_is_desired "$BPI_R4_DTSI"; then
+            echo "ERROR: BPI-R4 LED DTS does not match the desired layout after perl rewrite." >&2
             exit 1
         fi
     fi
