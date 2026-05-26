@@ -186,11 +186,23 @@ if [ -d "$MTK_TARGET" ]; then
             "$MTK_TARGET/patches-6.6"
 
         # ── 1. overlay files (new .c/.h not in upstream kernel) ──────────────
+        # mtk_eth_dbg.c is excluded: it references struct members added by the
+        # 999-27xx patch series (skipped due to mtk_eth_soc.c divergence) and
+        # would cause a compile error on the immortalwrt baseline.
+        # The mtk_hnat/ subdirectory files are safe to copy if present.
         src="$tmpdir/$HNAT_OVERLAY_SRC"
         if [ -d "$src" ] && [ -n "$(ls -A "$src" 2>/dev/null)" ]; then
             mkdir -p "$HNAT_OVERLAY_SRC"
-            cp -rf "$src/." "$HNAT_OVERLAY_SRC/"
-            echo "INFO: HNAT overlay files copied: $(find "$HNAT_OVERLAY_SRC" -type f | sed "s|$HNAT_OVERLAY_SRC/||" | sort | tr '\n' ' ')"
+            find "$src" -maxdepth 1 -type f ! -name "mtk_eth_dbg.c" \
+                -exec cp -f {} "$HNAT_OVERLAY_SRC/" \;
+            find "$src" -mindepth 1 -maxdepth 1 -type d \
+                -exec cp -rf {} "$HNAT_OVERLAY_SRC/" \;
+            copied_files=$(find "$HNAT_OVERLAY_SRC" -type f | sed "s|$HNAT_OVERLAY_SRC/||" | sort | tr '\n' ' ')
+            if [ -n "$copied_files" ]; then
+                echo "INFO: HNAT overlay files copied: $copied_files"
+            else
+                echo "INFO: HNAT overlay: no new files to copy (only mtk_eth_dbg.c present, skipped)."
+            fi
         else
             echo "WARN: padavanonly HNAT overlay dir empty; skipping file copy." >&2
         fi
@@ -214,7 +226,7 @@ if [ -d "$MTK_TARGET" ]; then
                 [ -f "$HNAT_PATCHES_DST/$name" ] && continue
                 keep=0
                 case "$name" in
-                    999-2705-*|999-2745-*|999-30[0-9][0-9]-*|9997-hnat*) keep=1 ;;
+                    999-2745-*|999-30[0-9][0-9]-*|9997-hnat*) keep=1 ;;
                 esac
                 [ "$keep" -eq 1 ] || continue
                 cp "$patch" "$HNAT_PATCHES_DST/"
