@@ -156,12 +156,16 @@ patch_makefile_dep \
 
 # ── MT7988 HNAT/PPE driver overlay from padavanonly mt798x fork ──────────────
 # immortalwrt openwrt-24.10 ships a baseline PPE implementation.
-# padavanonly/immortalwrt-mt798x-6.6 carries MT7988-specific HNAT backports
-# and PPE fixes not yet merged upstream. Overlay only the mediatek ethernet
-# driver subtree; kernel patches and feeds remain untouched.
-HNAT_OVERLAY_SRC="target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek"
+# padavanonly/immortalwrt-mt798x-6.6 carries:
+#   files-6.6/...mediatek/   – new files (e.g. mtk_eth_dbg.c) not in upstream kernel
+#   patches-6.6/             – Makefile/code patches to wire those files in + PPE improvements
+# We need both halves; only copying the overlay files without the matching patches
+# leaves new .c files stranded (no Makefile obj entry → never compiled).
+MTK_TARGET="target/linux/mediatek"
+HNAT_OVERLAY_SRC="$MTK_TARGET/files-6.6/drivers/net/ethernet/mediatek"
+HNAT_PATCHES_DST="$MTK_TARGET/patches-6.6"
 
-if [ -d "target/linux/mediatek" ]; then
+if [ -d "$MTK_TARGET" ]; then
     (
         tmpdir=$(mktemp -d)
         trap 'rm -rf "$tmpdir"' EXIT
@@ -177,20 +181,43 @@ if [ -d "target/linux/mediatek" ]; then
             exit 0
         }
 
-        git -C "$tmpdir" sparse-checkout set "$HNAT_OVERLAY_SRC"
+        git -C "$tmpdir" sparse-checkout set \
+            "$HNAT_OVERLAY_SRC" \
+            "$MTK_TARGET/patches-6.6"
 
+        # ── 1. overlay files (new .c/.h not in upstream kernel) ──────────────
         src="$tmpdir/$HNAT_OVERLAY_SRC"
         if [ -d "$src" ] && [ -n "$(ls -A "$src" 2>/dev/null)" ]; then
             mkdir -p "$HNAT_OVERLAY_SRC"
             cp -rf "$src/." "$HNAT_OVERLAY_SRC/"
-            echo "INFO: MT7988 HNAT/PPE overlay from padavanonly applied."
-            echo "INFO: overlay files: $(find "$HNAT_OVERLAY_SRC" -maxdepth 1 -type f -name '*.c' -o -name 'Makefile' -o -name 'Kconfig' | xargs -r basename | tr '\n' ' ')"
+            echo "INFO: HNAT overlay files copied: $(find "$HNAT_OVERLAY_SRC" -maxdepth 2 -type f | xargs -r basename | tr '\n' ' ')"
         else
-            echo "WARN: padavanonly HNAT source dir empty after sparse checkout; skipping." >&2
+            echo "WARN: padavanonly HNAT overlay dir empty; skipping file copy." >&2
+        fi
+
+        # ── 2. kernel patches (Makefile wiring + PPE improvements) ───────────
+        patches_src="$tmpdir/$MTK_TARGET/patches-6.6"
+        if [ -d "$patches_src" ]; then
+            mkdir -p "$HNAT_PATCHES_DST"
+            copied=0
+            while IFS= read -r -d '' patch; do
+                name=$(basename "$patch")
+                # Skip if already present (immortalwrt has its own copy)
+                [ -f "$HNAT_PATCHES_DST/$name" ] && continue
+                # Only copy patches that touch HNAT/PPE/eth_dbg related code
+                if grep -qE '(mtk_eth_dbg|mtk_ppe|NET_MEDIATEK_HNAT|mediatek.*hnat|hnat.*ppe)' "$patch" 2>/dev/null; then
+                    cp "$patch" "$HNAT_PATCHES_DST/"
+                    echo "INFO: Added HNAT patch: $name"
+                    copied=$((copied + 1))
+                fi
+            done < <(find "$patches_src" -maxdepth 1 -name "*.patch" -print0)
+            [ "$copied" -eq 0 ] && echo "WARN: No HNAT-related patches found in padavanonly patches-6.6." >&2
+        else
+            echo "WARN: padavanonly patches-6.6 dir not found after sparse checkout." >&2
         fi
     ) || true
 else
-    echo "WARN: target/linux/mediatek not found; skipping HNAT overlay." >&2
+    echo "WARN: $MTK_TARGET not found; skipping HNAT overlay." >&2
 fi
 # ─────────────────────────────────────────────────────────────────────────────
 
