@@ -153,6 +153,44 @@ patch_makefile_dep \
     'CONFIG_BOOTDELAY=30' \
     'CONFIG_BOOTDELAY=10'
 
+# ── MT7988 HNAT/PPE driver overlay from padavanonly mt798x fork ──────────────
+# immortalwrt openwrt-24.10 ships a baseline PPE implementation.
+# padavanonly/immortalwrt-mt798x-6.6 carries MT7988-specific HNAT backports
+# and PPE fixes not yet merged upstream. Overlay only the mediatek ethernet
+# driver subtree; kernel patches and feeds remain untouched.
+HNAT_OVERLAY_SRC="target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek"
+
+if [ -d "$HNAT_OVERLAY_SRC" ]; then
+    (
+        tmpdir=$(mktemp -d)
+        trap 'rm -rf "$tmpdir"' EXIT
+
+        git clone \
+            --depth=1 \
+            --filter=blob:none \
+            --sparse \
+            -b openwrt-24.10-6.6 \
+            https://github.com/padavanonly/immortalwrt-mt798x-6.6 \
+            "$tmpdir" || {
+            echo "WARN: Could not clone padavanonly repo for HNAT overlay; skipping." >&2
+            exit 0
+        }
+
+        git -C "$tmpdir" sparse-checkout set "$HNAT_OVERLAY_SRC"
+
+        src="$tmpdir/$HNAT_OVERLAY_SRC"
+        if [ -d "$src" ] && [ -n "$(ls -A "$src" 2>/dev/null)" ]; then
+            cp -rf "$src/." "$HNAT_OVERLAY_SRC/"
+            echo "INFO: MT7988 HNAT/PPE overlay from padavanonly applied."
+        else
+            echo "WARN: padavanonly HNAT source dir empty after sparse checkout; skipping." >&2
+        fi
+    ) || true
+else
+    echo "WARN: HNAT overlay target $HNAT_OVERLAY_SRC not found in source tree; skipping." >&2
+fi
+# ─────────────────────────────────────────────────────────────────────────────
+
 ./scripts/feeds install -a
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1000-luci-status-overview-wifi7-mlo.patch"
