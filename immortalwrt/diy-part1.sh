@@ -184,6 +184,7 @@ if [ -d "target/linux/mediatek" ]; then
             mkdir -p "$HNAT_OVERLAY_SRC"
             cp -rf "$src/." "$HNAT_OVERLAY_SRC/"
             echo "INFO: MT7988 HNAT/PPE overlay from padavanonly applied."
+            echo "INFO: overlay files: $(find "$HNAT_OVERLAY_SRC" -maxdepth 1 -type f -name '*.c' -o -name 'Makefile' -o -name 'Kconfig' | xargs -r basename | tr '\n' ' ')"
         else
             echo "WARN: padavanonly HNAT source dir empty after sparse checkout; skipping." >&2
         fi
