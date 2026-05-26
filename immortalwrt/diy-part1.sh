@@ -190,7 +190,7 @@ if [ -d "$MTK_TARGET" ]; then
         if [ -d "$src" ] && [ -n "$(ls -A "$src" 2>/dev/null)" ]; then
             mkdir -p "$HNAT_OVERLAY_SRC"
             cp -rf "$src/." "$HNAT_OVERLAY_SRC/"
-            echo "INFO: HNAT overlay files copied: $(find "$HNAT_OVERLAY_SRC" -maxdepth 2 -type f | xargs -r basename | tr '\n' ' ')"
+            echo "INFO: HNAT overlay files copied: $(find "$HNAT_OVERLAY_SRC" -type f | sed "s|$HNAT_OVERLAY_SRC/||" | sort | tr '\n' ' ')"
         else
             echo "WARN: padavanonly HNAT overlay dir empty; skipping file copy." >&2
         fi
@@ -200,16 +200,26 @@ if [ -d "$MTK_TARGET" ]; then
         if [ -d "$patches_src" ]; then
             mkdir -p "$HNAT_PATCHES_DST"
             copied=0
+            # Import only patches that are known to apply cleanly on the
+            # immortalwrt openwrt-24.10 baseline.  The 999-27xx series
+            # (LRO / eth_soc rewrites) targets padavanonly's diverged
+            # mtk_eth_soc.c and fails on immortalwrt's version — exclude it.
+            # Safe subsets:
+            #   999-2705-*  adds mtk_eth_dbg.c Makefile entry (isolated)
+            #   999-2745-*  wires mtkhnat driver support
+            #   999-30xx-*  PPE core improvements (isolated ppe files)
+            #   9997-hnat*  core HNAT driver
             while IFS= read -r -d '' patch; do
                 name=$(basename "$patch")
-                # Skip if already present (immortalwrt has its own copy)
                 [ -f "$HNAT_PATCHES_DST/$name" ] && continue
-                # Only copy patches that touch HNAT/PPE/eth_dbg related code
-                if grep -qE '(mtk_eth_dbg|mtk_ppe|NET_MEDIATEK_HNAT|mediatek.*hnat|hnat.*ppe)' "$patch" 2>/dev/null; then
-                    cp "$patch" "$HNAT_PATCHES_DST/"
-                    echo "INFO: Added HNAT patch: $name"
-                    copied=$((copied + 1))
-                fi
+                keep=0
+                case "$name" in
+                    999-2705-*|999-2745-*|999-30[0-9][0-9]-*|9997-hnat*) keep=1 ;;
+                esac
+                [ "$keep" -eq 1 ] || continue
+                cp "$patch" "$HNAT_PATCHES_DST/"
+                echo "INFO: Added HNAT patch: $name"
+                copied=$((copied + 1))
             done < <(find "$patches_src" -maxdepth 1 -name "*.patch" -print0)
             [ "$copied" -eq 0 ] && echo "WARN: No HNAT-related patches found in padavanonly patches-6.6." >&2
         else
