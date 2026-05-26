@@ -119,7 +119,7 @@ popd
 rm -rf feeds/packages/lang/golang
 git clone --depth=1 https://github.com/sbwml/packages_lang_golang -b 26.x feeds/packages/lang/golang
 rm -rf feeds/packages/net/mosdns
-git clone https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
+git clone --depth=1 https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
 
 # add luci-app-OpenClash
 mkdir -p package/OpenClash
@@ -161,7 +161,7 @@ patch_makefile_dep \
 # driver subtree; kernel patches and feeds remain untouched.
 HNAT_OVERLAY_SRC="target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek"
 
-if [ -d "$HNAT_OVERLAY_SRC" ]; then
+if [ -d "target/linux/mediatek" ]; then
     (
         tmpdir=$(mktemp -d)
         trap 'rm -rf "$tmpdir"' EXIT
@@ -181,6 +181,7 @@ if [ -d "$HNAT_OVERLAY_SRC" ]; then
 
         src="$tmpdir/$HNAT_OVERLAY_SRC"
         if [ -d "$src" ] && [ -n "$(ls -A "$src" 2>/dev/null)" ]; then
+            mkdir -p "$HNAT_OVERLAY_SRC"
             cp -rf "$src/." "$HNAT_OVERLAY_SRC/"
             echo "INFO: MT7988 HNAT/PPE overlay from padavanonly applied."
         else
@@ -188,7 +189,7 @@ if [ -d "$HNAT_OVERLAY_SRC" ]; then
         fi
     ) || true
 else
-    echo "WARN: HNAT overlay target $HNAT_OVERLAY_SRC not found in source tree; skipping." >&2
+    echo "WARN: target/linux/mediatek not found; skipping HNAT overlay." >&2
 fi
 # ─────────────────────────────────────────────────────────────────────────────
 
