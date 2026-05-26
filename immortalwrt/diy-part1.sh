@@ -15,10 +15,21 @@ patch_makefile_dep() {
     local file_path="$1"
     local old_text="$2"
     local new_text="$3"
+    local perl_status
 
     [ -f "$file_path" ] || return 0
     grep -qF "$old_text" "$file_path" || return 0
-    sed -i "s|$old_text|$new_text|g" "$file_path"
+
+    PATCH_OLD_TEXT="$old_text" PATCH_NEW_TEXT="$new_text" \
+        perl -0pi -e 'BEGIN { $old = $ENV{"PATCH_OLD_TEXT"}; $new = $ENV{"PATCH_NEW_TEXT"}; }
+            $count = s/\Q$old\E/$new/g;
+            END { exit($count > 0 ? 0 : 2); }' "$file_path"
+    perl_status=$?
+
+    [ "$perl_status" -eq 0 ] || {
+        echo "Failed to apply literal patch to $file_path" >&2
+        return "$perl_status"
+    }
 }
 
 apply_workspace_patch() {
@@ -33,6 +44,44 @@ apply_workspace_patch() {
     git apply --ignore-space-change --ignore-whitespace "$patch_file"
 }
 
+bpi_r4_led_dts_is_desired() {
+    local dtsi_path="$1"
+
+    [ -f "$dtsi_path" ] || return 1
+
+    grep -q 'linux,default-trigger = "default-on";' "$dtsi_path" &&
+    grep -q 'function = LED_FUNCTION_INDICATOR;' "$dtsi_path" &&
+    grep -q 'linux,default-trigger = "heartbeat";' "$dtsi_path"
+}
+
+bpi_r4_fix_led_dts() {
+    local dtsi_path="$1"
+
+    [ -f "$dtsi_path" ] || return 1
+
+    perl -0pi -e '
+        $ok_green = s@\n([ \t]*)(?:\w+:\s*)?led-green\s*\{.*?\n\1\};@
+\n$1led_green: led-green {
+$1\tfunction = LED_FUNCTION_STATUS;
+$1\tcolor = <LED_COLOR_ID_GREEN>;
+$1\tgpios = <&pio 79 GPIO_ACTIVE_HIGH>;
+$1\tlinux,default-trigger = "default-on";
+$1};@s;
+
+        $ok_blue = s@\n([ \t]*)(?:\w+:\s*)?led-blue\s*\{.*?\n\1\};@
+\n$1led_blue: led-blue {
+$1\tfunction = LED_FUNCTION_INDICATOR;
+$1\tcolor = <LED_COLOR_ID_BLUE>;
+$1\tgpios = <&pio 63 GPIO_ACTIVE_HIGH>;
+$1\tlinux,default-trigger = "heartbeat";
+$1};@s;
+
+        END { exit(($ok_green && $ok_blue) ? 0 : 1); }
+    ' "$dtsi_path"
+}
+
+# Remove feeds packages that will be replaced by community clones below.
+# This MUST run after the workflow's initial feeds update but BEFORE feeds install.
 rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/luci/applications/luci-app-argon-config
 rm -rf feeds/luci/applications/luci-app-passwall
@@ -67,20 +116,17 @@ popd
 
 # add luci-app-mosdns
 rm -rf feeds/packages/lang/golang
-git clone https://github.com/sbwml/packages_lang_golang -b 26.x feeds/packages/lang/golang
+git clone --depth=1 https://github.com/sbwml/packages_lang_golang -b 26.x feeds/packages/lang/golang
 rm -rf feeds/packages/net/mosdns
 git clone https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
 
 # add luci-app-OpenClash
 mkdir -p package/OpenClash
 pushd package/OpenClash
-git clone --depth=1  https://github.com/vernesong/OpenClash
-git config core.sparsecheckout true
+git clone --depth=1 https://github.com/vernesong/OpenClash
 popd
 
 # merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/package/mtk/applications/mtkhqos_util
-
-./scripts/feeds update -a
 
 # openwrt-24.10 compatibility fixes for floating packages feed metadata.
 patch_makefile_dep \
@@ -122,3 +168,68 @@ patch_makefile_dep \
     
 [ -f feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1003-luci-wireless-mtk-mlo-ofdma-controls.patch"
+
+# ── BPI-R4 LED + BE14000 WiFi fixes ─────────────────────────────────────────
+# The upstream immortalwrt openwrt-24.10 DTS defines the B LED (GPIO 63) with
+# LED_FUNCTION_WPS, which only activates during WPS setup – invisible after
+# normal boot.  The G LED (GPIO 79) uses 'default-state = "on"' which can be
+# lost when the mtwifi vendor driver re-initialises GPIO ordering.
+#
+# Preferred path: apply the workspace patch which rewrites the LED section to:
+#   G (GPIO 79) -> default-on (system status, always lit)
+#   B (GPIO 63) -> heartbeat  (system-alive blink; mtwifi takes over for WiFi)
+#
+# SSD LED intentionally omitted: GPIO 10 pinmux on MT7988A conflicts with
+# PCIe/I2C peripherals on this board and causes boot failure.
+
+BPI_R4_DTSI="target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4.dtsi"
+
+if [ -f "$BPI_R4_DTSI" ]; then
+    if apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/998-bpi-r4-be14000-leds-fix.patch" 2>/dev/null; then
+        echo "INFO: BPI-R4 LED DTS patch applied successfully."
+    elif bpi_r4_led_dts_is_desired "$BPI_R4_DTSI"; then
+        echo "INFO: BPI-R4 LED DTS already matches the desired layout; skipping patch."
+    else
+        echo "WARN: DTS patch did not apply cleanly; falling back to perl node rewrite."
+        if bpi_r4_fix_led_dts "$BPI_R4_DTSI"; then
+            echo "INFO: BPI-R4 LED DTS perl rewrite completed successfully."
+        else
+            echo "ERROR: BPI-R4 LED DTS perl rewrite failed to match one or more nodes." >&2
+            exit 1
+        fi
+
+        if ! bpi_r4_led_dts_is_desired "$BPI_R4_DTSI"; then
+            echo "ERROR: BPI-R4 LED DTS does not match the desired layout after perl rewrite." >&2
+            exit 1
+        fi
+    fi
+fi
+
+# Deploy a uci-defaults script so LED sysfs names are wired to the correct
+# OpenWrt system LED config entries on first boot.  This is a belt-and-
+# suspenders measure: even if the DTS labels drift, the LEDs are reachable
+# by their known sysfs names once the gpio-leds driver binds.
+mkdir -p package/base-files/files/etc/uci-defaults
+cat > package/base-files/files/etc/uci-defaults/91_bpi-r4-leds << 'EOF'
+#!/bin/sh
+# BPI-R4 H2 connector LED defaults – applied once on first boot.
+
+# G (green, GPIO 79) – always-on status LED
+uci -q delete system.led_status 2>/dev/null
+uci set system.led_status=led
+uci set system.led_status.name='Status'
+uci set system.led_status.sysfs='green:status'
+uci set system.led_status.trigger='default-on'
+
+# B (blue, GPIO 63) – heartbeat until mtwifi takes over for WiFi activity
+uci -q delete system.led_wifi 2>/dev/null
+uci set system.led_wifi=led
+uci set system.led_wifi.name='WiFi'
+uci set system.led_wifi.sysfs='blue:indicator'
+uci set system.led_wifi.trigger='heartbeat'
+
+uci commit system
+exit 0
+EOF
+chmod +x package/base-files/files/etc/uci-defaults/91_bpi-r4-leds
+# ─────────────────────────────────────────────────────────────────────────────
