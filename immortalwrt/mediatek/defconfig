@@ -6,6 +6,7 @@ CONFIG_TARGET_mediatek=y
 CONFIG_TARGET_mediatek_filogic=y
 CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi_bpi-r4=y
 CONFIG_DEFAULT_kmod-mediatek_hnat=y
+CONFIG_KERNEL_NET_MEDIATEK_HNAT=y
 CONFIG_DEVEL=y
 CONFIG_CCACHE=y
 CONFIG_TOOLCHAINOPTS=y
