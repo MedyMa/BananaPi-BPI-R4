@@ -120,6 +120,7 @@ done
 # 999-2746 failed to apply (context mismatch); inject its defines directly into
 # hnat.h so hnat.c compiles. MTK_FE_INT_STATUS2 is called MTK_INT_STATUS2 in
 # ImmortalWrt — provide both names so the driver builds regardless of base.
+# MTK_QTX_PER_PAGE: defined in BPI-R4PRO's mtk_eth_soc patches (not copied).
 cat >> target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_hnat/hnat.h << 'EOF'
 
 /* PPE flow-check interrupt registers (injected; normally patched via 999-2746) */
@@ -135,7 +136,27 @@ cat >> target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_hnat/hn
 #ifndef MTK_FE_INT2_PPE1_FLOW_CHK
 #define MTK_FE_INT2_PPE1_FLOW_CHK	BIT(29)
 #endif
+
+/* QDMA QTX per page (from BPI-R4PRO mtk_eth_soc patches; NETSYS V3 = 16) */
+#ifndef MTK_QTX_PER_PAGE
+#define MTK_QTX_PER_PAGE		16
+#endif
 EOF
+
+# flow_offload_hw_path.tnl_type is added by BPI-R4PRO's 999-4100 TOPS patch
+# which we do not carry.  Inject it via a numbered patch so it applies after
+# 999-2741 (which already added virt_dev to the struct).
+cat > target/linux/mediatek/patches-6.6/999-2741b-flow-offload-add-tnl-type.patch << 'PATCH'
+--- a/include/net/netfilter/nf_flow_table.h
++++ b/include/net/netfilter/nf_flow_table.h
+@@ -183,6 +183,7 @@ struct flow_offload_hw_path {
+ 	struct net_device *dev;
+ 	struct net_device *virt_dev;
++	u32 tnl_type;
+ 	u32 flags;
+
+ 	u8 eth_src[ETH_ALEN];
+PATCH
 
 rm -rf bpi-r4pro-src
 
