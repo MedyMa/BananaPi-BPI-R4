@@ -71,6 +71,7 @@ merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-fan
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-sfp-status
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-adguardhome
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-modemband
+merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-turboacc-mtk
 merge_package https://github.com/kenzok8/jell jell/wrtbwmon
 # merge_package "-b Immortalwrt https://github.com/shidahuilang/openwrt-package" openwrt-package/relevance/ddnsto
 # merge_package "-b Immortalwrt https://github.com/shidahuilang/openwrt-package" openwrt-package/luci-app-ddnsto
@@ -78,15 +79,37 @@ merge_package "-b ddnsto-beta https://github.com/linkease/nas-packages-luci" nas
 merge_package "-b ddnsto-beta https://github.com/linkease/nas-packages" nas-packages/network/services/ddnsto
 popd
 
-# Replace immortalwrt mt76 with BPI-R4PRO custom mt76
+# Replace immortalwrt mt76 with BPI-R4PRO custom mt76;
+# also pull mtk_hnat driver + mtk_eth_dbg dependency + hnat kernel patches.
 rm -rf package/kernel/mt76
 git clone --depth=1 --filter=blob:none --sparse \
     https://github.com/BPI-SINOVOIP/BPI-R4PRO-8X-OPENWRT-V24.10.0-Master-Devel \
     bpi-r4pro-src
 pushd bpi-r4pro-src
-git sparse-checkout set package/kernel/mt76
+git sparse-checkout set \
+    package/kernel/mt76 \
+    target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek \
+    target/linux/mediatek/patches-6.6
 popd
+
 mv bpi-r4pro-src/package/kernel/mt76 package/kernel/mt76
+
+cp -r bpi-r4pro-src/target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_hnat \
+    target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/
+cp bpi-r4pro-src/target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_eth_dbg.{c,h} \
+    target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/
+
+for patch in \
+    999-2741-mtkhnat-add-support-for-virtual-interface-a.patch \
+    "999-2742-mtkhnat-tnl-interface-offload-check.patch.patch" \
+    999-2743-mtkhnat-ipv6-fix-pskb-expand-head-limitatio.patch \
+    999-2745-mtkhnat-add-mtkhnat-driver-support.patch \
+    999-2746-mtkhnat-add-support-ppe-flow-check-interrupt.patch
+do
+    src="bpi-r4pro-src/target/linux/mediatek/patches-6.6/$patch"
+    [ -f "$src" ] && cp "$src" target/linux/mediatek/patches-6.6/
+done
+
 rm -rf bpi-r4pro-src
 
 # add luci-app-mosdns
