@@ -94,6 +94,7 @@ popd
 
 mv bpi-r4pro-src/package/kernel/mt76 package/kernel/mt76
 
+mkdir -p target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek
 cp -r bpi-r4pro-src/target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_hnat \
     target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/
 cp bpi-r4pro-src/target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_eth_dbg.{c,h} \
