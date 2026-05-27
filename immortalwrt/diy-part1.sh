@@ -118,6 +118,19 @@ done
 
 rm -rf bpi-r4pro-src
 
+# Kernel config symbols introduced by BPI-R4PRO hnat patches (999-2745).
+# Without explicit values, syncconfig blocks in non-interactive CI.
+# MT7988A is NETSYS V3; V3 selects V2 as base, so both are needed.
+for kcfg in \
+    CONFIG_MEDIATEK_NETSYS_V2=y \
+    CONFIG_MEDIATEK_NETSYS_V3=y \
+    CONFIG_MEDIATEK_NETSYS_RX_V2=y
+do
+    key="${kcfg%%=*}"
+    grep -qF "$key" target/linux/mediatek/filogic/config-6.6 || \
+        echo "$kcfg" >> target/linux/mediatek/filogic/config-6.6
+done
+
 # add luci-app-mosdns
 rm -rf feeds/packages/lang/golang
 git clone --depth=1 https://github.com/sbwml/packages_lang_golang -b 26.x feeds/packages/lang/golang
@@ -172,3 +185,4 @@ patch_makefile_dep \
     
 [ -f feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1003-luci-wireless-mtk-mlo-ofdma-controls.patch"
+
