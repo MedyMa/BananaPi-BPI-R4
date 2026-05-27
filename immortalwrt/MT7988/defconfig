@@ -4,8 +4,8 @@
 # The mt_wifi7 profile in this tree still maps Eagle to the BE19000 SKU string.
 
 CONFIG_TARGET_mediatek=y
-CONFIG_TARGET_mediatek_filogic=y
-CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi_bpi-r4=y
+CONFIG_TARGET_mediatek_filogic_a73=y
+CONFIG_TARGET_mediatek_filogic_a73_DEVICE_bananapi_bpi-r4=y
 CONFIG_PACKAGE_kmod-mediatek_hnat=y
 CONFIG_DEVEL=y
 CONFIG_CCACHE=y
