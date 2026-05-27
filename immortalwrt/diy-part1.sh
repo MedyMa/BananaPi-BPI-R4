@@ -110,11 +110,32 @@ for patch in \
     999-2741-mtkhnat-add-support-for-virtual-interface-a.patch \
     "999-2742-mtkhnat-tnl-interface-offload-check.patch.patch" \
     999-2743-mtkhnat-ipv6-fix-pskb-expand-head-limitatio.patch \
+    999-2744-mtk-gso-skb-headroom-copy.patch \
     999-2745-mtkhnat-add-mtkhnat-driver-support.patch
 do
     src="bpi-r4pro-src/target/linux/mediatek/patches-6.6/$patch"
     [ -f "$src" ] && cp "$src" target/linux/mediatek/patches-6.6/
 done
+
+# 999-2746 failed to apply (context mismatch); inject its defines directly into
+# hnat.h so hnat.c compiles. MTK_FE_INT_STATUS2 is called MTK_INT_STATUS2 in
+# ImmortalWrt — provide both names so the driver builds regardless of base.
+cat >> target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_hnat/hnat.h << 'EOF'
+
+/* PPE flow-check interrupt registers (injected; normally patched via 999-2746) */
+#ifndef MTK_FE_INT_STATUS2
+#define MTK_FE_INT_STATUS2		0x28
+#endif
+#ifndef MTK_FE_INT_ENABLE2
+#define MTK_FE_INT_ENABLE2		0x2C
+#endif
+#ifndef MTK_FE_INT2_PPE0_FLOW_CHK
+#define MTK_FE_INT2_PPE0_FLOW_CHK	BIT(28)
+#endif
+#ifndef MTK_FE_INT2_PPE1_FLOW_CHK
+#define MTK_FE_INT2_PPE1_FLOW_CHK	BIT(29)
+#endif
+EOF
 
 rm -rf bpi-r4pro-src
 
