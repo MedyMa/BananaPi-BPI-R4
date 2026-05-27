@@ -1,0 +1,28 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: MedyMa build <build@bpi-r4>
+Date: Mon, 01 Jan 2024 00:00:00 +0000
+Subject: [PATCH] mediatek: filogic: bpi-r4: add WiFi LED netdev trigger
+
+Wire the BPI-R4 blue front-panel LED (GPIO 63, sysfs "blue:indicator")
+to the 2.4 GHz wireless interface phy0-ap0 so it blinks on WiFi TX/RX
+activity instead of running a kernel heartbeat.
+
+The "blue:indicator" sysfs path depends on patch
+998-bpi-r4-be14000-leds-fix.patch which changes the DTS LED function
+from LED_FUNCTION_WPS to LED_FUNCTION_INDICATOR.
+---
+ target/linux/mediatek/filogic/base-files/etc/board.d/01_leds | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/target/linux/mediatek/filogic/base-files/etc/board.d/01_leds b/target/linux/mediatek/filogic/base-files/etc/board.d/01_leds
+--- a/target/linux/mediatek/filogic/base-files/etc/board.d/01_leds
++++ b/target/linux/mediatek/filogic/base-files/etc/board.d/01_leds
+@@ -100,7 +100,8 @@
+ bananapi,bpi-r4|\
+ bananapi,bpi-r4-poe)
+ 	ucidef_set_led_netdev "wan" "wan" "mt7530-0:00:green:lan" "wan" "link tx rx"
+ 	ucidef_set_led_netdev "lan1" "lan1" "mt7530-0:01:green:lan" "lan1" "link tx rx"
+ 	ucidef_set_led_netdev "lan2" "lan2" "mt7530-0:02:green:lan" "lan2" "link tx rx"
+ 	ucidef_set_led_netdev "lan3" "lan3" "mt7530-0:03:green:lan" "lan3" "link tx rx"
++	ucidef_set_led_netdev "wlan" "WiFi" "blue:indicator" "phy0-ap0"
+ 	;;
