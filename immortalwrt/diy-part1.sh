@@ -78,6 +78,17 @@ merge_package "-b ddnsto-beta https://github.com/linkease/nas-packages-luci" nas
 merge_package "-b ddnsto-beta https://github.com/linkease/nas-packages" nas-packages/network/services/ddnsto
 popd
 
+# Replace immortalwrt mt76 with BPI-R4PRO custom mt76
+rm -rf package/kernel/mt76
+git clone --depth=1 --filter=blob:none --sparse \
+    https://github.com/BPI-SINOVOIP/BPI-R4PRO-8X-OPENWRT-V24.10.0-Master-Devel \
+    bpi-r4pro-src
+pushd bpi-r4pro-src
+git sparse-checkout set package/kernel/mt76
+popd
+mv bpi-r4pro-src/package/kernel/mt76 package/kernel/mt76
+rm -rf bpi-r4pro-src
+
 # add luci-app-mosdns
 rm -rf feeds/packages/lang/golang
 git clone --depth=1 https://github.com/sbwml/packages_lang_golang -b 26.x feeds/packages/lang/golang
@@ -132,3 +143,4 @@ patch_makefile_dep \
     
 [ -f feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1003-luci-wireless-mtk-mlo-ofdma-controls.patch"
+
