@@ -110,8 +110,7 @@ for patch in \
     999-2741-mtkhnat-add-support-for-virtual-interface-a.patch \
     "999-2742-mtkhnat-tnl-interface-offload-check.patch.patch" \
     999-2743-mtkhnat-ipv6-fix-pskb-expand-head-limitatio.patch \
-    999-2745-mtkhnat-add-mtkhnat-driver-support.patch \
-    999-2746-mtkhnat-add-support-ppe-flow-check-interrupt.patch
+    999-2745-mtkhnat-add-mtkhnat-driver-support.patch
 do
     src="bpi-r4pro-src/target/linux/mediatek/patches-6.6/$patch"
     [ -f "$src" ] && cp "$src" target/linux/mediatek/patches-6.6/
@@ -173,4 +172,3 @@ patch_makefile_dep \
     
 [ -f feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1003-luci-wireless-mtk-mlo-ofdma-controls.patch"
-
