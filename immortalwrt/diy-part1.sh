@@ -124,7 +124,8 @@ rm -rf bpi-r4pro-src
 for kcfg in \
     CONFIG_MEDIATEK_NETSYS_V2=y \
     CONFIG_MEDIATEK_NETSYS_V3=y \
-    CONFIG_MEDIATEK_NETSYS_RX_V2=y
+    CONFIG_MEDIATEK_NETSYS_RX_V2=y \
+    CONFIG_NET_MEDIATEK_HNAT=m
 do
     key="${kcfg%%=*}"
     grep -qF "$key" target/linux/mediatek/filogic/config-6.6 || \
