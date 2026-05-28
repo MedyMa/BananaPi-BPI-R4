@@ -89,6 +89,7 @@ pushd bpi-r4pro-src
 git sparse-checkout set \
     package/kernel/mt76 \
     target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek \
+    target/linux/mediatek/files-6.6/include \
     target/linux/mediatek/patches-6.6
 popd
 
@@ -99,6 +100,12 @@ cp -r bpi-r4pro-src/target/linux/mediatek/files-6.6/drivers/net/ethernet/mediate
     target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/
 cp bpi-r4pro-src/target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_eth_dbg.{c,h} \
     target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/
+
+# ra_nat.h and other kernel headers needed by hnat/skbuff patches
+if [ -d bpi-r4pro-src/target/linux/mediatek/files-6.6/include ]; then
+    cp -r bpi-r4pro-src/target/linux/mediatek/files-6.6/include/. \
+        target/linux/mediatek/files-6.6/include/
+fi
 
 for patch in \
     999-2735-netfilter-nf_flow_table-support-hw-offload-through-v.patch \
