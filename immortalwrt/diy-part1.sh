@@ -95,31 +95,18 @@ popd
 
 mv bpi-r4pro-src/package/kernel/mt76 package/kernel/mt76
 
-# Fix BPI-R4PRO mt76 API incompatibilities with ImmortalWrt's mac80211/WED:
-# 1. vif->adv_ttlm added in Linux 6.13; not in backports-6.12.61 — drop the
-#    two lines that use it (merged TTLM loses adv_ttlm contribution, acceptable)
-# 2. BPI-R4PRO WED renamed mtk_wed_device_ppe_check to ppe_drop; revert here
-mkdir -p package/kernel/mt76/patches
-cat > package/kernel/mt76/patches/900-compat-immortalwrt.patch << 'PATCH'
---- a/mt7996/mt7996.h
-+++ b/mt7996/mt7996.h
-@@ -1163,12 +1163,9 @@
- 	if (!mconf->vif->link_conf.eht_bss_color.enabled)
- 		map = 0;
+# Fix BPI-R4PRO mt76 API incompatibilities with ImmortalWrt's mac80211/WED via
+# sed in Build/Prepare (avoids patch format issues with @@ headers in heredoc):
+#   1. vif->adv_ttlm not in backports-6.12.61 (Linux 6.13+), delete those lines
+#   2. BPI-R4PRO renamed ppe_check->ppe_drop; ImmortalWrt kept old name
+cat >> package/kernel/mt76/Makefile << 'MAKEFILE_EOF'
 
--	if (vif->adv_ttlm.active)
--		map &= vif->adv_ttlm.map;
--
- 	return map;
- }
-@@ -1592,7 +1589,7 @@
- #ifdef CONFIG_NET_MEDIATEK_SOC_WED
- 	if (mtk_wed_device_active(&dev->mt76.mmio.wed))
--		mtk_wed_device_ppe_drop(&dev->mt76.mmio.wed, enable);
-+		mtk_wed_device_ppe_check(&dev->mt76.mmio.wed, enable);
- #endif
- }
-PATCH
+define Build/Prepare
+	$(call Build/Prepare/Default)
+	sed -i '/adv_ttlm/d' $(PKG_BUILD_DIR)/mt7996/mt7996.h
+	sed -i 's/mtk_wed_device_ppe_drop/mtk_wed_device_ppe_check/g' $(PKG_BUILD_DIR)/mt7996/mt7996.h
+endef
+MAKEFILE_EOF
 
 mkdir -p target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek
 cp -r bpi-r4pro-src/target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_hnat \
