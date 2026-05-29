@@ -96,46 +96,29 @@ popd
 mv bpi-r4pro-src/package/kernel/mt76 package/kernel/mt76
 
 # Fix BPI-R4PRO mt76 API incompatibilities with ImmortalWrt's mac80211 backports-6.12.61.
-# Root cause: BPI-R4PRO mt76 (2025.06.01~79dd14f2) uses Linux 6.13+ ATTLM/TTLM APIs
-# that are not yet backported into mac80211 backports-6.12.61. All affected symbols are
-# in the ATTLM/TTLM feature set (advanced MLO TID-to-Link Mapping negotiation).
-# Disabling these features still leaves core MLO, BE14000 tri-band, and HNAT functional.
-cat >> package/kernel/mt76/Makefile << 'MAKEFILE_EOF'
-
-define Build/Prepare
-	$(call Build/Prepare/Default)
-	# 1. vif->adv_ttlm struct member (Linux 6.13+) — remove all references
-	find $(PKG_BUILD_DIR)/mt7996 -name '*.c' -o -name '*.h' | \
-	  xargs sed -i '/adv_ttlm/d'
-	# 2. vif->neg_ttlm struct member (Linux 6.13+) — remove all references
-	find $(PKG_BUILD_DIR)/mt7996 -name '*.c' -o -name '*.h' | \
-	  xargs sed -i '/neg_ttlm/d'
-	# 3. ieee80211_attlm_notify() function (Linux 6.13+)
-	find $(PKG_BUILD_DIR)/mt7996 -name '*.c' -o -name '*.h' | \
-	  xargs sed -i '/ieee80211_attlm_notify/d'
-	# 4. BSS_CHANGED_MLD_ADV_TTLM / BSS_CHANGED_MLD_NEG_TTLM flags
-	find $(PKG_BUILD_DIR)/mt7996 -name '*.c' -o -name '*.h' | \
-	  xargs sed -i '/BSS_CHANGED_MLD_ADV_TTLM/d; /BSS_CHANGED_MLD_NEG_TTLM/d'
-	# 5. NL80211_ATTLM_* enum values
-	find $(PKG_BUILD_DIR)/mt7996 -name '*.c' -o -name '*.h' | \
-	  xargs sed -i '/NL80211_ATTLM_/d'
-	# 6. NEG_TTLM_RES_* enum values (ieee80211_neg_ttlm_res)
-	find $(PKG_BUILD_DIR)/mt7996 -name '*.c' -o -name '*.h' | \
-	  xargs sed -i '/NEG_TTLM_RES_/d'
-	# 7. IEEE80211_MLD_CAP_OP_TID_TO_LINK_MAP_NEG_SUPP* constants
-	find $(PKG_BUILD_DIR)/mt7996 -name '*.c' -o -name '*.h' | \
-	  xargs sed -i '/TID_TO_LINK_MAP_NEG_SUPP/d'
-	# 8. .set_attlm / .set_ttlm / .can_neg_ttlm ops callbacks
-	find $(PKG_BUILD_DIR)/mt7996 -name '*.c' -o -name '*.h' | \
-	  xargs sed -i '/\.set_attlm\b/d; /\.set_ttlm\b/d; /\.can_neg_ttlm\b/d'
-	# 9. Function definitions for the removed callbacks (stubs that reference removed types)
-	find $(PKG_BUILD_DIR)/mt7996 -name '*.c' | \
-	  xargs sed -i '/mt7996_set_attlm\|mt7996_set_ttlm\|mt7996_can_neg_ttlm/d'
-	# 10. BPI-R4PRO WED renamed ppe_check->ppe_drop; ImmortalWrt kept old name
-	find $(PKG_BUILD_DIR)/mt7996 -name '*.c' -o -name '*.h' | \
-	  xargs sed -i 's/mtk_wed_device_ppe_drop/mtk_wed_device_ppe_check/g'
-endef
-MAKEFILE_EOF
+# Root cause: BPI-R4PRO mt76 (2025.06.01~79dd14f2) uses Linux 6.13+ ATTLM/TTLM APIs.
+# Strategy: write a shell script with the sed commands, then append a Build/Prepare
+# override using printf (guarantees literal TAB for make recipe lines).
+cat > package/kernel/mt76/fix-compat.sh << 'FIXSCRIPT'
+#!/bin/sh
+D="$1/mt7996"
+[ -d "$D" ] || exit 0
+find "$D" \( -name '*.c' -o -name '*.h' \) | xargs sed -i \
+  -e '/adv_ttlm/d' \
+  -e '/neg_ttlm/d' \
+  -e '/ieee80211_attlm_notify/d' \
+  -e '/BSS_CHANGED_MLD_ADV_TTLM/d' \
+  -e '/BSS_CHANGED_MLD_NEG_TTLM/d' \
+  -e '/NL80211_ATTLM_/d' \
+  -e '/NEG_TTLM_RES_/d' \
+  -e '/TID_TO_LINK_MAP_NEG_SUPP/d' \
+  -e '/\.set_attlm/d' \
+  -e '/\.set_ttlm/d' \
+  -e '/\.can_neg_ttlm/d' \
+  -e 's/mtk_wed_device_ppe_drop/mtk_wed_device_ppe_check/g'
+FIXSCRIPT
+printf '\ndefine Build/Prepare\n\t$(call Build/Prepare/Default)\n\tsh $(TOPDIR)/package/kernel/mt76/fix-compat.sh $(PKG_BUILD_DIR)\nendef\n' \
+    >> package/kernel/mt76/Makefile
 
 mkdir -p target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek
 cp -r bpi-r4pro-src/target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_hnat \
