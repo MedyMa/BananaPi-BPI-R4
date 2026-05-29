@@ -95,16 +95,45 @@ popd
 
 mv bpi-r4pro-src/package/kernel/mt76 package/kernel/mt76
 
-# Fix BPI-R4PRO mt76 API incompatibilities with ImmortalWrt's mac80211/WED via
-# sed in Build/Prepare (avoids patch format issues with @@ headers in heredoc):
-#   1. vif->adv_ttlm not in backports-6.12.61 (Linux 6.13+), delete those lines
-#   2. BPI-R4PRO renamed ppe_check->ppe_drop; ImmortalWrt kept old name
+# Fix BPI-R4PRO mt76 API incompatibilities with ImmortalWrt's mac80211 backports-6.12.61.
+# Root cause: BPI-R4PRO mt76 (2025.06.01~79dd14f2) uses Linux 6.13+ ATTLM/TTLM APIs
+# that are not yet backported into mac80211 backports-6.12.61. All affected symbols are
+# in the ATTLM/TTLM feature set (advanced MLO TID-to-Link Mapping negotiation).
+# Disabling these features still leaves core MLO, BE14000 tri-band, and HNAT functional.
 cat >> package/kernel/mt76/Makefile << 'MAKEFILE_EOF'
 
 define Build/Prepare
 	$(call Build/Prepare/Default)
-	sed -i '/adv_ttlm/d' $(PKG_BUILD_DIR)/mt7996/mt7996.h
-	sed -i 's/mtk_wed_device_ppe_drop/mtk_wed_device_ppe_check/g' $(PKG_BUILD_DIR)/mt7996/mt7996.h
+	# 1. vif->adv_ttlm struct member (Linux 6.13+) — remove all references
+	find $(PKG_BUILD_DIR)/mt7996 -name '*.c' -o -name '*.h' | \
+	  xargs sed -i '/adv_ttlm/d'
+	# 2. vif->neg_ttlm struct member (Linux 6.13+) — remove all references
+	find $(PKG_BUILD_DIR)/mt7996 -name '*.c' -o -name '*.h' | \
+	  xargs sed -i '/neg_ttlm/d'
+	# 3. ieee80211_attlm_notify() function (Linux 6.13+)
+	find $(PKG_BUILD_DIR)/mt7996 -name '*.c' -o -name '*.h' | \
+	  xargs sed -i '/ieee80211_attlm_notify/d'
+	# 4. BSS_CHANGED_MLD_ADV_TTLM / BSS_CHANGED_MLD_NEG_TTLM flags
+	find $(PKG_BUILD_DIR)/mt7996 -name '*.c' -o -name '*.h' | \
+	  xargs sed -i '/BSS_CHANGED_MLD_ADV_TTLM/d; /BSS_CHANGED_MLD_NEG_TTLM/d'
+	# 5. NL80211_ATTLM_* enum values
+	find $(PKG_BUILD_DIR)/mt7996 -name '*.c' -o -name '*.h' | \
+	  xargs sed -i '/NL80211_ATTLM_/d'
+	# 6. NEG_TTLM_RES_* enum values (ieee80211_neg_ttlm_res)
+	find $(PKG_BUILD_DIR)/mt7996 -name '*.c' -o -name '*.h' | \
+	  xargs sed -i '/NEG_TTLM_RES_/d'
+	# 7. IEEE80211_MLD_CAP_OP_TID_TO_LINK_MAP_NEG_SUPP* constants
+	find $(PKG_BUILD_DIR)/mt7996 -name '*.c' -o -name '*.h' | \
+	  xargs sed -i '/TID_TO_LINK_MAP_NEG_SUPP/d'
+	# 8. .set_attlm / .set_ttlm / .can_neg_ttlm ops callbacks
+	find $(PKG_BUILD_DIR)/mt7996 -name '*.c' -o -name '*.h' | \
+	  xargs sed -i '/\.set_attlm\b/d; /\.set_ttlm\b/d; /\.can_neg_ttlm\b/d'
+	# 9. Function definitions for the removed callbacks (stubs that reference removed types)
+	find $(PKG_BUILD_DIR)/mt7996 -name '*.c' | \
+	  xargs sed -i '/mt7996_set_attlm\|mt7996_set_ttlm\|mt7996_can_neg_ttlm/d'
+	# 10. BPI-R4PRO WED renamed ppe_check->ppe_drop; ImmortalWrt kept old name
+	find $(PKG_BUILD_DIR)/mt7996 -name '*.c' -o -name '*.h' | \
+	  xargs sed -i 's/mtk_wed_device_ppe_drop/mtk_wed_device_ppe_check/g'
 endef
 MAKEFILE_EOF
 
