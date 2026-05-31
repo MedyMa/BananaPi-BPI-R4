@@ -104,7 +104,7 @@ cat > package/kernel/mt76/fix-compat.sh << 'FIXSCRIPT'
 #!/bin/sh
 D="$1/mt7996"
 [ -d "$D" ] || exit 0
-find "$D" -name '*.c' -o -name '*.h' | xargs sed -i \
+find "$D" \( -name '*.c' -o -name '*.h' \) | xargs sed -i \
   -e '/adv_ttlm/d' \
   -e '/neg_ttlm/d' \
   -e '/ieee80211_attlm_notify/d' \
@@ -120,13 +120,11 @@ find "$D" -name '*.c' -o -name '*.h' | xargs sed -i \
 FIXSCRIPT
 
 # Inject the script call as the FIRST line of Build/Compile using awk.
-# awk guarantees a literal tab character (not spaces) before the recipe line,
-# and $(TOPDIR)/$(PKG_BUILD_DIR) are left as-is for make to expand later.
-awk '/^define Build\/Compile$/{
-    print
-    print "\tsh $(TOPDIR)/package/kernel/mt76/fix-compat.sh $(PKG_BUILD_DIR)"
-    next
-}1' package/kernel/mt76/Makefile > package/kernel/mt76/Makefile.tmp \
+# Use -v to pass make-variable strings; awk's $ would otherwise expand them
+# as field references ($0), corrupting the Makefile recipe line.
+awk -v cmd='sh $(TOPDIR)/package/kernel/mt76/fix-compat.sh $(PKG_BUILD_DIR)' \
+    '/^define Build\/Compile$/{print; print "\t" cmd; next}1' \
+    package/kernel/mt76/Makefile > package/kernel/mt76/Makefile.tmp \
   && mv package/kernel/mt76/Makefile.tmp package/kernel/mt76/Makefile
 
 mkdir -p target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek
