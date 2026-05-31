@@ -96,14 +96,15 @@ popd
 mv bpi-r4pro-src/package/kernel/mt76 package/kernel/mt76
 
 # Fix BPI-R4PRO mt76 API incompatibilities with ImmortalWrt's mac80211 backports-6.12.61.
-# Root cause: BPI-R4PRO mt76 (2025.06.01~79dd14f2) uses Linux 6.13+ ATTLM/TTLM APIs.
-# Strategy: write a shell script with the sed commands, then append a Build/Prepare
-# override using printf (guarantees literal TAB for make recipe lines).
+# Root cause: BPI-R4PRO mt76 uses Linux 6.13+ ATTLM/TTLM APIs not in backports-6.12.61.
+# Strategy: inject fix-compat.sh call into Build/Compile (which is ALWAYS invoked —
+# OpenWrt removes .built before every compile, so caching never skips it).
+# Build/Prepare is NOT reliable here: its .prepared stamp can be restored from CI cache.
 cat > package/kernel/mt76/fix-compat.sh << 'FIXSCRIPT'
 #!/bin/sh
 D="$1/mt7996"
 [ -d "$D" ] || exit 0
-find "$D" \( -name '*.c' -o -name '*.h' \) | xargs sed -i \
+find "$D" -name '*.c' -o -name '*.h' | xargs sed -i \
   -e '/adv_ttlm/d' \
   -e '/neg_ttlm/d' \
   -e '/ieee80211_attlm_notify/d' \
@@ -117,8 +118,16 @@ find "$D" \( -name '*.c' -o -name '*.h' \) | xargs sed -i \
   -e '/\.can_neg_ttlm/d' \
   -e 's/mtk_wed_device_ppe_drop/mtk_wed_device_ppe_check/g'
 FIXSCRIPT
-printf '\ndefine Build/Prepare\n\t$(call Build/Prepare/Default)\n\tsh $(TOPDIR)/package/kernel/mt76/fix-compat.sh $(PKG_BUILD_DIR)\nendef\n' \
-    >> package/kernel/mt76/Makefile
+
+# Inject the script call as the FIRST line of Build/Compile using awk.
+# awk guarantees a literal tab character (not spaces) before the recipe line,
+# and $(TOPDIR)/$(PKG_BUILD_DIR) are left as-is for make to expand later.
+awk '/^define Build\/Compile$/{
+    print
+    print "\tsh $(TOPDIR)/package/kernel/mt76/fix-compat.sh $(PKG_BUILD_DIR)"
+    next
+}1' package/kernel/mt76/Makefile > package/kernel/mt76/Makefile.tmp \
+  && mv package/kernel/mt76/Makefile.tmp package/kernel/mt76/Makefile
 
 mkdir -p target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek
 cp -r bpi-r4pro-src/target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_hnat \
