@@ -96,27 +96,30 @@ popd
 mv bpi-r4pro-src/package/kernel/mt76 package/kernel/mt76
 
 # Fix BPI-R4PRO mt76 API incompatibilities with ImmortalWrt's mac80211 backports-6.12.61.
-# Root cause: BPI-R4PRO mt76 uses Linux 6.13+ ATTLM/TTLM APIs not in backports-6.12.61.
-# Strategy: inject fix-compat.sh call into Build/Compile (which is ALWAYS invoked —
-# OpenWrt removes .built before every compile, so caching never skips it).
-# Build/Prepare is NOT reliable here: its .prepared stamp can be restored from CI cache.
+# Root cause: BPI-R4PRO mt76 vendor patches add TTLM/ATTLM hooks and a WED PPE helper
+# that do not match ImmortalWrt 24.10's backported mac80211 / WED APIs.
+# Strategy: rewrite the incompatible blocks after patch application but before compile,
+# using function/block-level substitutions instead of brittle line deletions.
 cat > package/kernel/mt76/fix-compat.sh << 'FIXSCRIPT'
 #!/bin/sh
-D="$1/mt7996"
-[ -d "$D" ] || exit 0
-find "$D" \( -name '*.c' -o -name '*.h' \) | xargs sed -i \
-  -e '/adv_ttlm/d' \
-  -e '/neg_ttlm/d' \
-  -e '/ieee80211_attlm_notify/d' \
-  -e '/BSS_CHANGED_MLD_ADV_TTLM/d' \
-  -e '/BSS_CHANGED_MLD_NEG_TTLM/d' \
-  -e '/NL80211_ATTLM_/d' \
-  -e '/NEG_TTLM_RES_/d' \
-  -e '/TID_TO_LINK_MAP_NEG_SUPP/d' \
-  -e '/\.set_attlm/d' \
-  -e '/\.set_ttlm/d' \
-  -e '/\.can_neg_ttlm/d' \
-  -e 's/mtk_wed_device_ppe_drop/mtk_wed_device_ppe_check/g'
+D="$1"
+[ -d "$D/mt7996" ] || exit 0
+
+perl -0pi -e 's@#define MT7996_NEG_TTLM_SUPPORT FIELD_PREP_CONST\(\s*IEEE80211_MLD_CAP_OP_TID_TO_LINK_MAP_NEG_SUPP,\s*IEEE80211_MLD_CAP_OP_TID_TO_LINK_MAP_NEG_SUPP_DIFF\)\n\n@@s; s@2 \| MT7996_NEG_TTLM_SUPPORT@2@g' "$D/mt7996/init.c"
+
+perl -0pi -e 's@\n\tif \(ieee80211_is_action\(fc\) &&\s*mgmt->u\.action\.category == WLAN_CATEGORY_PROTECTED_EHT &&\s*\(mgmt->u\.action\.u\.ttlm_req\.action_code ==\s*WLAN_PROTECTED_EHT_ACTION_TTLM_REQ \|\|\s*mgmt->u\.action\.u\.ttlm_req\.action_code ==\s*WLAN_PROTECTED_EHT_ACTION_TTLM_RES \|\|\s*mgmt->u\.action\.u\.ttlm_req\.action_code ==\s*WLAN_PROTECTED_EHT_ACTION_TTLM_TEARDOWN\)\)\s*\n\t\treturn true;\n@@s' "$D/mt7996/mac.c"
+perl -0pi -e 's@\n\tstruct ieee80211_neg_ttlm merged_ttlm;@@; s@\n\tmt7996_get_merged_ttlm\(vif, &merged_ttlm\);\n\tret = mt7996_mcu_peer_mld_ttlm_req\(dev, vif, sta, &merged_ttlm\);\n\tif \(ret\)\n\t\tgoto fail;\n@\n\tret = 0;\n@s' "$D/mt7996/mac.c"
+
+perl -0pi -e 's@if \(\(changed & BSS_CHANGED_MLD_VALID_LINKS\) &&\s*\(changed & \(BSS_CHANGED_MLD_ADV_TTLM \| BSS_CHANGED_MLD_NEG_TTLM\)\)\)\s*\n\s*mt7996_mcu_peer_mld_ttlm_req\(dev, vif, changed\);\n@@s' "$D/mt7996/main.c"
+perl -0pi -e 's@static int\s+mt7996_set_ttlm\(struct ieee80211_hw \*hw, struct ieee80211_vif \*vif\)\s*\{.*?\n\}\n\nstatic int@static int\nmt7996_set_ttlm(struct ieee80211_hw *hw, struct ieee80211_vif *vif)\n{\n\treturn -EOPNOTSUPP;\n}\n\nstatic int@s' "$D/mt7996/main.c"
+perl -0pi -e 's@static int\s+mt7996_set_sta_ttlm\(struct ieee80211_hw \*hw, struct ieee80211_vif \*vif,\s*struct ieee80211_sta \*sta, struct ieee80211_neg_ttlm \*neg_ttlm\)\s*\{.*?\n\}\n\nstatic int@static int\nmt7996_set_sta_ttlm(struct ieee80211_hw *hw, struct ieee80211_vif *vif,\n\t\t    struct ieee80211_sta *sta, struct ieee80211_neg_ttlm *neg_ttlm)\n{\n\treturn -EOPNOTSUPP;\n}\n\nstatic int@s' "$D/mt7996/main.c"
+perl -0pi -e 's@static enum ieee80211_neg_ttlm_res\s+mt7996_can_neg_ttlm\(struct ieee80211_hw \*hw, struct ieee80211_vif \*vif,\s*struct ieee80211_neg_ttlm \*neg_ttlm\)\s*\{.*?\n\}\n\nstatic void@static enum ieee80211_neg_ttlm_res\nmt7996_can_neg_ttlm(struct ieee80211_hw *hw, struct ieee80211_vif *vif,\n\t\t    struct ieee80211_neg_ttlm *neg_ttlm)\n{\n\treturn 0;\n}\n\nstatic void@s' "$D/mt7996/main.c"
+perl -0pi -e 's@\n\s*\.set_attlm = mt7996_set_attlm,@@; s@\n\s*\.set_sta_ttlm = mt7996_set_sta_ttlm,@@; s@\n\s*\.can_neg_ttlm = mt7996_can_neg_ttlm,@@; s@\n\s*\.set_ttlm = mt7996_set_ttlm,@@' "$D/mt7996/main.c"
+
+perl -0pi -e 's@\s*ieee80211_attlm_notify\([^;]*;\s*@@g' "$D/mt7996/mcu.c"
+
+perl -0pi -e 's@\s*if \(vif->neg_ttlm.valid\) \{.*?return;\s*\}@@s; s@\s*if \(vif->adv_ttlm.active\)\s*map &= vif->adv_ttlm.map;@@s' "$D/mt7996/mt7996.h"
+perl -0pi -e 's@mtk_wed_device_ppe_drop\(&dev->mt76\.mmio\.wed, enable\);@/* backport WED PPE API is incompatible */@' "$D/mt7996/mt7996.h"
 FIXSCRIPT
 
 # Inject the script call as the FIRST line of Build/Compile using awk.
@@ -189,12 +192,12 @@ cat > target/linux/mediatek/patches-6.6/999-2741b-flow-offload-add-tnl-type.patc
 --- a/include/net/netfilter/nf_flow_table.h
 +++ b/include/net/netfilter/nf_flow_table.h
 @@ -183,6 +183,7 @@ struct flow_offload_hw_path {
- 	struct net_device *dev;
- 	struct net_device *virt_dev;
+	struct net_device *dev;
+	struct net_device *virt_dev;
 +	u32 tnl_type;
- 	u32 flags;
+	u32 flags;
 
- 	u8 eth_src[ETH_ALEN];
+	u8 eth_src[ETH_ALEN];
 PATCH
 
 rm -rf bpi-r4pro-src
@@ -264,7 +267,6 @@ patch_makefile_dep \
 
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1002-luci-status-overview-rate-mhz-hi.patch"    
-    
+
 [ -f feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1003-luci-wireless-mtk-mlo-ofdma-controls.patch"
-
