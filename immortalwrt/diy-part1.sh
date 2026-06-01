@@ -106,6 +106,7 @@ D="$1"
 [ -d "$D/mt7996" ] || exit 0
 
 perl -0pi -e 's@#define MT7996_NEG_TTLM_SUPPORT FIELD_PREP_CONST\(\s*IEEE80211_MLD_CAP_OP_TID_TO_LINK_MAP_NEG_SUPP,\s*IEEE80211_MLD_CAP_OP_TID_TO_LINK_MAP_NEG_SUPP_DIFF\)\n\n@@s; s@2 \| MT7996_NEG_TTLM_SUPPORT@2@g' "$D/mt7996/init.c"
+perl -0pi -e 's@\n\t\[4\] = WLAN_EXT_CAPA5_QOS_MAP,@@; s@\n\t\[6\] = WLAN_EXT_CAPA7_SCS_SUPPORT,@@; s@\n\t\[10\] = WLAN_EXT_CAPA11_MIRRORED_SCS_SUPPORT,@@; s@\n\twiphy_ext_feature_set\(wiphy, NL80211_EXT_FEATURE_STAS_COUNT\);@@; s@\n\teht_cap_elem->mac_cap_info\[1\] \|=\n\t\tIEEE80211_EHT_MAC_CAP1_UNSOL_EPCS_PRIO_ACCESS;@@' "$D/mt7996/init.c"
 
 perl -0pi -e 's@\n\tif \(ieee80211_is_action\(fc\) &&\s*mgmt->u\.action\.category == WLAN_CATEGORY_PROTECTED_EHT &&\s*\(mgmt->u\.action\.u\.ttlm_req\.action_code ==\s*WLAN_PROTECTED_EHT_ACTION_TTLM_REQ \|\|\s*mgmt->u\.action\.u\.ttlm_req\.action_code ==\s*WLAN_PROTECTED_EHT_ACTION_TTLM_RES \|\|\s*mgmt->u\.action\.u\.ttlm_req\.action_code ==\s*WLAN_PROTECTED_EHT_ACTION_TTLM_TEARDOWN\)\)\s*\n\t\treturn true;\n@@s' "$D/mt7996/mac.c"
 perl -0pi -e 's@\n\tstruct ieee80211_neg_ttlm merged_ttlm;@@; s@\n\tmt7996_get_merged_ttlm\(vif, &merged_ttlm\);\n\tret = mt7996_mcu_peer_mld_ttlm_req\(dev, vif, sta, &merged_ttlm\);\n\tif \(ret\)\n\t\tgoto fail;\n@\n\tret = 0;\n@s' "$D/mt7996/mac.c"
@@ -117,6 +118,7 @@ perl -0pi -e 's@static enum ieee80211_neg_ttlm_res\s+mt7996_can_neg_ttlm\(struct
 perl -0pi -e 's@\n\s*\.set_attlm = mt7996_set_attlm,@@; s@\n\s*\.set_sta_ttlm = mt7996_set_sta_ttlm,@@; s@\n\s*\.can_neg_ttlm = mt7996_can_neg_ttlm,@@; s@\n\s*\.set_ttlm = mt7996_set_ttlm,@@' "$D/mt7996/main.c"
 
 perl -0pi -e 's@\s*ieee80211_attlm_notify\([^;]*;\s*@@g' "$D/mt7996/mcu.c"
+perl -0pi -e 's@wiphy_ext_feature_isset\(mphy->hw->wiphy,\s*NL80211_EXT_FEATURE_STAS_COUNT\)@false@s' "$D/mt7996/mcu.c"
 
 perl -0pi -e 's@\s*if \(vif->neg_ttlm.valid\) \{.*?return;\s*\}@@s; s@\s*if \(vif->adv_ttlm.active\)\s*map &= vif->adv_ttlm.map;@@s' "$D/mt7996/mt7996.h"
 perl -0pi -e 's@mtk_wed_device_ppe_drop\(&dev->mt76\.mmio\.wed, enable\);@/* backport WED PPE API is incompatible */@' "$D/mt7996/mt7996.h"
