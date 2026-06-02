@@ -120,9 +120,9 @@ perl -0pi -e 's@\n\s*\.set_attlm = mt7996_set_attlm,@@; s@\n\s*\.set_sta_ttlm = 
 perl -0pi -e 's@\s*ieee80211_attlm_notify\([^;]*;\s*@@g' "$D/mt7996/mcu.c"
 perl -0pi -e 's@wiphy_ext_feature_isset\(mphy->hw->wiphy,\s*NL80211_EXT_FEATURE_STAS_COUNT\)@false@s' "$D/mt7996/mcu.c"
 
-perl -0pi -e 's@MTK_WED_HW_V3_1@MTK_WED_HW_V3@g' "$D/mt7996/dma.c"
-perl -0pi -e 's@\n\tcase MTK_WED_HW_V3_1:\n\t\tdev->mt76\.hwrro_mode = is_mt7996\(&dev->mt76\) \?\n\t\t\t\t       MT76_HWRRO_V3 : MT76_HWRRO_V3_1;\n\t\trx_token_size = 24576;\n\t\tbreak;@@s' "$D/mt7996/mmio.c"
-perl -0pi -e 's@MTK_WED_HW_V3_1@MTK_WED_HW_V3@g' "$D/mt7996/mtk_debugfs.c"
+perl -0pi -e 's@if \(mtk_wed_device_active\(wed\) && wed->version == MTK_WED_HW_V3_1\) \{@if (false) {@g; s@if \(wed->version == MTK_WED_HW_V3_1\)@if (false)@g; s@if \(mdev->mmio.wed.version == MTK_WED_HW_V3_1\)@if (false)@g; s@if \(mt76_wed_check_rx_cap\(wed\) && wed->version != MTK_WED_HW_V3_1\)@if (mt76_wed_check_rx_cap(wed))@g; s@if \(mt76_wed_check_rx_cap\(wed\) && wed->version == MTK_WED_HW_V3_1\)@if (false)@g' "$D/mt7996/dma.c"
+perl -0pi -e 's@wed_hw_ver = mtk_wed_device_get_hw_version\(\);\n\ttx_token_size = MT7996_WED_TOKEN_SIZE;\n\n\tswitch \(wed_hw_ver\) \{.*?\n\t\}@@s@wed_hw_ver = mtk_wed_device_get_hw_version();\n\ttx_token_size = MT7996_WED_TOKEN_SIZE;\n\tdev->mt76.hwrro_mode = MT76_HWRRO_V3;\n\trx_token_size = dev->hif2 ? 32768 : 24576;@; s@wed_hw_ver == MTK_WED_HW_V3@1@g' "$D/mt7996/mmio.c"
+perl -0pi -e 's@mdev->mmio.wed.version == MTK_WED_HW_V3_1@false@g' "$D/mt7996/mtk_debugfs.c"
 
 perl -0pi -e 's@\s*if \(vif->neg_ttlm.valid\) \{.*?return;\s*\}@@s; s@\s*if \(vif->adv_ttlm.active\)\s*map &= vif->adv_ttlm.map;@@s' "$D/mt7996/mt7996.h"
 perl -0pi -e 's@mtk_wed_device_ppe_drop\(&dev->mt76\.mmio\.wed, enable\);@/* backport WED PPE API is incompatible */@' "$D/mt7996/mt7996.h"
