@@ -120,6 +120,10 @@ perl -0pi -e 's@\n\s*\.set_attlm = mt7996_set_attlm,@@; s@\n\s*\.set_sta_ttlm = 
 perl -0pi -e 's@\s*ieee80211_attlm_notify\([^;]*;\s*@@g' "$D/mt7996/mcu.c"
 perl -0pi -e 's@wiphy_ext_feature_isset\(mphy->hw->wiphy,\s*NL80211_EXT_FEATURE_STAS_COUNT\)@false@s' "$D/mt7996/mcu.c"
 
+perl -0pi -e 's@MTK_WED_HW_V3_1@MTK_WED_HW_V3@g' "$D/mt7996/dma.c"
+perl -0pi -e 's@\n\tcase MTK_WED_HW_V3_1:\n\t\tdev->mt76\.hwrro_mode = is_mt7996\(&dev->mt76\) \?\n\t\t\t\t       MT76_HWRRO_V3 : MT76_HWRRO_V3_1;\n\t\trx_token_size = 24576;\n\t\tbreak;@@s' "$D/mt7996/mmio.c"
+perl -0pi -e 's@MTK_WED_HW_V3_1@MTK_WED_HW_V3@g' "$D/mt7996/mtk_debugfs.c"
+
 perl -0pi -e 's@\s*if \(vif->neg_ttlm.valid\) \{.*?return;\s*\}@@s; s@\s*if \(vif->adv_ttlm.active\)\s*map &= vif->adv_ttlm.map;@@s' "$D/mt7996/mt7996.h"
 perl -0pi -e 's@mtk_wed_device_ppe_drop\(&dev->mt76\.mmio\.wed, enable\);@/* backport WED PPE API is incompatible */@' "$D/mt7996/mt7996.h"
 FIXSCRIPT
