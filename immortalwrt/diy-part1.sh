@@ -101,13 +101,13 @@ mv bpi-r4pro-src/package/kernel/mt76 package/kernel/mt76
 cp "$GITHUB_WORKSPACE/patches/filogic/1004-mt76-immortalwrt-24.10-compat.patch" \
     package/kernel/mt76/mt76-compat.patch
 perl -0pi -e 's/\r\n/\n/g; s/\r/\n/g' package/kernel/mt76/mt76-compat.patch
-cat > package/kernel/mt76/compat-prepare.mk << 'EOF'
-
-define Build/Prepare
-	$(call Build/Prepare/Default)
-    (cd $(PKG_BUILD_DIR) && patch -p1 < $(TOPDIR)/package/kernel/mt76/mt76-compat.patch)
-endef
-EOF
+{
+    printf '\n'
+    printf '%s\n' 'define Build/Prepare'
+    printf '\t%s\n' '$(call Build/Prepare/Default)'
+    printf '\t%s\n' '(cd $(PKG_BUILD_DIR) && patch -p1 < $(TOPDIR)/package/kernel/mt76/mt76-compat.patch)'
+    printf '%s\n' 'endef'
+} > package/kernel/mt76/compat-prepare.mk
 awk 'FNR == NR { block = block $0 "\n"; next }
     /^\$\(eval \$\(call KernelPackage,/ && !done { print block; done = 1 }
          { print }' \
