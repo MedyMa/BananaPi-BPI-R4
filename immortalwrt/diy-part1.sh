@@ -95,10 +95,24 @@ popd
 
 mv bpi-r4pro-src/package/kernel/mt76 package/kernel/mt76
 
-# Apply BPI-R4PRO mt76 compatibility through the standard OpenWrt patch phase.
-mkdir -p package/kernel/mt76/patches
+# Apply BPI-R4PRO mt76 compatibility after the vendor patch series.
+# The imported mt76 tree has CRLF source files, so GNU patch needs --binary.
 cp "$GITHUB_WORKSPACE/patches/filogic/1004-mt76-immortalwrt-24.10-compat.patch" \
-        package/kernel/mt76/patches/9999-immortalwrt-24.10-compat.patch
+    package/kernel/mt76/mt76-compat.patch
+cat > package/kernel/mt76/compat-prepare.mk << 'EOF'
+
+define Build/Prepare
+	$(call Build/Prepare/Default)
+	(cd $(PKG_BUILD_DIR) && patch --binary -p1 < $(TOPDIR)/package/kernel/mt76/mt76-compat.patch)
+endef
+EOF
+awk 'FNR == NR { block = block $0 "\n"; next }
+    /^\$\(eval \$\(call KernelPackage,/ && !done { print block; done = 1 }
+         { print }' \
+        package/kernel/mt76/compat-prepare.mk package/kernel/mt76/Makefile \
+        > package/kernel/mt76/Makefile.tmp \
+    && mv package/kernel/mt76/Makefile.tmp package/kernel/mt76/Makefile
+rm -f package/kernel/mt76/compat-prepare.mk
 
 mkdir -p target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek
 cp -r bpi-r4pro-src/target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_hnat \
