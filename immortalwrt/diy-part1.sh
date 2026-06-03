@@ -101,11 +101,24 @@ mv bpi-r4pro-src/package/kernel/mt76 package/kernel/mt76
 cp "$GITHUB_WORKSPACE/patches/filogic/1004-mt76-immortalwrt-24.10-compat.patch" \
     package/kernel/mt76/mt76-compat.patch
 perl -0pi -e 's/\r\n/\n/g; s/\r/\n/g' package/kernel/mt76/mt76-compat.patch
+cat > package/kernel/mt76/compat-fixup.sh << 'EOF'
+#!/bin/sh
+
+build_dir="$1"
+
+perl -0pi -e 's/^.*WLAN_EXT_CAPA5_QOS_MAP.*\r?\n//mg; s/^.*WLAN_EXT_CAPA7_SCS_SUPPORT.*\r?\n//mg; s/^.*WLAN_EXT_CAPA11_MIRRORED_SCS_SUPPORT.*\r?\n//mg; s/^.*NL80211_EXT_FEATURE_STAS_COUNT.*\r?\n//mg' "$build_dir/mt7996/init.c"
+perl -0pi -e 's/\n\s*ieee80211_tsf_offset_notify\(vif, rpted_linkid, rpted_mconf->tsf_offset,\n\s*sizeof\(rpted_mconf->tsf_offset\), GFP_KERNEL\);\n/\n/s' "$build_dir/mt7996/main.c"
+perl -0pi -e 's/\n\s*cfg80211_background_radar_update_channel\(hw->wiphy, c, expand\);\n/\n/s' "$build_dir/mt7996/main.c"
+perl -0pi -e 's/\n\s*ieee80211_tpt_led_trig_tx\(mphy->hw, tx_bytes\);\n\s*ieee80211_tpt_led_trig_rx\(mphy->hw, rx_bytes\);\n/\n/s' "$build_dir/mt7996/mcu.c"
+perl -0pi -e 's/^\s*struct mt7996_mcu_mld_ap_reconf_event \*reconf = \(void \*\)data->data;\n//m; s/\n\s*ieee80211_links_removed\(vif, le16_to_cpu\(reconf->link_bitmap\)\);\n/\n/s' "$build_dir/mt7996/mcu.c"
+EOF
+chmod 0755 package/kernel/mt76/compat-fixup.sh
 {
     printf '\n'
     printf '%s\n' 'define Build/Prepare'
     printf '\t%s\n' '$(call Build/Prepare/Default)'
     printf '\t%s\n' '(cd $(PKG_BUILD_DIR) && patch -p1 < $(TOPDIR)/package/kernel/mt76/mt76-compat.patch)'
+    printf '\t%s\n' '$(TOPDIR)/package/kernel/mt76/compat-fixup.sh $(PKG_BUILD_DIR)'
     printf '%s\n' 'endef'
 } > package/kernel/mt76/compat-prepare.mk
 awk 'FNR == NR { block = block $0 "\n"; next }
