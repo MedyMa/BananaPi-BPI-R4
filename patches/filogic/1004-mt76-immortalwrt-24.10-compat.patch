@@ -72,30 +72,6 @@ diff --git a/mt7996/init.c b/mt7996/init.c
 index 3f61c81..14a3e41 100644
 --- a/mt7996/init.c
 +++ b/mt7996/init.c
-@@ -91,11 +91,8 @@ static const struct ieee80211_iface_combination if_comb_7992 = {
- 
- static const u8 mt7996_if_types_ext_capa_ap[] = {
- 	[0] = WLAN_EXT_CAPA1_EXT_CHANNEL_SWITCHING,
--	[2] = WLAN_EXT_CAPA3_MULTI_BSSID_SUPPORT,
--	[4] = WLAN_EXT_CAPA5_QOS_MAP,
--	[6] = WLAN_EXT_CAPA7_SCS_SUPPORT,
--	[7] = WLAN_EXT_CAPA8_OPMODE_NOTIF,
--	[10] = WLAN_EXT_CAPA11_MIRRORED_SCS_SUPPORT,
-+	[2] = WLAN_EXT_CAPA3_MULTI_BSSID_SUPPORT,
-+	[7] = WLAN_EXT_CAPA8_OPMODE_NOTIF,
- };
- 
- static const u8 mt7996_if_types_ext_capa_sta[] = {
-@@ -568,8 +565,7 @@ mt7996_init_wiphy(struct ieee80211_hw *hw, struct mtk_wed_device *wed)
- 	wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_ACK_SIGNAL_SUPPORT);
- 	wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_CAN_REPLACE_PTK0);
- 	wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_MU_MIMO_AIR_SNIFFER);
--	wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_PUNCT);
--	wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_STAS_COUNT);
-+	wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_PUNCT);
- 	wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_SET_SCAN_DWELL);
- 
- 	wiphy_ext_feature_set(wiphy, NL80211_EXT_FEATURE_OPERATING_CHANNEL_VALIDATION);
 diff --git a/mt7996/mac.c b/mt7996/mac.c
 index cb68f37..c211d01 100644
 --- a/mt7996/mac.c
@@ -142,7 +118,8 @@ index cb68f37..c211d01 100644
 -						   &phy, RATE_PARAM_FIXED_ENCODING);
 -		}
 -#endif
-+						   RATE_PARAM_MMPS_UPDATE);
++						   RATE_PARAM_MMPS_UPDATE);
+
  
  		spin_lock_bh(&dev->mt76.sta_poll_lock);
  	}
@@ -163,17 +140,6 @@ index ea21977..4642df4 100644
  	struct mt7996_vif_link *mconf;
  	struct mt76_phy *mphy;
  	int delta;
-@@ -1034,9 +1034,7 @@ static void mt7996_get_tsf_offset(struct ieee80211_vif *vif,
- 				continue;
- 			mt7996_mcu_get_tsf_offset(phy, mvif, rpting_linkid, rpted_linkid);
- 		}
--
--		ieee80211_tsf_offset_notify(vif, rpted_linkid, rpted_mconf->tsf_offset,
--					    sizeof(rpted_mconf->tsf_offset), GFP_KERNEL);
-+
- 	}
- }
- 
 @@ -2104,82 +2102,6 @@ out:
  	mutex_unlock(&dev->mt76.mutex);
  }
@@ -289,23 +255,14 @@ index ea21977..4642df4 100644
  	struct mt7996_vif_link *mconf;
  	struct mt7996_sta_rc_work_data data = {
  		.link_id = link_id,
-@@ -2651,8 +2572,7 @@ mt7996_background_radar_handle_7975_ifem(struct ieee80211_hw *hw,
- 	c->width = NL80211_CHAN_WIDTH_80;
- 	c->center_freq1 = c->chan->center_freq + 30;
- 
--	if (c == user_chandef)
--		cfg80211_background_radar_update_channel(hw->wiphy, c, expand);
-+	if (c == user_chandef)
- 	return;
- out:
- 	dev->bg_nxt_freq = 0;
 @@ -2724,8 +2644,7 @@ mt7996_net_fill_forward_path(struct ieee80211_hw *hw,
  	struct mt7996_dev *dev = mt7996_hw_dev(hw);
  	struct mtk_wed_device *wed = &dev->mt76.mmio.wed;
  	struct mt7996_sta_link *msta_link;
 -	struct mt76_vif_link *mlink;
 -	u8 dscp = path->mtk_wdma.tid >> 2;
-+	struct mt76_vif_link *mlink;
++	struct mt76_vif_link *mlink;
+
  
  	mlink = rcu_dereference(mvif->mt76.link[msta->deflink_id]);
  	if (!mlink)
@@ -315,7 +272,8 @@ index ea21977..4642df4 100644
  	path->mtk_wdma.queue = 0;
 -	path->mtk_wdma.wcid = msta_link->wcid.idx;
 -	path->mtk_wdma.tid = mvif->qos_map[dscp];
-+	path->mtk_wdma.wcid = msta_link->wcid.idx;
++	path->mtk_wdma.wcid = msta_link->wcid.idx;
+
  
  	if (ieee80211_hw_check(hw, SUPPORTS_AMSDU_IN_AMPDU) &&
  	    mtk_wed_is_amsdu_supported(wed))
@@ -438,7 +396,8 @@ index ea21977..4642df4 100644
  	.set_coverage_class = mt7996_set_coverage_class,
 -	.sta_statistics = mt7996_sta_statistics,
 -	.sta_link_statistics = mt7996_sta_link_statistics,
-+	.sta_statistics = mt7996_sta_statistics,
++	.sta_statistics = mt7996_sta_statistics,
+
  	.sta_set_4addr = mt7996_sta_set_4addr,
  	.sta_set_decap_offload = mt7996_sta_set_decap_offload,
  	.add_twt_setup = mt7996_mac_add_twt_setup,
@@ -447,8 +406,17 @@ index ea21977..4642df4 100644
  	.event_callback = mt7996_event_callback,
  	.change_vif_links = mt7996_change_vif_links,
 -	.change_sta_links = mt7996_mac_sta_change_links,
--	.set_qos_map = mt7996_set_qos_map,
-+	.change_sta_links = mt7996_mac_sta_change_links,
+-	.set_qos_map = mt7996_set_qos_map,
+
+
+
+
++	.change_sta_links = mt7996_mac_sta_change_links,
+
+
+
+
+
  	.channel_switch = mt7996_sta_channel_switch,
  };
 diff --git a/mt7996/mcu.c b/mt7996/mcu.c
@@ -474,54 +442,6 @@ index 6fb6d91..d2cb906 100644
  	}
  }
  
-@@ -814,10 +813,7 @@ mt7996_mcu_rx_all_sta_info_event(struct mt7996_dev *dev, struct sk_buff *skb)
- 				wcid->stats.tx_bytes_failed += tx_bytes_failed;
- 
- 				__mt7996_stat_to_netdev(mphy, wcid,
--							tx_bytes, rx_bytes, 0, 0);
--
--				ieee80211_tpt_led_trig_tx(mphy->hw, tx_bytes);
--				ieee80211_tpt_led_trig_rx(mphy->hw, rx_bytes);
-+							tx_bytes, rx_bytes, 0, 0);
- 			}
- 			break;
- 		case UNI_ALL_STA_TXRX_MSDU_COUNT:
-@@ -1418,20 +1414,16 @@ mt7996_mcu_pp_event(struct mt7996_dev *dev, struct sk_buff *skb)
- static void
- mt7996_mcu_mld_reconf_finish(void *priv, u8 *mac, struct ieee80211_vif *vif)
- {
--	struct mt7996_mld_event_data *data = priv;
--	struct mt7996_mcu_mld_ap_reconf_event *reconf = (void *)data->data;
-+	struct mt7996_mld_event_data *data = priv;
- 
- 	if (!ether_addr_equal(vif->addr, data->mld_addr))
--		return;
--
--	ieee80211_links_removed(vif, le16_to_cpu(reconf->link_bitmap));
-+		return;
- }
- 
- static void
- mt7996_mcu_mld_attlm_event(void *priv, u8 *mac, struct ieee80211_vif *vif)
- {
--	struct mt7996_mld_event_data *data = priv;
--	struct mt7996_mcu_mld_attlm_timeout_event *ttlm = (void *)data->data;
-+	struct mt7996_mld_event_data *data = priv;
- 
- 	if (!ether_addr_equal(vif->addr, data->mld_addr))
- 		return;
-@@ -1549,10 +1541,7 @@ mt7996_mcu_bss_bcn_crit_finish(void *priv, u8 *mac, struct ieee80211_vif *vif)
- 		if (!mconf)
- 			continue;
- 
--		if (mconf->mt76.idx == data->bss_idx) {
--			ieee80211_crit_update_notify(vif, link_id,
--						     NL80211_CRIT_UPDATE_NONE,
--						     GFP_ATOMIC);
-+		if (mconf->mt76.idx == data->bss_idx) {
- 			rcu_read_unlock();
- 			return;
- 		}
 @@ -3173,12 +3162,12 @@ mt7996_mcu_sta_rate_ctrl_tlv(struct sk_buff *skb, struct mt7996_dev *dev,
  			     struct mt7996_vif_link *link)
  {
