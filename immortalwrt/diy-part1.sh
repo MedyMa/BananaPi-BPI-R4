@@ -96,14 +96,16 @@ popd
 mv bpi-r4pro-src/package/kernel/mt76 package/kernel/mt76
 
 # Apply BPI-R4PRO mt76 compatibility after the vendor patch series.
-# The imported mt76 tree has CRLF source files, so GNU patch needs --binary.
+# The compat patch in this workspace may contain mixed line endings.
+# Normalize it to LF so it matches the post-patch mt76 sources in CI.
 cp "$GITHUB_WORKSPACE/patches/filogic/1004-mt76-immortalwrt-24.10-compat.patch" \
     package/kernel/mt76/mt76-compat.patch
+perl -0pi -e 's/\r\n/\n/g; s/\r/\n/g' package/kernel/mt76/mt76-compat.patch
 cat > package/kernel/mt76/compat-prepare.mk << 'EOF'
 
 define Build/Prepare
 	$(call Build/Prepare/Default)
-	(cd $(PKG_BUILD_DIR) && patch --binary -p1 < $(TOPDIR)/package/kernel/mt76/mt76-compat.patch)
+    (cd $(PKG_BUILD_DIR) && patch -p1 < $(TOPDIR)/package/kernel/mt76/mt76-compat.patch)
 endef
 EOF
 awk 'FNR == NR { block = block $0 "\n"; next }
