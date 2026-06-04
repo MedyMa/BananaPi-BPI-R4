@@ -18,7 +18,7 @@ diff --git a/mt76_connac_mcu.h b/mt76_connac_mcu.h
 diff --git a/mt7996/init.c b/mt7996/init.c
 --- a/mt7996/init.c
 +++ b/mt7996/init.c
-@@ -367,26 +367,38 @@
+@@ -367,26 +367,33 @@
  }
  
  static void __mt7996_init_txpower(struct mt7996_phy *phy,
@@ -34,8 +34,6 @@ diff --git a/mt7996/init.c b/mt7996/init.c
 +	struct mt76_power_path_limits limits_path;
 +	struct device_node *np;
 +
-+	phy->sku_limit_en = true;
-+	phy->sku_path_en = true;
 +	np = mt76_find_power_limits_node(phy->mt76);
  	for (i = 0; i < sband->n_channels; i++) {
  		struct ieee80211_channel *chan = &sband->channels[i];
@@ -48,9 +46,6 @@ diff --git a/mt7996/init.c b/mt7996/init.c
 +					  &limits,
 +					  &limits_path,
 +					  target_power);
-+		if (!limits_path.ofdm[0])
-+			phy->sku_path_en = false;
-+
  		target_power += path_delta;
  		target_power = DIV_ROUND_UP(target_power, 2);
 -		chan->max_power = min_t(int, chan->max_reg_power,
@@ -63,7 +58,7 @@ diff --git a/mt7996/init.c b/mt7996/init.c
  		phy->txpower = max(phy->txpower, chan->max_power);
  		chan->orig_mpwr = target_power;
  	}
-@@ -394,15 +406,22 @@
+@@ -394,15 +401,22 @@
  
  void mt7996_init_txpower(struct mt7996_phy *phy)
  {
@@ -92,7 +87,7 @@ diff --git a/mt7996/init.c b/mt7996/init.c
  }
  
  static void
-@@ -861,6 +880,8 @@
+@@ -861,6 +875,8 @@
  
  	if (!is_mt7990(&dev->mt76))
  		mt7996_mcu_set_dup_wtbl(dev);
@@ -101,7 +96,7 @@ diff --git a/mt7996/init.c b/mt7996/init.c
  }
  
  void mt7996_wfsys_reset(struct mt7996_dev *dev)
-@@ -1737,8 +1758,10 @@
+@@ -1737,8 +1753,10 @@
  	if (iftype != NL80211_IFTYPE_AP)
  		return;
  
