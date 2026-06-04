@@ -102,15 +102,18 @@ rm -f package/kernel/mt76/patches/0001-mtk-mt76-mt7996-config-rxfilter-to-drop-o
 # 2ab64980 already carries the 0004 behavior in refactored mt76 dma init code.
 rm -f package/kernel/mt76/patches/0004-mtk-mt76-mt7996-Remove-wed-rro-ring-add-napi-at-init.patch
 
-# Rebase 0003/0005 onto 2ab64980 via workspace patch files instead of
+# Rebase 0003/0005/0008 onto 2ab64980 via workspace patch files instead of
 # embedding patch bodies in this script.
 cp "$GITHUB_WORKSPACE/patches/filogic/mt76/0003-mtk-mt76-mt7996-Fix-call-trace-happened-when-wed-att.patch" \
     package/kernel/mt76/patches/0003-mtk-mt76-mt7996-Fix-call-trace-happened-when-wed-att.patch
 cp "$GITHUB_WORKSPACE/patches/filogic/mt76/0005-mtk-mt76-mt7996-Remove-wed_stop-during-L1-SER.patch" \
     package/kernel/mt76/patches/0005-mtk-mt76-mt7996-Remove-wed_stop-during-L1-SER.patch
+cp "$GITHUB_WORKSPACE/patches/filogic/mt76/0008-mtk-mt76-mt7996-add-critical-update-support.patch" \
+    package/kernel/mt76/patches/0008-mtk-mt76-mt7996-add-critical-update-support.patch
 perl -0pi -e 's/\r\n/\n/g; s/\r/\n/g' \
     package/kernel/mt76/patches/0003-mtk-mt76-mt7996-Fix-call-trace-happened-when-wed-att.patch \
-    package/kernel/mt76/patches/0005-mtk-mt76-mt7996-Remove-wed_stop-during-L1-SER.patch
+    package/kernel/mt76/patches/0005-mtk-mt76-mt7996-Remove-wed_stop-during-L1-SER.patch \
+    package/kernel/mt76/patches/0008-mtk-mt76-mt7996-add-critical-update-support.patch
 
 # Keep the mt76 package Makefile bump as a standalone patch, so the version
 # update is tracked in the workspace and validated with patch(1).
