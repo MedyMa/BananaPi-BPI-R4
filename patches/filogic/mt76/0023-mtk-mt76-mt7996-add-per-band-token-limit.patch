@@ -1,0 +1,121 @@
+diff --git a/mt76.h b/mt76.h
+--- a/mt76.h
++++ b/mt76.h
+@@ -1072,6 +1072,7 @@
+ 	} leds;
+ 	struct mt76_tx_debug tx_dbg_stats;
+ 	struct mt76_rx_debug rx_dbg_stats;
++	int tokens;
+ };
+ 
+ struct mt76_dev {
+@@ -1125,6 +1126,7 @@
+ 	u16 token_count;
+ 	u16 token_start;
+ 	u16 token_size;
++	u16 token_threshold;
+ 
+ 	spinlock_t rx_token_lock;
+ 	struct idr rx_token;
+@@ -2249,7 +2251,8 @@
+ 
+ struct mt76_txwi_cache *
+ mt76_token_release(struct mt76_dev *dev, int token, bool *wake);
+-int mt76_token_consume(struct mt76_dev *dev, struct mt76_txwi_cache **ptxwi);
++int mt76_token_consume(struct mt76_dev *dev, struct mt76_txwi_cache **ptxwi,
++		       u8 phy_idx);
+ void __mt76_set_tx_blocked(struct mt76_dev *dev, bool blocked);
+ struct mt76_txwi_cache *mt76_rx_token_release(struct mt76_dev *dev, int token);
+ int mt76_rx_token_consume(struct mt76_dev *dev, void *ptr,
+diff --git a/mt7996/init.c b/mt7996/init.c
+--- a/mt7996/init.c
++++ b/mt7996/init.c
+@@ -1787,6 +1787,8 @@
+ 	mt7996_for_each_phy(dev, phy)
+ 		mt7996_thermal_init(phy);
+ 
++	dev->mt76.token_threshold = MT7996_PER_BAND_TOKEN_SIZE;
++
+ 	ieee80211_queue_work(mt76_hw(dev), &dev->init_work);
+ 
+ 	dev->recovery.hw_init_done = true;
+diff --git a/mt7996/mac.c b/mt7996/mac.c
+--- a/mt7996/mac.c
++++ b/mt7996/mac.c
+@@ -2241,8 +2241,11 @@
+ 
+ 	spin_lock_bh(&dev->mt76.token_lock);
+ 	idr_for_each_entry(&dev->mt76.token, txwi, id) {
++		struct mt76_phy *phy = mt76_dev_phy(&dev->mt76, txwi->phy_idx);
++
+ 		mt7996_txwi_free(dev, txwi, NULL, NULL, NULL);
+ 		dev->mt76.token_count--;
++		phy->tokens--;
+ 	}
+ 	spin_unlock_bh(&dev->mt76.token_lock);
+ 	idr_destroy(&dev->mt76.token);
+diff --git a/mt7996/mt7996.h b/mt7996/mt7996.h
+--- a/mt7996/mt7996.h
++++ b/mt7996/mt7996.h
+@@ -96,6 +96,7 @@
+ #define MT7996_TOKEN_SIZE		16384
+ #define MT7996_HW_TOKEN_SIZE		8192
+ #define MT7996_SW_TOKEN_SIZE		15360
++#define MT7996_PER_BAND_TOKEN_SIZE	4000
+ 
+ #define MT7996_CFEND_RATE_DEFAULT	0x49	/* OFDM 24M */
+ #define MT7996_CFEND_RATE_11B		0x03	/* 11B LP, 11M */
+diff --git a/mt7996/mtk_debugfs.c b/mt7996/mtk_debugfs.c
+--- a/mt7996/mtk_debugfs.c
++++ b/mt7996/mtk_debugfs.c
+@@ -2406,7 +2406,7 @@
+ static int mt7996_token_read(struct seq_file *s, void *data)
+ {
+ 	struct mt7996_dev *dev = dev_get_drvdata(s->private);
+-	int msdu_id;
++	int msdu_id, i;
+ 	struct mt76_txwi_cache *txwi;
+ 
+ 	seq_printf(s, "Token from host:\n");
+@@ -2416,8 +2416,18 @@
+ 			   msdu_id, txwi->wcid,
+ 			   jiffies_to_msecs(jiffies - txwi->jiffies));
+ 	}
++	seq_printf(s, "\n");
++	for (i = 0; i < __MT_MAX_BAND; i++) {
++		struct mt76_phy *phy = mt76_dev_phy(&dev->mt76, i);
++
++		if (!mt7996_band_valid(dev, i))
++			continue;
++
++		seq_printf(s, "Band%u consume: %d, free: %d total: %d\n",
++			   i, phy->tokens, dev->mt76.token_threshold - phy->tokens,
++			   dev->mt76.token_threshold);
++	}
+ 	spin_unlock_bh(&dev->mt76.token_lock);
+-	seq_printf(s, "\n");
+ 
+ 	return 0;
+ }
+diff --git a/tx.c b/tx.c
+--- a/tx.c
++++ b/tx.c
+@@ -974,6 +974,7 @@
+ 	if (dev->token_count >= dev->token_size - MT76_TOKEN_FREE_THR)
+ 		__mt76_set_tx_blocked(dev, true);
+ 
++out:
+ 	spin_unlock_bh(&dev->token_lock);
+ 
+ 	return token;
+@@ -1007,7 +1008,10 @@
+ 
+ 	txwi = idr_remove(&dev->token, token);
+ 	if (txwi) {
++		struct mt76_phy *phy = mt76_dev_phy(dev, txwi->phy_idx);
++
+ 		dev->token_count--;
++		phy->tokens--;
+ 
+ 		if (txwi->qid == MT_TXQ_PSD) {
+ 			struct mt76_phy *mphy = mt76_dev_phy(dev, txwi->phy_idx);

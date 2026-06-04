@@ -1,0 +1,1750 @@
+diff --git a/mt7996/coredump.c b/mt7996/coredump.c
+--- a/mt7996/coredump.c
++++ b/mt7996/coredump.c
+@@ -126,6 +126,8 @@
+ 		}
+ 		*num = ARRAY_SIZE(mt7992_wm_mem_regions);
+ 		return &mt7992_wm_mem_regions[0];
++	case MT7990_DEVICE_ID:
++		/* Todo: add mt7990 support */
+ 	default:
+ 		return NULL;
+ 	}
+diff --git a/mt7996/debugfs.c b/mt7996/debugfs.c
+--- a/mt7996/debugfs.c
++++ b/mt7996/debugfs.c
+@@ -306,7 +306,7 @@
+ 
+ 	mutex_lock(&dev->mt76.mutex);
+ 
+-	if (!mt7996_has_background_radar(dev)) {
++	if (!mt7996_eeprom_has_background_radar(dev)) {
+ 		seq_puts(s, "no background radar capability\n");
+ 		goto out;
+ 	}
+diff --git a/mt7996/dma.c b/mt7996/dma.c
+--- a/mt7996/dma.c
++++ b/mt7996/dma.c
+@@ -876,7 +876,7 @@
+ 		if (ret)
+ 			return ret;
+ 
+-		if (is_mt7992(&dev->mt76)) {
++		if (!is_mt7996(&dev->mt76)) {
+ 			dev->mt76.q_rx[MT_RXQ_RRO_BAND1].flags =
+ 				MT_WED_RRO_Q_DATA(1) | MT_QFLAG_WED_RRO_EN;
+ 			if (mtk_wed_device_active(wed) &&
+diff --git a/mt7996/eeprom.c b/mt7996/eeprom.c
+--- a/mt7996/eeprom.c
++++ b/mt7996/eeprom.c
+@@ -308,6 +308,8 @@
+ 					    u8 *path, u8 *rx_path, u8 *nss)
+ {
+ #define MODE_HE_ONLY		BIT(0)
++#define PWR_BOOST_CAP		BIT(7)
++#define FIPS_CAP		BIT(8)
+ #define WTBL_SIZE_GROUP		GENMASK(31, 28)
+ #define STREAM_CAP(_offs)	((cap & (0x7 << (_offs))) >> (_offs))
+ 	struct mt7996_dev *dev = phy->dev;
+@@ -328,6 +330,11 @@
+ 		*nss = min_t(u8, *nss, STREAM_CAP(1 + band_offs));
+ 		*path = min_t(u8, *path, STREAM_CAP(10 + band_offs));
+ 		*rx_path = min_t(u8, *rx_path, STREAM_CAP(19 + band_offs));
++
++		if (is_mt7990(&dev->mt76)) {
++			dev->pwr_boost_cap = !!(cap & PWR_BOOST_CAP);
++			dev->fips_cap = !!(cap & FIPS_CAP);
++		}
+ 	}
+ 
+ 	if (dev->wtbl_size_group < 2 || dev->wtbl_size_group > 4)
+@@ -455,15 +462,18 @@
+ 		dev->prek.dpd_ch_num[DPD_CH_NUM_BW320_6G] = ARRAY_SIZE(dpd_6g_ch_list_bw320);
+ 		break;
+ 	case MT7992_DEVICE_ID:
+-		dev->prek.rev  = mt7992_prek_rev;
++		dev->prek.rev = mt7992_prek_rev;
+ 		dev->prek.dpd_ch_num[DPD_CH_NUM_BW80_5G] = ARRAY_SIZE(dpd_5g_ch_list_bw80);
+ 		/* 6g is not used in current sku */
+ 		dev->prek.dpd_ch_num[DPD_CH_NUM_BW20_6G] = 0;
+ 		dev->prek.dpd_ch_num[DPD_CH_NUM_BW80_6G] = 0;
+ 		dev->prek.dpd_ch_num[DPD_CH_NUM_BW160_6G] = 0;
+ 		break;
++	case MT7990_DEVICE_ID:
++		dev->prek.rev = mt7990_prek_rev;
++		break;
+ 	default:
+-		dev->prek.rev  = mt7996_prek_rev;
++		dev->prek.rev = mt7996_prek_rev;
+ 		break;
+ 	}
+ }
+diff --git a/mt7996/eeprom.h b/mt7996/eeprom.h
+--- a/mt7996/eeprom.h
++++ b/mt7996/eeprom.h
+@@ -95,6 +95,19 @@
+ 	[DPD_OTFG0_SIZE] =			2 * MT_EE_CAL_UNIT,
+ };
+ 
++static const u32 mt7990_prek_rev[] = {
++	[GROUP_SIZE_2G] =			4 * MT_EE_CAL_UNIT,
++	[GROUP_SIZE_5G] =			45 * MT_EE_CAL_UNIT,
++	[GROUP_SIZE_6G] =			90 * MT_EE_CAL_UNIT,
++	[ADCDCOC_SIZE_2G] =			4 * 2,
++	[ADCDCOC_SIZE_5G] =			4 * 3,
++	[ADCDCOC_SIZE_6G] =			4 * 3,
++	[DPD_LEGACY_SIZE] =			5 * MT_EE_CAL_UNIT,
++	/* no mem dpd cal for griffin, use legacy dpd cal instead */
++	[DPD_MEM_SIZE] =			0,
++	[DPD_OTFG0_SIZE] =			2 * MT_EE_CAL_UNIT,
++};
++
+ extern const struct ieee80211_channel dpd_2g_ch_list_bw20[];
+ extern const struct ieee80211_channel dpd_5g_skip_ch_list[];
+ extern const struct ieee80211_channel dpd_5g_ch_list_bw80[];
+@@ -109,7 +122,9 @@
+ 						 PREK(GROUP_SIZE_6G) + PREK(ADCDCOC_SIZE_2G) + \
+ 						 PREK(ADCDCOC_SIZE_5G) + PREK(ADCDCOC_SIZE_6G))
+ #define DPD_PER_CH_BW20_SIZE			(PREK(DPD_LEGACY_SIZE) + PREK(DPD_OTFG0_SIZE))
+-#define DPD_PER_CH_GT_BW20_SIZE			(PREK(DPD_MEM_SIZE) + PREK(DPD_OTFG0_SIZE))
++#define DPD_PER_CH_GT_BW20_SIZE			(PREK(DPD_MEM_SIZE) ? PREK(DPD_MEM_SIZE) + \
++								      PREK(DPD_OTFG0_SIZE) : \
++								      DPD_PER_CH_BW20_SIZE)
+ #define MT_EE_CAL_DPD_SIZE_2G			(DPD_CH_NUM(BW20_2G) * DPD_PER_CH_BW20_SIZE)
+ #define MT_EE_CAL_DPD_SIZE_5G			(DPD_CH_NUM(BW20_5G) * DPD_PER_CH_BW20_SIZE + \
+ 						 DPD_CH_NUM(BW80_5G) * DPD_PER_CH_GT_BW20_SIZE + \
+diff --git a/mt7996/init.c b/mt7996/init.c
+--- a/mt7996/init.c
++++ b/mt7996/init.c
+@@ -594,7 +594,6 @@
+ 	 * MT_AGG_ACR_PPDU_TXS2H (PPDU format) even though ACR bit is set.
+ 	 */
+ 	mt76_set(dev, MT_AGG_ACR4(band), MT_AGG_ACR_PPDU_TXS2H);
+-
+ 
+ 	if (!is_mt7996(&dev->mt76))
+ 		mt7996_mcu_set_bssid_mapping_addr(&dev->mt76, band);
+diff --git a/mt7996/main.c b/mt7996/main.c
+--- a/mt7996/main.c
++++ b/mt7996/main.c
+@@ -2535,6 +2535,7 @@
+ 		is_ifem_adie = dev->var.type == MT7992_VAR_TYPE_44 &&
+ 			       dev->var.fem != MT7996_FEM_EXT;
+ 		break;
++	case MT7990_DEVICE_ID:
+ 	default:
+ 		return;
+ 	}
+diff --git a/mt7996/mcu.c b/mt7996/mcu.c
+--- a/mt7996/mcu.c
++++ b/mt7996/mcu.c
+@@ -1208,38 +1208,53 @@
+ #define WMM_PBC_LOW_BOUND_BK	900
+ #define WMM_PBC_LOW_BOUND_MGMT	32
+ 	struct mt7996_dev *dev = container_of(work, struct mt7996_dev, wmm_pbc_work);
++
+ 	struct {
+-		u8 bss_idx;
+-		u8 queue_num;
+-		__le16 wlan_idx;
+-		u8 band_idx;
+-		u8 __rsv[3];
++		u8 _rsv[4];
++
++		__le16 tag;
++		__le16 len;
++
+ 		struct {
+-			__le16 low;
+-			__le16 up;
+-		} __packed bound[WMM_PBC_QUEUE_NUM];
++			u8 bss_idx;
++			u8 queue_num;
++			__le16 wlan_idx;
++			u8 band_idx;
++			u8 __rsv[3];
++			struct {
++				__le16 low;
++				__le16 up;
++			} __packed bound[WMM_PBC_QUEUE_NUM];
++		} __packed data;
+ 	} __packed req = {
+-		.bss_idx = WMM_PBC_BSS_ALL,
+-		.queue_num = WMM_PBC_QUEUE_NUM,
+-		.wlan_idx = cpu_to_le16(WMM_PBC_WLAN_IDX_ALL),
+-		.band_idx = dev->mphy.band_idx,
++		.tag = cpu_to_le16(UNI_CMD_SDO_PKT_BUDGET_CTRL_CFG),
++		.len = cpu_to_le16(sizeof(req) - 4),
++		.data.bss_idx = WMM_PBC_BSS_ALL,
++		.data.queue_num = WMM_PBC_QUEUE_NUM,
++		.data.wlan_idx = cpu_to_le16(WMM_PBC_WLAN_IDX_ALL),
++		.data.band_idx = dev->mphy.band_idx,
+ 	};
+ 	int i, ret;
+ 
+-#define pbc_acq_low_bound_config(_ac, _bound)								\
+-	req.bound[mt76_connac_lmac_mapping(_ac)].low = dev->wmm_pbc_enable ? cpu_to_le16(_bound) : 0
++#define pbc_acq_low_bound_config(_ac, _bound)						\
++	req.data.bound[mt76_connac_lmac_mapping(_ac)].low = dev->wmm_pbc_enable ?	\
++							    cpu_to_le16(_bound) : 0
+ 	pbc_acq_low_bound_config(IEEE80211_AC_VO, WMM_PBC_LOW_BOUND_VO);
+ 	pbc_acq_low_bound_config(IEEE80211_AC_VI, WMM_PBC_LOW_BOUND_VI);
+ 	pbc_acq_low_bound_config(IEEE80211_AC_BE, WMM_PBC_LOW_BOUND_BE);
+ 	pbc_acq_low_bound_config(IEEE80211_AC_BK, WMM_PBC_LOW_BOUND_BK);
+-	req.bound[4].low = dev->wmm_pbc_enable
+-	                   ? cpu_to_le16(WMM_PBC_LOW_BOUND_MGMT) : 0;
++	req.data.bound[4].low = dev->wmm_pbc_enable ?
++				cpu_to_le16(WMM_PBC_LOW_BOUND_MGMT) : 0;
+ 
+ 	for (i = 0; i < WMM_PBC_QUEUE_NUM; ++i)
+-		req.bound[i].up = cpu_to_le16(WMM_PBC_BOUND_DEFAULT);
+-
+-	ret = mt76_mcu_send_msg(&dev->mt76, MCU_WA_EXT_CMD(PKT_BUDGET_CTRL),
+-	                        &req, sizeof(req), true);
++		req.data.bound[i].up = cpu_to_le16(WMM_PBC_BOUND_DEFAULT);
++
++	if (is_mt7990(&dev->mt76))
++		ret = mt76_mcu_send_msg(&dev->mt76, MCU_WA_UNI_CMD(SDO),
++					 &req, sizeof(req), false);
++	else
++		ret = mt76_mcu_send_msg(&dev->mt76, MCU_WA_EXT_CMD(PKT_BUDGET_CTRL),
++					&req.data, sizeof(req.data), true);
+ 	if (ret)
+ 		dev_err(dev->mt76.dev, "Failed to configure WMM PBC.\n");
+ }
+@@ -1573,6 +1588,60 @@
+ }
+ 
+ static void
++mt7996_mcu_uni_bss_acq_pkt_cnt(struct mt7996_dev *dev, struct tlv *tlv)
++{
++	struct mt7996_mld_sdo_bss_acq_pkt_cnt *data =
++		(struct mt7996_mld_sdo_bss_acq_pkt_cnt *)tlv->data;
++	u64 sum[IEEE80211_NUM_ACS] = {0};
++	u8 ac_cnt = 0;
++	int i, j;
++
++	for (i = 0; i < UNI_CMD_SDO_CFG_BSS_NUM; i++) {
++		for (j = IEEE80211_AC_VO; j < IEEE80211_NUM_ACS; j++)
++			sum[j] += le32_to_cpu(data->pkt_cnt[i][mt76_connac_lmac_mapping(j)]);
++	}
++
++	for (i = IEEE80211_AC_VO; i < IEEE80211_NUM_ACS; i++) {
++		if (sum[i] > WMM_PKT_THRESHOLD)
++			ac_cnt++;
++	}
++
++	if (ac_cnt > 1 && !dev->wmm_pbc_enable) {
++		dev->wmm_pbc_enable = true;
++		queue_work(dev->mt76.wq, &dev->wmm_pbc_work);
++	} else if (ac_cnt <= 1 && dev->wmm_pbc_enable) {
++		dev->wmm_pbc_enable = false;
++		queue_work(dev->mt76.wq, &dev->wmm_pbc_work);
++	}
++}
++
++static void
++mt7996_mcu_sdo_event(struct mt7996_dev *dev, struct sk_buff *skb)
++{
++	struct mt7996_mcu_sdo_event *event = (void *)skb->data;
++	struct tlv *tlv;
++	int len;
++
++	skb_pull(skb, sizeof(*event));
++	tlv = (struct tlv *)skb->data;
++	len = skb->len;
++
++	while (len > 0 && le16_to_cpu(tlv->len) <= len) {
++		switch (le16_to_cpu(tlv->tag)) {
++		case UNI_EVENT_SDO_BSS_ACQ_PKT_CNT:
++			mt7996_mcu_uni_bss_acq_pkt_cnt(dev, tlv);
++			break;
++		default:
++			break;
++		}
++
++		len -= le16_to_cpu(tlv->len);
++		tlv = (struct tlv *)((u8 *)(tlv) + le16_to_cpu(tlv->len));
++	}
++
++}
++
++static void
+ mt7996_mcu_bss_bcn_crit_finish(void *priv, u8 *mac, struct ieee80211_vif *vif)
+ {
+ 	struct mt7996_mcu_bss_event *data = priv;
+@@ -1653,6 +1722,9 @@
+ 		break;
+ 	case MCU_UNI_EVENT_MLD:
+ 		mt7996_mcu_mld_event(dev, skb);
++		break;
++	case MCU_UNI_EVENT_SDO:
++		mt7996_mcu_sdo_event(dev, skb);
+ 		break;
+ 	case MCU_UNI_EVENT_BSS_INFO:
+ 		mt7996_mcu_bss_event(dev, skb);
+@@ -2220,7 +2292,7 @@
+ 	mt7996_mcu_bss_ifs_timing_tlv(skb, phy);
+ 
+ 	return mt76_mcu_skb_send_msg(&dev->mt76, skb,
+-				     MCU_WMWA_UNI_CMD(BSS_INFO_UPDATE), true);
++				     MCU_WM_UNI_CMD(BSS_INFO_UPDATE), true);
+ }
+ 
+ static int
+@@ -4595,7 +4667,7 @@
+ 	dev_kfree_skb(skb);
+ 
+ 	return mt76_mcu_skb_send_msg(&dev->mt76, rskb,
+-				     MCU_WMWA_UNI_CMD(BSS_INFO_UPDATE), true);
++				     MCU_WM_UNI_CMD(BSS_INFO_UPDATE), true);
+ }
+ 
+ static int mt7996_driver_own(struct mt7996_dev *dev, u8 band)
+@@ -4922,7 +4994,7 @@
+ 		.ctrl = ctrl,
+ 	};
+ 
+-	if (type == MCU_FW_LOG_WA)
++	if (type == MCU_FW_LOG_WA && mt7996_has_wa(dev))
+ 		return mt76_mcu_send_msg(&dev->mt76, MCU_WA_UNI_CMD(WSYS_CONFIG),
+ 					 &data, sizeof(data), true);
+ 
+@@ -5707,6 +5779,13 @@
+ 		req.info.tag = cpu_to_le16(UNI_EXT_EEPROM_ACCESS);
+ 		req.eeprom.ext_eeprom.data_len = cpu_to_le32(buf_len);
+ 		break;
++	case MT7990_DEVICE_ID:
++		adie_base = adie_base_7990;
++		/* adie 0 */
++		adie_id = ADIE_7976;
++		adie_offs[0] = adie_offs_list[adie_id];
++		eep_offs[0] = eep_offs_list[adie_id];
++		break;
+ 	default:
+ 		return -EINVAL;
+ 	}
+@@ -6764,7 +6843,7 @@
+ 	/* starec hdr trans */
+ 	mt7996_mcu_sta_hdr_trans_tlv(dev, skb, vif, &msta_link->wcid);
+ 	return mt76_mcu_skb_send_msg(&dev->mt76, skb,
+-				     MCU_WMWA_UNI_CMD(STA_REC_UPDATE), true);
++				     MCU_WM_UNI_CMD(STA_REC_UPDATE), true);
+ }
+ 
+ int mt7996_mcu_ps_leave(struct mt7996_dev *dev, struct mt7996_vif_link *mconf,
+@@ -7035,6 +7114,33 @@
+ 				 &req, sizeof(req), false);
+ }
+ 
++int mt7996_mcu_get_bss_acq_pkt_cnt(struct mt7996_dev *dev)
++{
++	struct {
++		u8 _rsv[4];
++
++		__le16 tag;
++		__le16 len;
++
++		__le32 bitmap[UNI_CMD_SDO_CFG_BSS_MAP_WORDLEN];
++	} __packed req = {
++		.tag = cpu_to_le16(UNI_CMD_SDO_GET_BSS_ACQ_PKT_NUM),
++		.len = cpu_to_le16(sizeof(req) - 4),
++	};
++	int i = 0;
++
++	if (mt7996_has_wa(dev))
++		return mt7996_mcu_wa_cmd(dev, MCU_WA_PARAM_CMD(QUERY),
++			MCU_WA_PARAM_BSS_ACQ_PKT_CNT,
++			BSS_ACQ_PKT_CNT_BSS_BITMAP_ALL | BSS_ACQ_PKT_CNT_READ_CLR, 0);
++
++	for (i = 0; i < UNI_CMD_SDO_CFG_BSS_MAP_WORDLEN; i++)
++		req.bitmap[i] = cpu_to_le32(~0);
++
++	return mt76_mcu_send_msg(&dev->mt76, MCU_WA_UNI_CMD(SDO), &req,
++				 sizeof(req), false);
++}
++
+ int mt7996_mcu_wed_rro_reset_sessions(struct mt7996_dev *dev, u16 id)
+ {
+ 	struct {
+@@ -7649,7 +7755,20 @@
+ 		__le16 len;
+ 
+ 		__le32 pp_timer_intv;
+-		__le32 rsv2[14];
++		__le32 thr_x2_value;
++		__le32 thr_x2_shift;
++		__le32 thr_x3_value;
++		__le32 thr_x3_shift;
++		__le32 thr_x4_value;
++		__le32 thr_x4_shift;
++		__le32 thr_x5_value;
++		__le32 thr_x5_shift;
++		__le32 thr_x6_value;
++		__le32 thr_x6_shift;
++		__le32 thr_x7_value;
++		__le32 thr_x7_shift;
++		__le32 thr_x8_value;
++		__le32 thr_x8_shift;
+ 		u8 band_idx;
+ 		u8 pp_action;
+ 		u8 reset;
+@@ -7658,11 +7777,52 @@
+ 		.tag = cpu_to_le16(UNI_CMD_PP_ALG_CTRL),
+ 		.len = cpu_to_le16(sizeof(req) - 4),
+ 
+-		.pp_timer_intv = action == PP_ALG_SET_TIMER ? 2000 : 0,
++		.pp_timer_intv = 0,
++		.thr_x2_value = 0,
++		.thr_x2_shift = 0,
++		.thr_x3_value = 0,
++		.thr_x3_shift = 0,
++		.thr_x4_value = 0,
++		.thr_x4_shift = 0,
++		.thr_x5_value = 0,
++		.thr_x5_shift = 0,
++		.thr_x6_value = 0,
++		.thr_x6_shift = 0,
++		.thr_x7_value = 0,
++		.thr_x7_shift = 0,
++		.thr_x8_value = 0,
++		.thr_x8_shift = 0,
+ 		.band_idx = phy->mt76->band_idx,
+ 		.pp_action = action,
+ 		.reset = 0,
+ 	};
++
++	switch (action)
++	{
++	case PP_ALG_SET_TIMER:
++		req.pp_timer_intv = 5000;
++		break;
++	case PP_ALG_SET_THR:
++		req.thr_x2_value = 1;
++		req.thr_x2_shift = 0;
++		req.thr_x3_value = 5000000;
++		req.thr_x3_shift = 3;
++		req.thr_x4_value = 1;
++		req.thr_x4_shift = 1;
++		req.thr_x5_value = 1;
++		req.thr_x5_shift = 0;
++		req.thr_x6_value = 1;
++		req.thr_x6_shift = 3;
++		req.thr_x7_value = 1;
++		req.thr_x7_shift = 0;
++		req.thr_x8_value = 5000000;
++		req.thr_x8_shift = 2;
++		break;
++	case PP_ALG_GET_STATISTICS:
++		break;
++	default:
++		return 0;
++	}
+ 
+ 	return mt76_mcu_send_msg(&dev->mt76, MCU_WM_UNI_CMD(PP),
+ 				 &req, sizeof(req), false);
+@@ -8359,13 +8519,22 @@
+ 			   struct cfg80211_qos_map *usr_qos_map)
+ {
+ 	struct {
+-		u8 bss_idx;
+-		u8 qos_map_enable;
+-		u8 __rsv[2];
+-		s8 qos_map[IP_DSCP_NUM];
++		u8 _rsv[4];
++
++		__le16 tag;
++		__le16 len;
++
++		struct {
++			u8 bss_idx;
++			u8 qos_map_enable;
++			u8 __rsv[2];
++			s8 qos_map[IP_DSCP_NUM];
++		} data;
+ 	} __packed req = {
+-		.bss_idx = mconf->mt76.idx,
+-		.qos_map_enable = true,
++		.tag = cpu_to_le16(UNI_CMD_SDO_SET_QOS_MAP),
++		.len = cpu_to_le16(sizeof(req) - 4),
++		.data.bss_idx = mconf->mt76.idx,
++		.data.qos_map_enable = true,
+ 	};
+ 	s8 i;
+ 
+@@ -8373,17 +8542,18 @@
+ 	 * Three most significant bits of DSCP are used as UP.
+ 	 */
+ 	for (i = 0; i < IP_DSCP_NUM; ++i)
+-		req.qos_map[i] = i >> 3;
++		req.data.qos_map[i] = i >> 3;
+ 
+ 	/* Recommended QoS map, defined in section 4 of RFC8325.
+ 	 * Used in cfg80211_classify8021d since kernel v6.8.
+ 	 */
+-	req.qos_map[10] = req.qos_map[12] = req.qos_map[14] = req.qos_map[16] = 0;
+-	req.qos_map[18] = req.qos_map[20] = req.qos_map[22] = 3;
+-	req.qos_map[24] = 4;
+-	req.qos_map[40] = 5;
+-	req.qos_map[44] = req.qos_map[46] = 6;
+-	req.qos_map[48] = 7;
++	req.data.qos_map[10] = req.data.qos_map[12] =
++			       req.data.qos_map[14] = req.data.qos_map[16] = 0;
++	req.data.qos_map[18] = req.data.qos_map[20] = req.data.qos_map[22] = 3;
++	req.data.qos_map[24] = 4;
++	req.data.qos_map[40] = 5;
++	req.data.qos_map[44] = req.data.qos_map[46] = 6;
++	req.data.qos_map[48] = 7;
+ 
+ 	/* User-defined QoS map */
+ 	if (usr_qos_map) {
+@@ -8392,7 +8562,7 @@
+ 			u8 high = usr_qos_map->up[i].high;
+ 
+ 			if (low < IP_DSCP_NUM && high < IP_DSCP_NUM && low <= high)
+-				memset(req.qos_map + low, i, high - low + 1);
++				memset(req.data.qos_map + low, i, high - low + 1);
+ 		}
+ 
+ 		for (i = 0; i < usr_qos_map->num_des; ++i) {
+@@ -8400,13 +8570,17 @@
+ 			u8 up = usr_qos_map->dscp_exception[i].up;
+ 
+ 			if (dscp < IP_DSCP_NUM && up < IEEE80211_NUM_UPS)
+-				req.qos_map[dscp] = up;
++				req.data.qos_map[dscp] = up;
+ 		}
+ 	}
+ 
+-	memcpy(mconf->vif->qos_map, req.qos_map, IP_DSCP_NUM);
+-
+-	return mt76_mcu_send_msg(&dev->mt76, MCU_WA_EXT_CMD(SET_QOS_MAP), &req,
+-				 sizeof(req), false);
++	memcpy(mconf->vif->qos_map, req.data.qos_map, IP_DSCP_NUM);
++
++	if (!mt7996_has_wa(dev))
++		return mt76_mcu_send_msg(&dev->mt76, MCU_WA_UNI_CMD(SDO),
++					 &req, sizeof(req), false);
++
++	return mt76_mcu_send_msg(&dev->mt76, MCU_WA_EXT_CMD(SET_QOS_MAP), &req.data,
++				 sizeof(req.data), false);
+ }
+ #endif
+diff --git a/mt7996/mcu.h b/mt7996/mcu.h
+--- a/mt7996/mcu.h
++++ b/mt7996/mcu.h
+@@ -1311,6 +1311,30 @@
+ struct mt7996_mld_event_data {
+ 	u8 mld_addr[ETH_ALEN];
+ 	u8 *data;
++};
++
++struct mt7996_mcu_sdo_event {
++	struct mt7996_mcu_rxd rxd;
++
++	/* fixed field */
++	u8 rsv[4];
++	/* tlv */
++	u8 buf[];
++} __packed;
++
++#define UNI_CMD_SDO_CFG_BSS_NUM 96
++#define UNI_CMD_SDO_CFG_BSS_MAP_WORDLEN ((UNI_CMD_SDO_CFG_BSS_NUM) / 32)
++
++struct mt7996_mld_sdo_bss_acq_pkt_cnt {
++	__le16 tag;
++	__le16 len;
++
++	__le32 bitmap[UNI_CMD_SDO_CFG_BSS_MAP_WORDLEN];
++	__le32 pkt_cnt[UNI_CMD_SDO_CFG_BSS_NUM][IEEE80211_NUM_ACS];
++};
++
++enum {
++	UNI_EVENT_SDO_BSS_ACQ_PKT_CNT,
+ };
+ 
+ struct mt7996_mcu_mld_attlm_resp_event {
+@@ -1589,7 +1613,14 @@
+ enum {
+ 	UNI_CMD_SDO_SET = 1,
+ 	UNI_CMD_SDO_QUERY,
+-	UNI_CMD_SDO_CP_MODE = 6,
++	UNI_CMD_SDO_AUTO_BA,
++	UNI_CMD_SDO_SET_QOS_MAP,
++	UNI_CMD_SDO_HOTSPOT,
++	UNI_CMD_SDO_CP_MODE,
++	UNI_CMD_SDO_RED_SETTING,
++	UNI_CMD_SDO_PKT_BUDGET_CTRL_CFG,
++	UNI_CMD_SDO_GET_BSS_ACQ_PKT_NUM,
++	UNI_CMD_SDO_OVERRIDE_CTRL
+ };
+ 
+ enum {
+@@ -1613,7 +1644,8 @@
+ 
+ enum pp_alg_action {
+ 	PP_ALG_SET_TIMER,
+-	PP_ALG_GET_STATISTICS = 2,
++	PP_ALG_SET_THR,
++	PP_ALG_GET_STATISTICS,
+ };
+ 
+ enum {
+diff --git a/mt7996/mmio.c b/mt7996/mmio.c
+--- a/mt7996/mmio.c
++++ b/mt7996/mmio.c
+@@ -54,6 +54,14 @@
+ 	[MIB_BSCR7]		= 0x9e8,
+ 	[MIB_BSCR17]		= 0xa10,
+ 	[MIB_TRDR1]		= 0xa28,
++	[MIB_TSCR0]		= 0x6b0,
++	[MIB_TSCR1]		= 0x6b4,
++	[MIB_TSCR2]		= 0x6b8,
++	[MIB_TSCR3]		= 0x6bc,
++	[MIB_TSCR4]		= 0x6c0,
++	[MIB_TSCR5]		= 0x6c4,
++	[MIB_TSCR6]		= 0x6c8,
++	[MIB_TSCR7]		= 0x6d0,
+ 	[HIF_REMAP_L1]		= 0x24,
+ 	[HIF_REMAP_BASE_L1]	= 0x130000,
+ 	[HIF_REMAP_L2]		= 0x1b4,
+@@ -91,6 +99,14 @@
+ 	[MIB_BSCR7]		= 0xae4,
+ 	[MIB_BSCR17]		= 0xb0c,
+ 	[MIB_TRDR1]		= 0xb24,
++	[MIB_TSCR0]		= 0x6b0,
++	[MIB_TSCR1]		= 0x6b4,
++	[MIB_TSCR2]		= 0x6b8,
++	[MIB_TSCR3]		= 0x6bc,
++	[MIB_TSCR4]		= 0x6c0,
++	[MIB_TSCR5]		= 0x6c4,
++	[MIB_TSCR6]		= 0x6c8,
++	[MIB_TSCR7]		= 0x6d0,
+ 	[HIF_REMAP_L1]		= 0x8,
+ 	[HIF_REMAP_BASE_L1]	= 0x40000,
+ 	[HIF_REMAP_L2]		= 0x1b4,
+@@ -128,6 +144,14 @@
+ 	[MIB_BSCR7]		= 0xbd4,
+ 	[MIB_BSCR17]		= 0xbfc,
+ 	[MIB_TRDR1]		= 0xc14,
++	[MIB_TSCR0]		= 0x750,
++	[MIB_TSCR1]		= 0x754,
++	[MIB_TSCR2]		= 0x758,
++	[MIB_TSCR3]		= 0x75c,
++	[MIB_TSCR4]		= 0x760,
++	[MIB_TSCR5]		= 0x764,
++	[MIB_TSCR6]		= 0x768,
++	[MIB_TSCR7]		= 0x770,
+ 	[HIF_REMAP_L1]		= 0x8,
+ 	[HIF_REMAP_BASE_L1]	= 0x40000,
+ 	[HIF_REMAP_L2]		= 0x1b8,
+diff --git a/mt7996/mt7996.h b/mt7996/mt7996.h
+--- a/mt7996/mt7996.h
++++ b/mt7996/mt7996.h
+@@ -73,6 +73,7 @@
+ #define MT7990_FIRMWARE_WA		""
+ #define MT7990_FIRMWARE_WM		"mediatek/mt7996/mt7990_wm.bin"
+ #define MT7990_FIRMWARE_DSP		""
++#define MT7990_FIRMWARE_WM_TM		"mediatek/mt7996/mt7990_wm_tm.bin"
+ #define MT7990_ROM_PATCH		"mediatek/mt7996/mt7990_rom_patch.bin"
+ 
+ #define MT7996_EEPROM_DEFAULT		"mediatek/mt7996/mt7996_eeprom.bin"
+@@ -213,6 +214,7 @@
+ enum mt7996_ddie_type {
+ 	DDIE_7996,
+ 	DDIE_7992,
++	DDIE_7990,
+ 	DDIE_TYPE_NUM,
+ };
+ 
+@@ -272,6 +274,18 @@
+ 	MT7996_RXQ_RRO_RXDMAD_C = 0,
+ 	MT7990_RXQ_TXFREE0 = 6,
+ 	MT7990_RXQ_TXFREE1 = 7,
++};
++
++enum {
++	MT7996_TXFREE_FROM_MAC,
++	MT7996_TXFREE_FROM_WA,
++};
++
++enum {
++	MT7996_RRO_BMC_NOT_BYPASS_UC_BASED_ON_WTBL,
++	MT7996_RRO_ALL_NOT_BYPASS,
++	MT7996_RRO_BMC_BYPASS_UC_BASED_ON_WTBL,
++	MT7996_RRO_ALL_BYPASS,
+ };
+ 
+ struct mt7996_twt_flow {
+@@ -759,6 +773,9 @@
+ 
+ 	struct dentry *debugfs_dir;
+ 	struct rchan *relay_fwlog;
++
++	bool fips_cap:1;
++	bool pwr_boost_cap:1;
+ 
+ 	struct {
+ 		u16 table_mask;
+diff --git a/mt7996/mtk_debug.h b/mt7996/mtk_debug.h
+--- a/mt7996/mtk_debug.h
++++ b/mt7996/mtk_debug.h
+@@ -46,6 +46,11 @@
+ 	MIB_MSR2,
+ 	MIB_MCTR5,
+ 	MIB_MCTR6,
++	MIB_TSCR8,
++	MIB_TBCR0,
++	MIB_TBCR1,
++	MIB_TBCR2,
++	MIB_TBCR3,
+ 	__MT_DBG_OFFS_REV_MAX,
+ };
+ 
+@@ -83,6 +88,11 @@
+ 	[MIB_MSR2]		= 0xa6c,
+ 	[MIB_MCTR5]		= 0xa70,
+ 	[MIB_MCTR6]		= 0xa74,
++	[MIB_TSCR8]		= 0x6cc,
++	[MIB_TBCR0]		= 0x6ec,
++	[MIB_TBCR1]		= 0x6f0,
++	[MIB_TBCR2]		= 0x6f4,
++	[MIB_TBCR3]		= 0x6f8,
+ };
+ 
+ static const u32 mt7992_dbg_offs[] = {
+@@ -119,6 +129,52 @@
+ 	[MIB_MSR2]		= 0xb68,
+ 	[MIB_MCTR5]		= 0xb6c,
+ 	[MIB_MCTR6]		= 0xb70,
++	[MIB_TSCR8]		= 0x6cc,
++	[MIB_TBCR0]		= 0x6ec,
++	[MIB_TBCR1]		= 0x6f0,
++	[MIB_TBCR2]		= 0x6f4,
++	[MIB_TBCR3]		= 0x6f8,
++};
++
++static const u32 mt7990_dbg_offs[] = {
++	[AGG_AALCR2]		= 0x12c,
++	[AGG_AALCR3]		= 0x130,
++	[AGG_AALCR4]		= 0x134,
++	[AGG_AALCR5]		= 0x138,
++	[AGG_AALCR6]		= 0x13c,
++	[AGG_AALCR7]		= 0x140,
++	[MIB_TDRCR0]		= 0x808,
++	[MIB_TDRCR1]		= 0x80c,
++	[MIB_TDRCR2]		= 0x810,
++	[MIB_TDRCR3]		= 0x814,
++	[MIB_TDRCR4]		= 0x818,
++	[MIB_RSCR26]		= 0xa34,
++	[MIB_TSCR18]		= 0xc08,
++	[MIB_TRDR0]		= 0xc10,
++	[MIB_TRDR2]		= 0xc18,
++	[MIB_TRDR3]		= 0xc1c,
++	[MIB_TRDR4]		= 0xc20,
++	[MIB_TRDR5]		= 0xc24,
++	[MIB_TRDR6]		= 0xc28,
++	[MIB_TRDR7]		= 0xc2c,
++	[MIB_TRDR8]		= 0xc30,
++	[MIB_TRDR9]		= 0xc34,
++	[MIB_TRDR10]		= 0xc38,
++	[MIB_TRDR11]		= 0xc3c,
++	[MIB_TRDR12]		= 0xc40,
++	[MIB_TRDR13]		= 0xc44,
++	[MIB_TRDR14]		= 0xc48,
++	[MIB_TRDR15]		= 0xc4c,
++	[MIB_MSR0]		= 0xc50,
++	[MIB_MSR1]		= 0xc54,
++	[MIB_MSR2]		= 0xc58,
++	[MIB_MCTR5]		= 0xc5c,
++	[MIB_MCTR6]		= 0xc60,
++	[MIB_TSCR8]		= 0x76c,
++	[MIB_TBCR0]		= 0x78c,
++	[MIB_TBCR1]		= 0x790,
++	[MIB_TBCR2]		= 0x794,
++	[MIB_TBCR3]		= 0x798,
+ };
+ 
+ /* used to differentiate between generations */
+@@ -733,19 +789,13 @@
+ #define BN0_WF_MIB_TOP_BTCR_ADDR                               (BN0_WF_MIB_TOP_BASE + 0x5A0) // D5A0
+ #define BN0_WF_MIB_TOP_RVSR0_ADDR                              (BN0_WF_MIB_TOP_BASE + __OFFS(MIB_RVSR0))
+ 
+-#define BN0_WF_MIB_TOP_TSCR0_ADDR                              (BN0_WF_MIB_TOP_BASE + 0x6B0) // D6B0
+-#define BN0_WF_MIB_TOP_TSCR3_ADDR                              (BN0_WF_MIB_TOP_BASE + 0x6BC) // D6BC
+-#define BN0_WF_MIB_TOP_TSCR4_ADDR                              (BN0_WF_MIB_TOP_BASE + 0x6C0) // D6C0
+-#define BN0_WF_MIB_TOP_TSCR5_ADDR                              (BN0_WF_MIB_TOP_BASE + 0x6C4) // D6C4
+-#define BN0_WF_MIB_TOP_TSCR6_ADDR                              (BN0_WF_MIB_TOP_BASE + 0x6C8) // D6C8
+-#define BN0_WF_MIB_TOP_TSCR7_ADDR                              (BN0_WF_MIB_TOP_BASE + 0x6D0) // D6D0
+-#define BN0_WF_MIB_TOP_TSCR8_ADDR                              (BN0_WF_MIB_TOP_BASE + 0x6CC) // D6CC
+-
+-#define BN0_WF_MIB_TOP_TBCR0_ADDR                              (BN0_WF_MIB_TOP_BASE + 0x6EC) // D6EC
+-#define BN0_WF_MIB_TOP_TBCR1_ADDR                              (BN0_WF_MIB_TOP_BASE + 0x6F0) // D6F0
+-#define BN0_WF_MIB_TOP_TBCR2_ADDR                              (BN0_WF_MIB_TOP_BASE + 0x6F4) // D6F4
+-#define BN0_WF_MIB_TOP_TBCR3_ADDR                              (BN0_WF_MIB_TOP_BASE + 0x6F8) // D6F8
+-#define BN0_WF_MIB_TOP_TBCR4_ADDR                              (BN0_WF_MIB_TOP_BASE + 0x6FC) // D6FC
++#define BN0_WF_MIB_TOP_TSCR8_ADDR                              (BN0_WF_MIB_TOP_BASE + __DBG_OFFS(MIB_TSCR8))
++
++#define BN0_WF_MIB_TOP_TBCR0_ADDR                              (BN0_WF_MIB_TOP_BASE + __DBG_OFFS(MIB_TBCR0))
++#define BN0_WF_MIB_TOP_TBCR1_ADDR                              (BN0_WF_MIB_TOP_BASE + __DBG_OFFS(MIB_TBCR1))
++#define BN0_WF_MIB_TOP_TBCR2_ADDR                              (BN0_WF_MIB_TOP_BASE + __DBG_OFFS(MIB_TBCR2))
++#define BN0_WF_MIB_TOP_TBCR3_ADDR                              (BN0_WF_MIB_TOP_BASE + __DBG_OFFS(MIB_TBCR3))
++#define BN0_WF_MIB_TOP_TBCR4_ADDR                              (BN0_WF_MIB_TOP_BASE + 0x6FC) // D6FC, only for 7996
+ 
+ #define BN0_WF_MIB_TOP_TDRCR0_ADDR                             (BN0_WF_MIB_TOP_BASE + __DBG_OFFS(MIB_TDRCR0))
+ #define BN0_WF_MIB_TOP_TDRCR1_ADDR                             (BN0_WF_MIB_TOP_BASE + __DBG_OFFS(MIB_TDRCR1))
+@@ -960,14 +1010,13 @@
+ 
+ #define MT_DBG_WTBL_BASE		0x820D8000
+ 
+-#define MT_DBG_WTBLON_TOP_BASE		0x820d4000
+-#define MT_DBG_WTBLON_TOP_WDUCR_ADDR	(MT_DBG_WTBLON_TOP_BASE + 0x0370) // 4370
+-#define MT_DBG_WTBLON_TOP_WDUCR_GROUP	GENMASK(4, 0)
+-
+ #define MT_DBG_UWTBL_TOP_BASE		0x820c4000
+ #define MT_DBG_UWTBL_TOP_WDUCR_ADDR	(MT_DBG_UWTBL_TOP_BASE + 0x0104) // 4104
+ #define MT_DBG_UWTBL_TOP_WDUCR_GROUP	GENMASK(5, 0)
+ #define MT_DBG_UWTBL_TOP_WDUCR_TARGET	BIT(31)
++/* for 7990 */
++#define MT_DBG_UWTBL_TOP_KDUCR_ADDR	(MT_DBG_UWTBL_TOP_BASE + 0x010c) // 410c
++#define MT_DBG_UWTBL_TOP_KDUCR_GROUP	GENMASK(6, 0)
+ 
+ #define LWTBL_IDX2BASE_ID		GENMASK(14, 8)
+ #define LWTBL_IDX2BASE_DW		GENMASK(7, 2)
+@@ -985,6 +1034,10 @@
+ #define KEYTBL_IDX2BASE_DW		GENMASK(5, 2)
+ #define KEYTBL_IDX2BASE(_key, _dw)	(MT_DBG_UWTBL_TOP_BASE | 0x2000 | \
+ 					FIELD_PREP(KEYTBL_IDX2BASE_KEY, _key) | \
++					FIELD_PREP(KEYTBL_IDX2BASE_DW, _dw))
++#define KEYTBL_IDX2BASE_KEY_7990	GENMASK(11, 6)
++#define KEYTBL_IDX2BASE_7990(_key, _dw)	(MT_DBG_UWTBL_TOP_BASE | 0x1000 | \
++					FIELD_PREP(KEYTBL_IDX2BASE_KEY_7990, _key) | \
+ 					FIELD_PREP(KEYTBL_IDX2BASE_DW, _dw))
+ 
+ // UMAC WTBL
+@@ -1089,6 +1142,10 @@
+ #define WF_UWTBL_SEC_ADDR_MODE_ADDR                                 32
+ #define WF_UWTBL_SEC_ADDR_MODE_MASK                                 0x00300000 // 21-20
+ #define WF_UWTBL_SEC_ADDR_MODE_SHIFT                                20
++#define WF_UWTBL_AAD_OM_DW                                          8
++#define WF_UWTBL_AAD_OM_ADDR                                        32
++#define WF_UWTBL_AAD_OM_MASK                                        0x01000000 // 24-24
++#define WF_UWTBL_AAD_OM_SHIFT                                       24
+ #define WF_UWTBL_WMM_Q_DW                                           8
+ #define WF_UWTBL_WMM_Q_ADDR                                         32
+ #define WF_UWTBL_WMM_Q_MASK                                         0x06000000 // 26-25
+@@ -2154,6 +2211,20 @@
+ 	0x00fc0000 // 23-18
+ #define WF_LWTBL_SNR_RX3_SHIFT                                      18
+ 
++/* for 7992 & 7990 */
++#define WF_LWTBL_SNR_RX0_MASK_7992  \
++	0x000000ff //  7- 0
++#define WF_LWTBL_SNR_RX0_SHIFT_7992                                 0
++#define WF_LWTBL_SNR_RX1_MASK_7992 \
++	0x0000ff00 // 15- 8
++#define WF_LWTBL_SNR_RX1_SHIFT_7992                                 8
++#define WF_LWTBL_SNR_RX2_MASK_7992 \
++	0x00ff0000 // 23-16
++#define WF_LWTBL_SNR_RX2_SHIFT_7992                                 16
++#define WF_LWTBL_SNR_RX3_MASK_7992 \
++	0xff000000 // 31-24
++#define WF_LWTBL_SNR_RX3_SHIFT_7992                                 24
++
+ /* WTBL Group - Packet Number */
+ /* DW 2 */
+ #define WTBL_PN0_MASK                   BITS(0, 7)
+@@ -2324,6 +2395,10 @@
+ /* PSE PLE QUEUE */
+ #define CR_NUM_OF_AC_MT7996	34
+ #define CR_NUM_OF_AC_MT7992	17
++
++#define CR_NUM_OF_TWT_MT7996	34
++#define CR_NUM_OF_TWT_MT7992	17
++#define CR_NUM_OF_TWT_MT7990	18
+ struct bmac_queue_info {
+ 	char *QueueName;
+ 	u32 Portid;
+@@ -2672,6 +2747,15 @@
+ #define WF_PSE_TOP_QUEUE_EMPTY_CPU_Q0_EMPTY_MASK               0x00000001                // CPU_Q0_EMPTY[0]
+ #define WF_PSE_TOP_QUEUE_EMPTY_CPU_Q0_EMPTY_SHFT               0
+ 
++#define WF_PSE_TOP_QUEUE_EMPTY_1_HIF_16_EMPTY_ADDR             WF_PSE_TOP_QUEUE_EMPTY_1_ADDR
++#define WF_PSE_TOP_QUEUE_EMPTY_1_HIF_16_EMPTY_MASK             0x00001000
++#define WF_PSE_TOP_QUEUE_EMPTY_1_HIF_16_EMPTY_SHFT             12
++#define WF_PSE_TOP_QUEUE_EMPTY_1_HIF_15_EMPTY_ADDR             WF_PSE_TOP_QUEUE_EMPTY_1_ADDR
++#define WF_PSE_TOP_QUEUE_EMPTY_1_HIF_15_EMPTY_MASK             0x80000000                // HIF_15_EMPTY[31]
++#define WF_PSE_TOP_QUEUE_EMPTY_1_HIF_15_EMPTY_SHFT             31
++#define WF_PSE_TOP_QUEUE_EMPTY_1_HIF_14_EMPTY_ADDR             WF_PSE_TOP_QUEUE_EMPTY_1_ADDR
++#define WF_PSE_TOP_QUEUE_EMPTY_1_HIF_14_EMPTY_MASK             0x40000000                // HIF_14_EMPTY[30]
++#define WF_PSE_TOP_QUEUE_EMPTY_1_HIF_14_EMPTY_SHFT             30
+ #define WF_PSE_TOP_QUEUE_EMPTY_1_HIF_13_EMPTY_ADDR             WF_PSE_TOP_QUEUE_EMPTY_1_ADDR
+ #define WF_PSE_TOP_QUEUE_EMPTY_1_HIF_13_EMPTY_MASK             0x20000000                // HIF_13_EMPTY[29]
+ #define WF_PSE_TOP_QUEUE_EMPTY_1_HIF_13_EMPTY_SHFT             29
+diff --git a/mt7996/mtk_debugfs.c b/mt7996/mtk_debugfs.c
+--- a/mt7996/mtk_debugfs.c
++++ b/mt7996/mtk_debugfs.c
+@@ -532,26 +532,48 @@
+ 		WF_WFDMA_HOST_DMA0_WPDMA_TX_RING16_CTRL0_ADDR);
+ 	dump_dma_tx_ring_info(s, dev, "T17:Cmd(H2WM)", "Both",
+ 		WF_WFDMA_HOST_DMA0_WPDMA_TX_RING17_CTRL0_ADDR);
+-	dump_dma_tx_ring_info(s, dev, "T18:TXD0(H2WA)", "AP",
+-		WF_WFDMA_HOST_DMA0_WPDMA_TX_RING18_CTRL0_ADDR);
+-	dump_dma_tx_ring_info(s, dev, "T19:TXD1(H2WA)", "AP",
+-		WF_WFDMA_HOST_DMA0_WPDMA_TX_RING19_CTRL0_ADDR);
+-	dump_dma_tx_ring_info(s, dev, "T20:Cmd(H2WA)", "AP",
+-		WF_WFDMA_HOST_DMA0_WPDMA_TX_RING20_CTRL0_ADDR);
+-	dump_dma_tx_ring_info(s, dev, "T21:TXD2(H2WA)", "AP",
+-		WF_WFDMA_HOST_DMA0_WPDMA_TX_RING21_CTRL0_ADDR);
+-	dump_dma_tx_ring_info(s, dev, "T22:TXD3(H2WA)", "AP",
+-		WF_WFDMA_HOST_DMA0_WPDMA_TX_RING22_CTRL0_ADDR);
++	if (mt7996_has_wa(dev)) {
++		dump_dma_tx_ring_info(s, dev, "T18:TXD0(H2WA)", "AP",
++			WF_WFDMA_HOST_DMA0_WPDMA_TX_RING18_CTRL0_ADDR);
++		dump_dma_tx_ring_info(s, dev, "T19:TXD1(H2WA)", "AP",
++			WF_WFDMA_HOST_DMA0_WPDMA_TX_RING19_CTRL0_ADDR);
++		dump_dma_tx_ring_info(s, dev, "T20:Cmd(H2WA)", "AP",
++			WF_WFDMA_HOST_DMA0_WPDMA_TX_RING20_CTRL0_ADDR);
++		dump_dma_tx_ring_info(s, dev, "T21:TXD2(H2WA)", "AP",
++			WF_WFDMA_HOST_DMA0_WPDMA_TX_RING21_CTRL0_ADDR);
++		dump_dma_tx_ring_info(s, dev, "T22:TXD3(H2WA)", "AP",
++			WF_WFDMA_HOST_DMA0_WPDMA_TX_RING22_CTRL0_ADDR);
++	} else {
++		dump_dma_tx_ring_info(s, dev, "T18:TXD0(H2SDO)", "AP",
++			WF_WFDMA_HOST_DMA0_WPDMA_TX_RING18_CTRL0_ADDR);
++		dump_dma_tx_ring_info(s, dev, "T19:TXD1(H2SDO)", "AP",
++			WF_WFDMA_HOST_DMA0_WPDMA_TX_RING19_CTRL0_ADDR);
++		dump_dma_tx_ring_info(s, dev, "T20:Reserved", "AP",
++			WF_WFDMA_HOST_DMA0_WPDMA_TX_RING20_CTRL0_ADDR);
++		dump_dma_tx_ring_info(s, dev, "T21:TXD2(H2SDO)", "AP",
++			WF_WFDMA_HOST_DMA0_WPDMA_TX_RING21_CTRL0_ADDR);
++		dump_dma_tx_ring_info(s, dev, "T22:TXD3(H2SDO)", "AP",
++			WF_WFDMA_HOST_DMA0_WPDMA_TX_RING22_CTRL0_ADDR);
++	}
+ 
+ 
+ 	dump_dma_rx_ring_info(s, dev, "R0:Event(WM2H)", "Both",
+ 		WF_WFDMA_HOST_DMA0_WPDMA_RX_RING0_CTRL0_ADDR);
+-	dump_dma_rx_ring_info(s, dev, "R1:Event(WA2H)", "AP",
+-		WF_WFDMA_HOST_DMA0_WPDMA_RX_RING1_CTRL0_ADDR);
+-	dump_dma_rx_ring_info(s, dev, "R2:TxDone0(WA2H)", "AP",
+-		WF_WFDMA_HOST_DMA0_WPDMA_RX_RING2_CTRL0_ADDR);
+-	dump_dma_rx_ring_info(s, dev, "R3:TxDone1(WA2H)", "AP",
+-		WF_WFDMA_HOST_DMA0_WPDMA_RX_RING3_CTRL0_ADDR);
++	if (mt7996_has_wa(dev)) {
++		dump_dma_rx_ring_info(s, dev, "R1:Event(WA2H)", "AP",
++			WF_WFDMA_HOST_DMA0_WPDMA_RX_RING1_CTRL0_ADDR);
++		dump_dma_rx_ring_info(s, dev, "R2:TxDone0(WA2H)", "AP",
++			WF_WFDMA_HOST_DMA0_WPDMA_RX_RING2_CTRL0_ADDR);
++		dump_dma_rx_ring_info(s, dev, "R3:TxDone1(WA2H)", "AP",
++			WF_WFDMA_HOST_DMA0_WPDMA_RX_RING3_CTRL0_ADDR);
++	} else {
++		dump_dma_rx_ring_info(s, dev, "R1:Event(SDO2H)", "AP",
++			WF_WFDMA_HOST_DMA0_WPDMA_RX_RING1_CTRL0_ADDR);
++		dump_dma_rx_ring_info(s, dev, "R2:Reserved", "AP",
++			WF_WFDMA_HOST_DMA0_WPDMA_RX_RING2_CTRL0_ADDR);
++		dump_dma_rx_ring_info(s, dev, "R3:Reserved", "AP",
++			WF_WFDMA_HOST_DMA0_WPDMA_RX_RING3_CTRL0_ADDR);
++	}
+ 	dump_dma_rx_ring_info(s, dev, "R4:Data0(MAC2H)", "Both",
+ 		WF_WFDMA_HOST_DMA0_WPDMA_RX_RING4_CTRL0_ADDR);
+ 	dump_dma_rx_ring_info(s, dev, "R5:Data1(MAC2H)", "Both",
+@@ -562,8 +584,12 @@
+ 	else
+ 		dump_dma_rx_ring_info(s, dev, "R6:TxDone0(MAC2H)", "Both",
+ 			WF_WFDMA_HOST_DMA0_WPDMA_RX_RING6_CTRL0_ADDR);
+-	dump_dma_rx_ring_info(s, dev, "R7:TxDone1(MAC2H)", "Both",
+-		WF_WFDMA_HOST_DMA0_WPDMA_RX_RING7_CTRL0_ADDR);
++	if (is_mt7990(&dev->mt76))
++		dump_dma_rx_ring_info(s, dev, "R7:Reserved)", "Both",
++			WF_WFDMA_HOST_DMA0_WPDMA_RX_RING7_CTRL0_ADDR);
++	else
++		dump_dma_rx_ring_info(s, dev, "R7:TxDone1(MAC2H)", "Both",
++			WF_WFDMA_HOST_DMA0_WPDMA_RX_RING7_CTRL0_ADDR);
+ 	dump_dma_rx_ring_info(s, dev, "R8:BUF0(MAC2H)", "Both",
+ 		WF_WFDMA_HOST_DMA0_WPDMA_RX_RING8_CTRL0_ADDR);
+ 	if (is_mt7996(&dev->mt76))
+@@ -585,12 +611,21 @@
+ 		seq_printf(s, "HOST_DMA0 PCIe1 Ring Configuration\n");
+ 		seq_printf(s, "%20s %6s %10s %15s %10s %10s %10s\n",
+ 			"Name", "Used", "Base", "Ctrl1(Cnt)", "CIDX", "DIDX", "QCnt");
+-		dump_dma_tx_ring_info(s, dev, "T21:TXD2(H2WA)", "AP",
+-			WF_WFDMA_HOST_DMA0_PCIE1_WPDMA_TX_RING21_CTRL0_ADDR);
+-		dump_dma_tx_ring_info(s, dev, "T22:TXD?(H2WA)", "AP",
+-			WF_WFDMA_HOST_DMA0_PCIE1_WPDMA_TX_RING22_CTRL0_ADDR);
+-		dump_dma_rx_ring_info(s, dev, "R3:TxDone1(WA2H)", "AP",
+-			WF_WFDMA_HOST_DMA0_PCIE1_WPDMA_RX_RING3_CTRL0_ADDR);
++		if (mt7996_has_wa(dev)) {
++			dump_dma_tx_ring_info(s, dev, "T21:TXD2(H2WA)", "AP",
++				WF_WFDMA_HOST_DMA0_PCIE1_WPDMA_TX_RING21_CTRL0_ADDR);
++			dump_dma_tx_ring_info(s, dev, "T22:TXD?(H2WA)", "AP",
++				WF_WFDMA_HOST_DMA0_PCIE1_WPDMA_TX_RING22_CTRL0_ADDR);
++			dump_dma_rx_ring_info(s, dev, "R3:TxDone1(WA2H)", "AP",
++				WF_WFDMA_HOST_DMA0_PCIE1_WPDMA_RX_RING3_CTRL0_ADDR);
++		} else {
++			dump_dma_tx_ring_info(s, dev, "T21:TXD2(H2SDO)", "AP",
++				WF_WFDMA_HOST_DMA0_PCIE1_WPDMA_TX_RING21_CTRL0_ADDR);
++			dump_dma_tx_ring_info(s, dev, "T22:TXD?(H2SDO)", "AP",
++				WF_WFDMA_HOST_DMA0_PCIE1_WPDMA_TX_RING22_CTRL0_ADDR);
++			dump_dma_rx_ring_info(s, dev, "R3:Reserved", "AP",
++				WF_WFDMA_HOST_DMA0_PCIE1_WPDMA_RX_RING3_CTRL0_ADDR);
++		}
+ 		dump_dma_rx_ring_info(s, dev, "R5:Data1(MAC2H)", "Both",
+ 			WF_WFDMA_HOST_DMA0_PCIE1_WPDMA_RX_RING5_CTRL0_ADDR);
+ 		if (is_mt7996(&dev->mt76))
+@@ -598,7 +633,7 @@
+ 				WF_WFDMA_HOST_DMA0_PCIE1_WPDMA_RX_RING6_CTRL0_ADDR);
+ 		dump_dma_rx_ring_info(s, dev, "R7:TxDone1(MAC2H)", "Both",
+ 			WF_WFDMA_HOST_DMA0_PCIE1_WPDMA_RX_RING7_CTRL0_ADDR);
+-		if (is_mt7992(&dev->mt76))
++		if (is_mt7992(&dev->mt76) || is_mt7990(&dev->mt76))
+ 			dump_dma_rx_ring_info(s, dev, "R9:BUF1(MAC2H)", "Both",
+ 				WF_WFDMA_HOST_DMA0_PCIE1_WPDMA_RX_RING9_CTRL0_ADDR);
+ 	}
+@@ -627,36 +662,62 @@
+ 		"Name", "Used", "Base", "Cnt", "CIDX", "DIDX", "QCnt");
+ 	dump_dma_tx_ring_info(s, dev, "T0:Event(WM2H)", "Both",
+ 		WF_WFDMA_MCU_DMA0_WPDMA_TX_RING0_CTRL0_ADDR);
+-	dump_dma_tx_ring_info(s, dev, "T1:Event(WA2H)", "AP",
+-		WF_WFDMA_MCU_DMA0_WPDMA_TX_RING1_CTRL0_ADDR);
+-	dump_dma_tx_ring_info(s, dev, "T2:TxDone0(WA2H)", "AP",
+-		WF_WFDMA_MCU_DMA0_WPDMA_TX_RING2_CTRL0_ADDR);
+-	dump_dma_tx_ring_info(s, dev, "T3:TxDone1(WA2H)", "AP",
+-		WF_WFDMA_MCU_DMA0_WPDMA_TX_RING3_CTRL0_ADDR);
++	if (mt7996_has_wa(dev)) {
++		dump_dma_tx_ring_info(s, dev, "T1:Event(WA2H)", "AP",
++			WF_WFDMA_MCU_DMA0_WPDMA_TX_RING1_CTRL0_ADDR);
++		dump_dma_tx_ring_info(s, dev, "T2:TxDone0(WA2H)", "AP",
++			WF_WFDMA_MCU_DMA0_WPDMA_TX_RING2_CTRL0_ADDR);
++		dump_dma_tx_ring_info(s, dev, "T3:TxDone1(WA2H)", "AP",
++			WF_WFDMA_MCU_DMA0_WPDMA_TX_RING3_CTRL0_ADDR);
++	} else {
++		dump_dma_tx_ring_info(s, dev, "T1:Event(SDO2H)", "AP",
++			WF_WFDMA_MCU_DMA0_WPDMA_TX_RING1_CTRL0_ADDR);
++		dump_dma_tx_ring_info(s, dev, "T2:Reserved", "AP",
++			WF_WFDMA_MCU_DMA0_WPDMA_TX_RING2_CTRL0_ADDR);
++		dump_dma_tx_ring_info(s, dev, "T3:Reserved", "AP",
++			WF_WFDMA_MCU_DMA0_WPDMA_TX_RING3_CTRL0_ADDR);
++	}
+ 	dump_dma_tx_ring_info(s, dev, "T4:TXD(WM2MAC)", "Both",
+ 		WF_WFDMA_MCU_DMA0_WPDMA_TX_RING4_CTRL0_ADDR);
+ 	dump_dma_tx_ring_info(s, dev, "T5:TXCMD(WM2MAC)", "Both",
+ 		WF_WFDMA_MCU_DMA0_WPDMA_TX_RING5_CTRL0_ADDR);
+-	dump_dma_tx_ring_info(s, dev, "T6:TXD(WA2MAC)", "AP",
+-		WF_WFDMA_MCU_DMA0_WPDMA_TX_RING6_CTRL0_ADDR);
++	if (mt7996_has_wa(dev))
++		dump_dma_tx_ring_info(s, dev, "T6:TXD(WA2MAC)", "AP",
++			WF_WFDMA_MCU_DMA0_WPDMA_TX_RING6_CTRL0_ADDR);
++	else
++		dump_dma_tx_ring_info(s, dev, "T6:TXD(SDO2MAC)", "AP",
++			WF_WFDMA_MCU_DMA0_WPDMA_TX_RING6_CTRL0_ADDR);
+ 	dump_dma_rx_ring_info(s, dev, "R0:FWDL", "Both",
+ 		WF_WFDMA_MCU_DMA0_WPDMA_RX_RING0_CTRL0_ADDR);
+ 	dump_dma_rx_ring_info(s, dev, "R1:Cmd(H2WM)", "Both",
+ 		WF_WFDMA_MCU_DMA0_WPDMA_RX_RING1_CTRL0_ADDR);
+-	dump_dma_rx_ring_info(s, dev, "R2:TXD0(H2WA)", "AP",
+-		WF_WFDMA_MCU_DMA0_WPDMA_RX_RING2_CTRL0_ADDR);
+-	dump_dma_rx_ring_info(s, dev, "R3:TXD1(H2WA)", "AP",
+-		WF_WFDMA_MCU_DMA0_WPDMA_RX_RING3_CTRL0_ADDR);
+-	dump_dma_rx_ring_info(s, dev, "R4:Cmd(H2WA)", "AP",
+-		WF_WFDMA_MCU_DMA0_WPDMA_RX_RING4_CTRL0_ADDR);
++	if (mt7996_has_wa(dev)) {
++		dump_dma_rx_ring_info(s, dev, "R2:TXD0(H2WA)", "AP",
++			WF_WFDMA_MCU_DMA0_WPDMA_RX_RING2_CTRL0_ADDR);
++		dump_dma_rx_ring_info(s, dev, "R3:TXD1(H2WA)", "AP",
++			WF_WFDMA_MCU_DMA0_WPDMA_RX_RING3_CTRL0_ADDR);
++		dump_dma_rx_ring_info(s, dev, "R4:Cmd(H2WA)", "AP",
++			WF_WFDMA_MCU_DMA0_WPDMA_RX_RING4_CTRL0_ADDR);
++	} else {
++		dump_dma_rx_ring_info(s, dev, "R2:TXD0(H2SDO)", "AP",
++			WF_WFDMA_MCU_DMA0_WPDMA_RX_RING2_CTRL0_ADDR);
++		dump_dma_rx_ring_info(s, dev, "R3:TXD1(H2SDO)", "AP",
++			WF_WFDMA_MCU_DMA0_WPDMA_RX_RING3_CTRL0_ADDR);
++		dump_dma_rx_ring_info(s, dev, "R4:Reserved", "AP",
++			WF_WFDMA_MCU_DMA0_WPDMA_RX_RING4_CTRL0_ADDR);
++	}
+ 	dump_dma_rx_ring_info(s, dev, "R5:Data0(MAC2WM)", "Both",
+ 		WF_WFDMA_MCU_DMA0_WPDMA_RX_RING5_CTRL0_ADDR);
+ 	dump_dma_rx_ring_info(s, dev, "R6:TxDone(MAC2WM)", "Both",
+ 		WF_WFDMA_MCU_DMA0_WPDMA_RX_RING6_CTRL0_ADDR);
+ 	dump_dma_rx_ring_info(s, dev, "R7:SPL/RPT(MAC2WM)", "Both",
+ 		WF_WFDMA_MCU_DMA0_WPDMA_RX_RING7_CTRL0_ADDR);
+-	dump_dma_rx_ring_info(s, dev, "R8:TxDone(MAC2WA)", "AP",
+-		WF_WFDMA_MCU_DMA0_WPDMA_RX_RING8_CTRL0_ADDR);
++	if (mt7996_has_wa(dev))
++		dump_dma_rx_ring_info(s, dev, "R8:TxDone(MAC2WA)", "AP",
++			WF_WFDMA_MCU_DMA0_WPDMA_RX_RING8_CTRL0_ADDR);
++	else
++		dump_dma_rx_ring_info(s, dev, "R8:Reserved", "AP",
++			WF_WFDMA_MCU_DMA0_WPDMA_RX_RING8_CTRL0_ADDR);
+ 	dump_dma_rx_ring_info(s, dev, "R9:Data1(MAC2WM)", "Both",
+ 		WF_WFDMA_MCU_DMA0_WPDMA_RX_RING9_CTRL0_ADDR);
+ 	dump_dma_rx_ring_info(s, dev, "R10:TXD2(H2WA)", "AP",
+@@ -755,9 +816,9 @@
+ 	msr0 = mt76_rr(dev, BN0_WF_MIB_TOP_MSR0_ADDR + band_offset);
+ 	msr1 = mt76_rr(dev, BN0_WF_MIB_TOP_MSR1_ADDR + band_offset);
+ 	msr2 = mt76_rr(dev, BN0_WF_MIB_TOP_MSR2_ADDR + band_offset);
+-	ampdu_cnt[0] = mt76_rr(dev, BN0_WF_MIB_TOP_TSCR0_ADDR + band_offset);
+-	ampdu_cnt[1] = mt76_rr(dev, BN0_WF_MIB_TOP_TSCR3_ADDR + band_offset);
+-	ampdu_cnt[2] = mt76_rr(dev, BN0_WF_MIB_TOP_TSCR4_ADDR + band_offset);
++	ampdu_cnt[0] = mt76_rr(dev, MT_MIB_TSCR0(band_idx));
++	ampdu_cnt[1] = mt76_rr(dev, MT_MIB_TSCR3(band_idx));
++	ampdu_cnt[2] = mt76_rr(dev, MT_MIB_TSCR4(band_idx));
+ 	ampdu_cnt[1] &= BN0_WF_MIB_TOP_TSCR3_AMPDU_MPDU_COUNT_MASK;
+ 	ampdu_cnt[2] &= BN0_WF_MIB_TOP_TSCR4_AMPDU_ACKED_COUNT_MASK;
+ 
+@@ -799,7 +860,7 @@
+ 	tbcr3 = mt76_rr(dev, BN0_WF_MIB_TOP_TBCR3_ADDR + band_offset);
+ 	seq_printf(s, "\tTx 160MHz Cnt=0x%x\n",
+ 		tbcr3 & BN0_WF_MIB_TOP_TBCR3_TX_160MHZ_CNT_MASK);
+-	tbcr4 = mt76_rr(dev, BN0_WF_MIB_TOP_TBCR4_ADDR + band_offset);
++	tbcr4 = is_mt7996(&dev->mt76) ? mt76_rr(dev, BN0_WF_MIB_TOP_TBCR4_ADDR + band_offset) : 0;
+ 	seq_printf(s, "\tTx 320MHz Cnt=0x%x\n",
+ 		tbcr4 & BN0_WF_MIB_TOP_TBCR4_TX_320MHZ_CNT_MASK);
+ 	seq_printf(s, "\tAMPDU Cnt=0x%x\n", ampdu_cnt[0]);
+@@ -811,10 +872,10 @@
+ 
+ 	seq_printf(s, "===MU Related Counters===\n");
+ 	mu_cnt[0] = mt76_rr(dev, BN0_WF_MIB_TOP_BSCR2_ADDR + band_offset);
+-	mu_cnt[1] = mt76_rr(dev, BN0_WF_MIB_TOP_TSCR5_ADDR + band_offset);
+-	mu_cnt[2] = mt76_rr(dev, BN0_WF_MIB_TOP_TSCR6_ADDR + band_offset);
++	mu_cnt[1] = mt76_rr(dev, MT_MIB_TSCR5(band_idx));
++	mu_cnt[2] = mt76_rr(dev, MT_MIB_TSCR6(band_idx));
+ 	mu_cnt[3] = mt76_rr(dev, BN0_WF_MIB_TOP_TSCR8_ADDR + band_offset);
+-	mu_cnt[4] = mt76_rr(dev, BN0_WF_MIB_TOP_TSCR7_ADDR + band_offset);
++	mu_cnt[4] = mt76_rr(dev, MT_MIB_TSCR7(band_idx));
+ 
+ 	seq_printf(s, "\tMUBF_TX_COUNT=0x%x\n",
+ 		mu_cnt[0] & BN0_WF_MIB_TOP_BSCR2_MUBF_TX_COUNT_MASK);
+@@ -936,18 +997,25 @@
+ 		return 0xFF;
+ 
+ 	if (type == WTBL_TYPE_LMAC) {
+-		mt76_wr(dev, MT_DBG_WTBLON_TOP_WDUCR_ADDR,
+-			FIELD_PREP(MT_DBG_WTBLON_TOP_WDUCR_GROUP, (idx >> 7)));
++		mt76_wr(dev, MT_WTBLON_TOP_WDUCR,
++			FIELD_PREP(MT_WTBLON_TOP_WDUCR_GROUP, (idx >> 7)));
+ 		src = LWTBL_IDX2BASE(idx, start_dw);
+ 	} else if (type == WTBL_TYPE_UMAC) {
+ 		mt76_wr(dev,  MT_DBG_UWTBL_TOP_WDUCR_ADDR,
+ 			FIELD_PREP(MT_DBG_UWTBL_TOP_WDUCR_GROUP, (idx >> 7)));
+ 		src = UWTBL_IDX2BASE(idx, start_dw);
+ 	} else if (type == WTBL_TYPE_KEY) {
+-		mt76_wr(dev,  MT_DBG_UWTBL_TOP_WDUCR_ADDR,
+-			MT_DBG_UWTBL_TOP_WDUCR_TARGET |
+-			FIELD_PREP(MT_DBG_UWTBL_TOP_WDUCR_GROUP, (idx >> 7)));
+-		src = KEYTBL_IDX2BASE(idx, start_dw);
++		if (is_mt7990(&dev->mt76)) {
++			mt76_wr(dev,  MT_DBG_UWTBL_TOP_KDUCR_ADDR,
++				FIELD_PREP(MT_DBG_UWTBL_TOP_KDUCR_GROUP, (idx >> 6)));
++			src = KEYTBL_IDX2BASE_7990(idx, start_dw);
++		} else {
++			mt76_wr(dev,  MT_DBG_UWTBL_TOP_WDUCR_ADDR,
++				MT_DBG_UWTBL_TOP_WDUCR_TARGET |
++				FIELD_PREP(MT_DBG_UWTBL_TOP_WDUCR_GROUP, (idx >> 7)));
++			src = KEYTBL_IDX2BASE(idx, start_dw);
++		}
++
+ 	}
+ 
+ 	while (size_dw--) {
+@@ -967,8 +1035,8 @@
+ 	u32 addr = 0;
+ 
+ 	if (type == WTBL_TYPE_LMAC) {
+-		mt76_wr(dev, MT_DBG_WTBLON_TOP_WDUCR_ADDR,
+-			FIELD_PREP(MT_DBG_WTBLON_TOP_WDUCR_GROUP, (idx >> 7)));
++		mt76_wr(dev, MT_WTBLON_TOP_WDUCR,
++			FIELD_PREP(MT_WTBLON_TOP_WDUCR_GROUP, (idx >> 7)));
+ 		addr = LWTBL_IDX2BASE(idx, start_dw);
+ 	} else if (type == WTBL_TYPE_UMAC) {
+ 		mt76_wr(dev, MT_DBG_UWTBL_TOP_WDUCR_ADDR,
+@@ -1591,7 +1659,7 @@
+ 		== MUAR_INDEX_OWN_MAC_ADDR_BC_MC) {
+ 		/* LMAC WTBL DW 14 */
+ 		seq_printf(s, "\t\n");
+-		seq_printf(s, "LWTBL DW 14\n");
++		seq_printf(s, "LWTBL DW 14_BMC\n");
+ 		addr = (u32 *)&(lwtbl[WF_LWTBL_CIPHER_SUIT_IGTK_DW*4]);
+ 		dw_value = *addr;
+ 
+@@ -1767,10 +1835,12 @@
+ }
+ 
+ static const struct berse_wtbl_parse WTBL_LMAC_DW32[] = {
+-	{"OM_INFO",			WF_LWTBL_OM_INFO_MASK,			WF_LWTBL_OM_INFO_SHIFT,		false},
+-	{"OM_INFO_EHT",         WF_LWTBL_OM_INFO_EHT_MASK,         WF_LWTBL_OM_INFO_EHT_SHIFT,  false},
+-	{"RXD_DUP_FOR_OM_CHG",		WF_LWTBL_RXD_DUP_FOR_OM_CHG_MASK,	NO_SHIFT_DEFINE,		false},
++	{"OM_INFO",		WF_LWTBL_OM_INFO_MASK,			WF_LWTBL_OM_INFO_SHIFT,			false},
++	{"OM_INFO_EHT",		WF_LWTBL_OM_INFO_EHT_MASK,		WF_LWTBL_OM_INFO_EHT_SHIFT,		false},
++	{"RXD_DUP_FOR_OM_CHG",	WF_LWTBL_RXD_DUP_FOR_OM_CHG_MASK,	NO_SHIFT_DEFINE,			false},
+ 	{"RXD_DUP_WHITE_LIST",	WF_LWTBL_RXD_DUP_WHITE_LIST_MASK,	WF_LWTBL_RXD_DUP_WHITE_LIST_SHIFT,	false},
++	{"RXD_DUP_MODE",	WF_LWTBL_RXD_DUP_MODE_MASK,		WF_LWTBL_RXD_DUP_MODE_SHIFT,		false},
++	{"ACK_EN",		WF_LWTBL_ACK_EN_MASK,			NO_SHIFT_DEFINE,			true},
+ 	{NULL,}
+ };
+ 
+@@ -1864,11 +1934,20 @@
+ 	}
+ }
+ 
+-static const struct berse_wtbl_parse WTBL_LMAC_DW35[] = {
++static const struct berse_wtbl_parse *WTBL_LMAC_DW35;
++static const struct berse_wtbl_parse WTBL_LMAC_DW35_7996[] = {
+ 	{"SNR 0",	WF_LWTBL_SNR_RX0_MASK,		WF_LWTBL_SNR_RX0_SHIFT,		false},
+ 	{"SNR 1",	WF_LWTBL_SNR_RX1_MASK,		WF_LWTBL_SNR_RX1_SHIFT,		false},
+ 	{"SNR 2",	WF_LWTBL_SNR_RX2_MASK,		WF_LWTBL_SNR_RX2_SHIFT,		false},
+ 	{"SNR 3",	WF_LWTBL_SNR_RX3_MASK,		WF_LWTBL_SNR_RX3_SHIFT,		true},
++	{NULL,}
++};
++
++static const struct berse_wtbl_parse WTBL_LMAC_DW35_7992[] = {
++	{"SNR 0",	WF_LWTBL_SNR_RX0_MASK_7992,	WF_LWTBL_SNR_RX0_SHIFT_7992,	false},
++	{"SNR 1",	WF_LWTBL_SNR_RX1_MASK_7992,	WF_LWTBL_SNR_RX1_SHIFT_7992,	false},
++	{"SNR 2",	WF_LWTBL_SNR_RX2_MASK_7992,	WF_LWTBL_SNR_RX2_SHIFT_7992,	false},
++	{"SNR 3",	WF_LWTBL_SNR_RX3_MASK_7992,	WF_LWTBL_SNR_RX3_SHIFT_7992,	true},
+ 	{NULL,}
+ };
+ 
+@@ -2135,16 +2214,21 @@
+ 	seq_printf(s, "\t\n");
+ 	seq_printf(s, "\t%s:%d\n", "keyloc0", keyloc0);
+ 	if (keyloc0 != INVALID_KEY_ENTRY) {
+-
+ 		/* Don't swap below two lines, halWtblReadRaw will
+ 		* write new value WF_WTBLON_TOP_WDUCR_ADDR
+ 		*/
+ 		mt7996_wtbl_read_raw(dev, keyloc0,
+ 			WTBL_TYPE_KEY, 0, ONE_KEY_ENTRY_LEN_IN_DW, keytbl);
+-		seq_printf(s, "\t\tKEY WTBL Addr: group:0x%x=0x%x addr: 0x%lx\n",
+-			MT_DBG_UWTBL_TOP_WDUCR_ADDR,
+-			mt76_rr(dev, MT_DBG_UWTBL_TOP_WDUCR_ADDR),
+-			KEYTBL_IDX2BASE(keyloc0, 0));
++		if (is_mt7990(&dev->mt76))
++			seq_printf(s, "\t\tKEY WTBL Addr: group:0x%x=0x%x addr: 0x%lx\n",
++				MT_DBG_UWTBL_TOP_KDUCR_ADDR,
++				mt76_rr(dev, MT_DBG_UWTBL_TOP_KDUCR_ADDR),
++				KEYTBL_IDX2BASE_7990(keyloc0, 0));
++		else
++			seq_printf(s, "\t\tKEY WTBL Addr: group:0x%x=0x%x addr: 0x%lx\n",
++				MT_DBG_UWTBL_TOP_WDUCR_ADDR,
++				mt76_rr(dev, MT_DBG_UWTBL_TOP_WDUCR_ADDR),
++				KEYTBL_IDX2BASE(keyloc0, 0));
+ 		for (x = 0; x < ONE_KEY_ENTRY_LEN_IN_DW; x++) {
+ 			seq_printf(s, "\t\tDW%02d: %02x %02x %02x %02x\n",
+ 				x,
+@@ -2162,10 +2246,16 @@
+ 		*/
+ 		mt7996_wtbl_read_raw(dev, keyloc1,
+ 			WTBL_TYPE_KEY, 0, ONE_KEY_ENTRY_LEN_IN_DW, keytbl);
+-		seq_printf(s, "\t\tKEY WTBL Addr: group:0x%x=0x%x addr: 0x%lx\n",
+-			MT_DBG_UWTBL_TOP_WDUCR_ADDR,
+-			mt76_rr(dev, MT_DBG_UWTBL_TOP_WDUCR_ADDR),
+-			KEYTBL_IDX2BASE(keyloc1, 0));
++		if (is_mt7990(&dev->mt76))
++			seq_printf(s, "\t\tKEY WTBL Addr: group:0x%x=0x%x addr: 0x%lx\n",
++				MT_DBG_UWTBL_TOP_KDUCR_ADDR,
++				mt76_rr(dev, MT_DBG_UWTBL_TOP_KDUCR_ADDR),
++				KEYTBL_IDX2BASE_7990(keyloc1, 0));
++		else
++			seq_printf(s, "\t\tKEY WTBL Addr: group:0x%x=0x%x addr: 0x%lx\n",
++				MT_DBG_UWTBL_TOP_WDUCR_ADDR,
++				mt76_rr(dev, MT_DBG_UWTBL_TOP_WDUCR_ADDR),
++				KEYTBL_IDX2BASE(keyloc1, 0));
+ 		for (x = 0; x < ONE_KEY_ENTRY_LEN_IN_DW; x++) {
+ 			seq_printf(s, "\t\tDW%02d: %02x %02x %02x %02x\n",
+ 				x,
+@@ -2183,10 +2273,16 @@
+ 		*/
+ 		mt7996_wtbl_read_raw(dev, keyloc2,
+ 			WTBL_TYPE_KEY, 0, ONE_KEY_ENTRY_LEN_IN_DW, keytbl);
+-		seq_printf(s, "\t\tKEY WTBL Addr: group:0x%x=0x%x addr: 0x%lx\n",
+-			MT_DBG_UWTBL_TOP_WDUCR_ADDR,
+-			mt76_rr(dev, MT_DBG_UWTBL_TOP_WDUCR_ADDR),
+-			KEYTBL_IDX2BASE(keyloc2, 0));
++		if (is_mt7990(&dev->mt76))
++			seq_printf(s, "\t\tKEY WTBL Addr: group:0x%x=0x%x addr: 0x%lx\n",
++				MT_DBG_UWTBL_TOP_KDUCR_ADDR,
++				mt76_rr(dev, MT_DBG_UWTBL_TOP_KDUCR_ADDR),
++				KEYTBL_IDX2BASE_7990(keyloc2, 0));
++		else
++			seq_printf(s, "\t\tKEY WTBL Addr: group:0x%x=0x%x addr: 0x%lx\n",
++				MT_DBG_UWTBL_TOP_WDUCR_ADDR,
++				mt76_rr(dev, MT_DBG_UWTBL_TOP_WDUCR_ADDR),
++				KEYTBL_IDX2BASE(keyloc2, 0));
+ 		for (x = 0; x < ONE_KEY_ENTRY_LEN_IN_DW; x++) {
+ 			seq_printf(s, "\t\tDW%02d: %02x %02x %02x %02x\n",
+ 				x,
+@@ -2235,6 +2331,7 @@
+ 	{"UWTBL_QOS",		WF_UWTBL_QOS_MASK,		NO_SHIFT_DEFINE,	false},
+ 	{"UWTBL_HT_VHT_HE",	WF_UWTBL_HT_MASK,		NO_SHIFT_DEFINE,	false},
+ 	{"UWTBL_HDRT_MODE",	WF_UWTBL_HDRT_MODE_MASK,	NO_SHIFT_DEFINE,	true},
++	{"UWTBL_AAD_OM",	WF_UWTBL_AAD_OM_MASK,		WF_UWTBL_AAD_OM_SHIFT,	true},
+ 	{NULL,}
+ };
+ 
+@@ -2315,8 +2412,8 @@
+ 				 LWTBL_LEN_IN_DW, lwtbl);
+ 	seq_printf(s, "Dump WTBL info of WLAN_IDX:%d\n", dev->wlan_idx);
+ 	seq_printf(s, "LMAC WTBL Addr: group:0x%x=0x%x addr: 0x%lx\n",
+-		   MT_DBG_WTBLON_TOP_WDUCR_ADDR,
+-		   mt76_rr(dev, MT_DBG_WTBLON_TOP_WDUCR_ADDR),
++		   MT_WTBLON_TOP_WDUCR,
++		   mt76_rr(dev, MT_WTBLON_TOP_WDUCR),
+ 		   LWTBL_IDX2BASE(dev->wlan_idx, 0));
+ 	for (x = 0; x < LWTBL_LEN_IN_DW; x++) {
+ 		seq_printf(s, "DW%02d: %02x %02x %02x %02x\n",
+@@ -3624,7 +3721,7 @@
+ 			  ((pse_stat[0] & WF_PSE_TOP_QUEUE_EMPTY_CPU_Q2_EMPTY_MASK) >> WF_PSE_TOP_QUEUE_EMPTY_CPU_Q2_EMPTY_SHFT),
+ 			  ((pse_stat[0] & WF_PSE_TOP_QUEUE_EMPTY_CPU_Q3_EMPTY_MASK) >> WF_PSE_TOP_QUEUE_EMPTY_CPU_Q3_EMPTY_SHFT),
+ 			  ((pse_stat[0] & WF_PSE_TOP_QUEUE_EMPTY_CPU_Q4_EMPTY_MASK) >> WF_PSE_TOP_QUEUE_EMPTY_CPU_Q4_EMPTY_SHFT));
+-	seq_printf(s, "\t\tHIF Q0/1/2/3/4/5/6/7/8/9/10/11/12/13 empty=%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d/%d\n",
++	seq_printf(s, "\t\tHIF Q0/1/2/3/4/5/6/7/8 empty=%d/%d/%d/%d/%d/%d/%d/%d/%d\n",
+ 			  ((pse_stat[1] & WF_PSE_TOP_QUEUE_EMPTY_1_HIF_0_EMPTY_MASK) >> WF_PSE_TOP_QUEUE_EMPTY_1_HIF_0_EMPTY_SHFT),
+ 			  ((pse_stat[1] & WF_PSE_TOP_QUEUE_EMPTY_1_HIF_1_EMPTY_MASK) >> WF_PSE_TOP_QUEUE_EMPTY_1_HIF_1_EMPTY_SHFT),
+ 			  ((pse_stat[1] & WF_PSE_TOP_QUEUE_EMPTY_1_HIF_2_EMPTY_MASK) >> WF_PSE_TOP_QUEUE_EMPTY_1_HIF_2_EMPTY_SHFT),
+@@ -3633,12 +3730,16 @@
+ 			  ((pse_stat[1] & WF_PSE_TOP_QUEUE_EMPTY_1_HIF_5_EMPTY_MASK) >> WF_PSE_TOP_QUEUE_EMPTY_1_HIF_5_EMPTY_SHFT),
+ 			  ((pse_stat[1] & WF_PSE_TOP_QUEUE_EMPTY_1_HIF_6_EMPTY_MASK) >> WF_PSE_TOP_QUEUE_EMPTY_1_HIF_6_EMPTY_SHFT),
+ 			  ((pse_stat[1] & WF_PSE_TOP_QUEUE_EMPTY_1_HIF_7_EMPTY_MASK) >> WF_PSE_TOP_QUEUE_EMPTY_1_HIF_7_EMPTY_SHFT),
+-			  ((pse_stat[1] & WF_PSE_TOP_QUEUE_EMPTY_1_HIF_8_EMPTY_MASK) >> WF_PSE_TOP_QUEUE_EMPTY_1_HIF_8_EMPTY_SHFT),
++			  ((pse_stat[1] & WF_PSE_TOP_QUEUE_EMPTY_1_HIF_8_EMPTY_MASK) >> WF_PSE_TOP_QUEUE_EMPTY_1_HIF_8_EMPTY_SHFT));
++	seq_printf(s, "\t\tHIF Q9/10/11/12/13/14/15/16 empty=%d/%d/%d/%d/%d/%d/%d/%d\n",
+ 			  ((pse_stat[1] & WF_PSE_TOP_QUEUE_EMPTY_1_HIF_9_EMPTY_MASK) >> WF_PSE_TOP_QUEUE_EMPTY_1_HIF_9_EMPTY_SHFT),
+ 			  ((pse_stat[1] & WF_PSE_TOP_QUEUE_EMPTY_1_HIF_10_EMPTY_MASK) >> WF_PSE_TOP_QUEUE_EMPTY_1_HIF_10_EMPTY_SHFT),
+ 			  ((pse_stat[1] & WF_PSE_TOP_QUEUE_EMPTY_1_HIF_11_EMPTY_MASK) >> WF_PSE_TOP_QUEUE_EMPTY_1_HIF_11_EMPTY_SHFT),
+ 			  ((pse_stat[1] & WF_PSE_TOP_QUEUE_EMPTY_1_HIF_12_EMPTY_MASK) >> WF_PSE_TOP_QUEUE_EMPTY_1_HIF_12_EMPTY_SHFT),
+-			  ((pse_stat[1] & WF_PSE_TOP_QUEUE_EMPTY_1_HIF_13_EMPTY_MASK) >> WF_PSE_TOP_QUEUE_EMPTY_1_HIF_13_EMPTY_SHFT));
++			  ((pse_stat[1] & WF_PSE_TOP_QUEUE_EMPTY_1_HIF_13_EMPTY_MASK) >> WF_PSE_TOP_QUEUE_EMPTY_1_HIF_13_EMPTY_SHFT),
++			  ((pse_stat[1] & WF_PSE_TOP_QUEUE_EMPTY_1_HIF_14_EMPTY_MASK) >> WF_PSE_TOP_QUEUE_EMPTY_1_HIF_14_EMPTY_SHFT),
++			  ((pse_stat[1] & WF_PSE_TOP_QUEUE_EMPTY_1_HIF_15_EMPTY_MASK) >> WF_PSE_TOP_QUEUE_EMPTY_1_HIF_15_EMPTY_SHFT),
++			  ((pse_stat[1] & WF_PSE_TOP_QUEUE_EMPTY_1_HIF_16_EMPTY_MASK) >> WF_PSE_TOP_QUEUE_EMPTY_1_HIF_16_EMPTY_SHFT));
+ 	seq_printf(s, "\t\tLMAC TX Q empty=%d\n",
+ 			  ((pse_stat[0] & WF_PSE_TOP_QUEUE_EMPTY_LMAC_TX_QUEUE_EMPTY_MASK) >> WF_PSE_TOP_QUEUE_EMPTY_LMAC_TX_QUEUE_EMPTY_SHFT));
+ 	seq_printf(s, "\t\tMDP TX Q0/Q1/Q2/RX Q empty=%d/%d/%d/%d\n",
+@@ -3829,11 +3930,26 @@
+ ple_cr_num_of_ac(struct mt76_dev *dev)
+ {
+ 	switch (mt76_chip(dev)) {
+-	case 0x7990:
++	case MT7996_DEVICE_ID:
+ 		return CR_NUM_OF_AC_MT7996;
+-	case 0x7992:
++	case MT7992_DEVICE_ID:
++	case MT7990_DEVICE_ID:
+ 	default:
+ 		return CR_NUM_OF_AC_MT7992;
++	}
++}
++
++static size_t
++ple_cr_num_of_twt(struct mt76_dev *dev)
++{
++	switch (mt76_chip(dev)) {
++	case MT7996_DEVICE_ID:
++		return CR_NUM_OF_TWT_MT7996;
++	case MT7990_DEVICE_ID:
++		return CR_NUM_OF_TWT_MT7990;
++	case MT7992_DEVICE_ID:
++	default:
++		return CR_NUM_OF_TWT_MT7992;
+ 	}
+ }
+ 
+@@ -3917,13 +4033,14 @@
+ {
+ 	u32 i, addr;
+ 	size_t cr_num_of_ac = ple_cr_num_of_ac(&dev->mt76);
++	bool has_ext = is_mt7992(&dev->mt76) || is_mt7990(&dev->mt76);
+ 
+ 	ple_stat[0] = mt76_rr(dev, WF_PLE_TOP_QUEUE_EMPTY_ADDR);
+ 
+ 	/* Legacy */
+ 	addr = WF_PLE_TOP_AC0_QUEUE_EMPTY0_ADDR;
+ 	for (i = 1; i <= cr_num_of_ac; i++, addr += 4) {
+-		if (i == cr_num_of_ac && is_mt7992(&dev->mt76))
++		if (i == cr_num_of_ac && has_ext)
+ 			ple_stat[i] = mt76_rr(dev, WF_PLE_TOP_AC0_QUEUE_EMPTY_EXT0_ADDR);
+ 		else
+ 			ple_stat[i] = mt76_rr(dev, addr);
+@@ -3931,7 +4048,7 @@
+ 
+ 	addr = WF_PLE_TOP_AC1_QUEUE_EMPTY0_ADDR;
+ 	for (; i <= cr_num_of_ac * 2; i++, addr += 4) {
+-		if (i == cr_num_of_ac * 2 && is_mt7992(&dev->mt76))
++		if (i == cr_num_of_ac * 2 && has_ext)
+ 			ple_stat[i] = mt76_rr(dev, WF_PLE_TOP_AC1_QUEUE_EMPTY_EXT0_ADDR);
+ 		else
+ 			ple_stat[i] = mt76_rr(dev, addr);
+@@ -3939,7 +4056,7 @@
+ 
+ 	addr = WF_PLE_TOP_AC2_QUEUE_EMPTY0_ADDR;
+ 	for (; i <= cr_num_of_ac * 3; i++, addr += 4) {
+-		if (i == cr_num_of_ac * 3 && is_mt7992(&dev->mt76))
++		if (i == cr_num_of_ac * 3 && has_ext)
+ 			ple_stat[i] = mt76_rr(dev, WF_PLE_TOP_AC2_QUEUE_EMPTY_EXT0_ADDR);
+ 		else
+ 			ple_stat[i] = mt76_rr(dev, addr);
+@@ -3947,7 +4064,7 @@
+ 
+ 	addr = WF_PLE_TOP_AC3_QUEUE_EMPTY0_ADDR;
+ 	for (; i <= cr_num_of_ac * 4; i++, addr += 4) {
+-		if (i == cr_num_of_ac * 4 && is_mt7992(&dev->mt76))
++		if (i == cr_num_of_ac * 4 && has_ext)
+ 			ple_stat[i] = mt76_rr(dev, WF_PLE_TOP_AC3_QUEUE_EMPTY_EXT0_ADDR);
+ 		else
+ 			ple_stat[i] = mt76_rr(dev, addr);
+@@ -3959,6 +4076,8 @@
+ {
+ 	u32 i, addr;
+ 	size_t cr_num_of_ac = ple_cr_num_of_ac(&dev->mt76);
++	size_t cr_num_of_twt = ple_cr_num_of_twt(&dev->mt76);
++	bool has_ext = is_mt7992(&dev->mt76) || is_mt7990(&dev->mt76);
+ 
+ 	/* switch to target band */
+ 	mt76_wr(dev, WF_DRR_TOP_SBRR_ADDR, u32_encode_bits(band, WF_DRR_TOP_SBRR_TARGET_BAND_MASK));
+@@ -3966,7 +4085,7 @@
+ 	/* Legacy */
+ 	addr = WF_DRR_TOP_AC0_STATION_PAUSE00_ADDR;
+ 	for (i = 0; i < cr_num_of_ac; i++, addr += 4) {
+-		if (i == cr_num_of_ac - 1 && is_mt7992(&dev->mt76))
++		if (i == cr_num_of_ac - 1 && has_ext)
+ 			sta_pause[i] = mt76_rr(dev, WF_DRR_TOP_AC0_STATION_PAUSE_EXT_00_ADDR);
+ 		else
+ 			sta_pause[i] = mt76_rr(dev, addr);
+@@ -3974,7 +4093,7 @@
+ 
+ 	addr = WF_DRR_TOP_AC1_STATION_PAUSE00_ADDR;
+ 	for (; i < cr_num_of_ac * 2; i++, addr += 4) {
+-		if (i == cr_num_of_ac * 2 - 1 && is_mt7992(&dev->mt76))
++		if (i == cr_num_of_ac * 2 - 1 && has_ext)
+ 			sta_pause[i] = mt76_rr(dev, WF_DRR_TOP_AC1_STATION_PAUSE_EXT_00_ADDR);
+ 		else
+ 			sta_pause[i] = mt76_rr(dev, addr);
+@@ -3982,7 +4101,7 @@
+ 
+ 	addr = WF_DRR_TOP_AC2_STATION_PAUSE00_ADDR;
+ 	for (; i < cr_num_of_ac * 3; i++, addr += 4) {
+-		if (i == cr_num_of_ac * 3 - 1 && is_mt7992(&dev->mt76))
++		if (i == cr_num_of_ac * 3 - 1 && has_ext)
+ 			sta_pause[i] = mt76_rr(dev, WF_DRR_TOP_AC2_STATION_PAUSE_EXT_00_ADDR);
+ 		else
+ 			sta_pause[i] = mt76_rr(dev, addr);
+@@ -3990,7 +4109,7 @@
+ 
+ 	addr = WF_DRR_TOP_AC3_STATION_PAUSE00_ADDR;
+ 	for (; i < cr_num_of_ac * 4; i++, addr += 4) {
+-		if (i == cr_num_of_ac * 4 - 1 && is_mt7992(&dev->mt76))
++		if (i == cr_num_of_ac * 4 - 1 && has_ext)
+ 			sta_pause[i] = mt76_rr(dev, WF_DRR_TOP_AC3_STATION_PAUSE_EXT_00_ADDR);
+ 		else
+ 			sta_pause[i] = mt76_rr(dev, addr);
+@@ -3998,8 +4117,8 @@
+ 
+ 	/* TWT */
+ 	addr = WF_DRR_TOP_TWT_STA_MAP00_ADDR;
+-	for (i = 0; i < cr_num_of_ac; i++, addr += 4) {
+-		if (i == cr_num_of_ac - 1 && is_mt7992(&dev->mt76))
++	for (i = 0; i < cr_num_of_twt; i++, addr += 4) {
++		if (i == cr_num_of_twt - 1 && has_ext)
+ 			twt_pause[i] = mt76_rr(dev, WF_DRR_TOP_TWT_STA_MAP_EXT_00_ADDR);
+ 		else
+ 			twt_pause[i] = mt76_rr(dev, addr);
+@@ -4032,6 +4151,7 @@
+ 	struct mt7996_dev *dev = dev_get_drvdata(s->private);
+ 	size_t cr_num_of_ac = ple_cr_num_of_ac(&dev->mt76);
+ 	size_t cr_num_of_all_ac = cr_num_of_ac * IEEE80211_NUM_ACS;
++	size_t cr_num_of_twt = ple_cr_num_of_twt(&dev->mt76);
+ 	int i, j;
+ 
+ 	for (j = 0; j < cr_num_of_all_ac; j++) { /* show AC Q info */
+@@ -4065,7 +4185,7 @@
+ 				if (sta_pause[idx] & BIT(i))
+ 					ctrl = 2;
+ 
+-				idx = wcid->phy_idx * cr_num_of_ac + j % cr_num_of_ac;
++				idx = wcid->phy_idx * cr_num_of_twt + j % cr_num_of_twt;
+ 				if (twt_sta_pause[idx] & BIT(i))
+ 					ctrl = 3;
+ 
+@@ -4127,6 +4247,7 @@
+ 	struct mt7996_dev *dev = dev_get_drvdata(s->private);
+ 	size_t cr_num_of_ac = ple_cr_num_of_ac(&dev->mt76);
+ 	size_t cr_num_of_all_ac = cr_num_of_ac * IEEE80211_NUM_ACS;
++	size_t cr_num_of_twt = ple_cr_num_of_twt(&dev->mt76);
+ 	u32 *sta_pause, *twt_sta_pause;
+ 	unsigned long *ple_stat;
+ 	int i, j, ret = 0;
+@@ -4141,7 +4262,7 @@
+ 		goto out;
+ 	}
+ 
+-	twt_sta_pause = kzalloc(__MT_MAX_BAND * cr_num_of_ac * sizeof(u32), GFP_KERNEL);
++	twt_sta_pause = kzalloc(__MT_MAX_BAND * cr_num_of_twt * sizeof(u32), GFP_KERNEL);
+ 	if (!twt_sta_pause) {
+ 		ret = -ENOMEM;
+ 		goto out;
+@@ -4154,7 +4275,7 @@
+ 		if (dev->mt76.phys[i])
+ 			mt7996_get_sta_pause(dev, i,
+ 					     sta_pause + i * cr_num_of_all_ac,
+-					     twt_sta_pause + i * cr_num_of_ac);
++					     twt_sta_pause + i * cr_num_of_twt);
+ 	}
+ 
+ 	if ((ple_stat[0] & WF_PLE_TOP_QUEUE_EMPTY_ALL_AC_EMPTY_MASK) == 0) {
+@@ -4477,8 +4598,9 @@
+ 	u32 device_id = (dev->mt76.rev) >> 16;
+ 	int i = 0;
+ 	static const struct mt7996_dbg_reg_desc dbg_reg_s[] = {
+-		{ 0x7990, mt7996_dbg_offs },
+-		{ 0x7992, mt7992_dbg_offs },
++		{ MT7996_DEVICE_ID, mt7996_dbg_offs },
++		{ MT7992_DEVICE_ID, mt7992_dbg_offs },
++		{ MT7990_DEVICE_ID, mt7990_dbg_offs },
+ 	};
+ 
+ 	for (i = 0; i < ARRAY_SIZE(dbg_reg_s); i++) {
+@@ -4492,10 +4614,12 @@
+ 		WTBL_LMAC_DW2 = WTBL_LMAC_DW2_7996;
+ 		WTBL_LMAC_DW5 = WTBL_LMAC_DW5_7996;
+ 		WTBL_LMAC_DW9 = WTBL_LMAC_DW9_7996;
++		WTBL_LMAC_DW35 = WTBL_LMAC_DW35_7996;
+ 	} else {
+ 		WTBL_LMAC_DW2 = WTBL_LMAC_DW2_7992;
+ 		WTBL_LMAC_DW5 = WTBL_LMAC_DW5_7992;
+ 		WTBL_LMAC_DW9 = WTBL_LMAC_DW9_7992;
++		WTBL_LMAC_DW35 = WTBL_LMAC_DW35_7992;
+ 	}
+ 
+ 	/* amsdu */
+diff --git a/mt7996/mtk_mcu.c b/mt7996/mtk_mcu.c
+--- a/mt7996/mtk_mcu.c
++++ b/mt7996/mtk_mcu.c
+@@ -1475,7 +1475,7 @@
+ 		return -EINVAL;
+ 	}
+ 
+-	return mt76_mcu_send_msg(&dev->mt76, MCU_WM_UNI_CMD(MURU), &req,
++	return mt76_mcu_send_msg(&dev->mt76, MCU_WMWA_UNI_CMD(MURU), &req,
+ 				 sizeof(req), true);
+ }
+ #endif
+diff --git a/mt7996/mtk_mcu.h b/mt7996/mtk_mcu.h
+--- a/mt7996/mtk_mcu.h
++++ b/mt7996/mtk_mcu.h
+@@ -819,9 +819,9 @@
+ static inline int get_ibf_version(struct mt7996_dev *dev)
+ {
+ 	switch (mt76_chip(&dev->mt76)) {
+-	case 0x7990:
++	case MT7996_DEVICE_ID:
+ 		return IBF_VER_1;
+-	case 0x7992:
++	case MT7992_DEVICE_ID:
+ 	default:
+ 		return IBF_VER_2;
+ 	}
+diff --git a/mt7996/pci.c b/mt7996/pci.c
+--- a/mt7996/pci.c
++++ b/mt7996/pci.c
+@@ -113,7 +113,10 @@
+ 	int irq, ret;
+ 	struct mt76_dev *mdev;
+ 
+-	hif2_enable |= (id->device == 0x7990 || id->device == 0x7991 || id->device == 0x799a);
++	hif2_enable |= (id->device == MT7996_DEVICE_ID ||
++			id->device == MT7996_DEVICE_ID_2 ||
++			id->device == MT7992_DEVICE_ID_2 ||
++			id->device == MT7990_DEVICE_ID_2);
+ 
+ 	ret = pcim_enable_device(pdev);
+ 	if (ret)
+diff --git a/mt7996/regs.h b/mt7996/regs.h
+--- a/mt7996/regs.h
++++ b/mt7996/regs.h
+@@ -64,6 +64,14 @@
+ 	MIB_BSCR7,
+ 	MIB_BSCR17,
+ 	MIB_TRDR1,
++	MIB_TSCR0,
++	MIB_TSCR1,
++	MIB_TSCR2,
++	MIB_TSCR3,
++	MIB_TSCR4,
++	MIB_TSCR5,
++	MIB_TSCR6,
++	MIB_TSCR7,
+ 	HIF_REMAP_L1,
+ 	HIF_REMAP_BASE_L1,
+ 	HIF_REMAP_L2,
+@@ -250,9 +258,9 @@
+ #define MT_MIB_BSCR7(_band)			MT_WF_MIB(_band, __OFFS(MIB_BSCR7))
+ #define MT_MIB_BSCR17(_band)			MT_WF_MIB(_band, __OFFS(MIB_BSCR17))
+ 
+-#define MT_MIB_TSCR5(_band)			MT_WF_MIB(_band, 0x6c4)
+-#define MT_MIB_TSCR6(_band)			MT_WF_MIB(_band, 0x6c8)
+-#define MT_MIB_TSCR7(_band)			MT_WF_MIB(_band, 0x6d0)
++#define MT_MIB_TSCR5(_band)			MT_WF_MIB(_band, __OFFS(MIB_TSCR5))
++#define MT_MIB_TSCR6(_band)			MT_WF_MIB(_band, __OFFS(MIB_TSCR6))
++#define MT_MIB_TSCR7(_band)			MT_WF_MIB(_band, __OFFS(MIB_TSCR7))
+ 
+ #define MT_MIB_RSCR1(_band)			MT_WF_MIB(_band, __OFFS(MIB_RSCR1))
+ /* rx mpdu counter, full 32 bits */
+@@ -268,14 +276,14 @@
+ #define MT_MIB_RSCR36(_band)			MT_WF_MIB(_band, __OFFS(MIB_RSCR36))
+ 
+ /* tx ampdu cnt, full 32 bits */
+-#define MT_MIB_TSCR0(_band)			MT_WF_MIB(_band, 0x6b0)
+-#define MT_MIB_TSCR2(_band)			MT_WF_MIB(_band, 0x6b8)
++#define MT_MIB_TSCR0(_band)			MT_WF_MIB(_band, __OFFS(MIB_TSCR0))
++#define MT_MIB_TSCR2(_band)			MT_WF_MIB(_band, __OFFS(MIB_TSCR2))
+ 
+ /* counts all mpdus in ampdu, regardless of success */
+-#define MT_MIB_TSCR3(_band)			MT_WF_MIB(_band, 0x6bc)
++#define MT_MIB_TSCR3(_band)			MT_WF_MIB(_band, __OFFS(MIB_TSCR3))
+ 
+ /* counts all successfully tx'd mpdus in ampdu */
+-#define MT_MIB_TSCR4(_band)			MT_WF_MIB(_band, 0x6c0)
++#define MT_MIB_TSCR4(_band)			MT_WF_MIB(_band, __OFFS(MIB_TSCR4))
+ 
+ /* rx ampdu count, 32-bit */
+ #define MT_MIB_RSCR27(_band)			MT_WF_MIB(_band, __OFFS(MIB_RSCR27))
+@@ -299,7 +307,7 @@
+ #define MT_MIB_RVSR1(_band)			MT_WF_MIB(_band, __OFFS(MIB_RVSR1))
+ 
+ /* rx blockack count, 32 bits */
+-#define MT_MIB_TSCR1(_band)			MT_WF_MIB(_band, 0x6b4)
++#define MT_MIB_TSCR1(_band)			MT_WF_MIB(_band, __OFFS(MIB_TSCR1))
+ 
+ #define MT_MIB_BTSCR0(_band)			MT_WF_MIB(_band, 0x5e0)
+ #define MT_MIB_BTSCR5(_band)			MT_WF_MIB(_band, __OFFS(MIB_BTSCR5))
+diff --git a/mt7996/testmode.c b/mt7996/testmode.c
+--- a/mt7996/testmode.c
++++ b/mt7996/testmode.c
+@@ -612,7 +612,7 @@
+ 		},
+ 	};
+ 	u32 i, j, group_size, dpd_size, size, offs, *pre_cal;
+-	u32 wait_on_prek_offset = 0;
++	u32 func_data, wait_on_prek_offset = 0;
+ 	u8 do_precal, *eeprom;
+ 	int ret = 0;
+ 
+@@ -656,10 +656,13 @@
+ 		wait_event_timeout(mdev->mcu.wait, dev->cur_prek_offset == wait_on_prek_offset,
+ 				   30 * HZ);
+ 
++		/* griffin does not support mem dpd cal */
++		func_data = PREK(DPD_MEM_SIZE) ? RF_DPD_FLAT_5G_MEM_CAL : RF_DPD_FLAT_5G_CAL;
++
+ 		/* 5g channel bw80 calibration */
+ 		ret = mt7996_tm_dpd_prek_send_req(phy, &req, dpd_5g_ch_list_bw80,
+ 						  DPD_CH_NUM(BW80_5G),
+-						  NL80211_CHAN_WIDTH_80, RF_DPD_FLAT_5G_MEM_CAL);
++						  NL80211_CHAN_WIDTH_80, func_data);
+ 		if (ret)
+ 			return ret;
+ 		wait_on_prek_offset += DPD_CH_NUM(BW80_5G) * DPD_PER_CH_GT_BW20_SIZE;
+@@ -669,7 +672,7 @@
+ 		/* 5g channel bw160 calibration */
+ 		ret = mt7996_tm_dpd_prek_send_req(phy, &req, dpd_5g_ch_list_bw160,
+ 						  DPD_CH_NUM(BW160_5G),
+-						  NL80211_CHAN_WIDTH_160, RF_DPD_FLAT_5G_MEM_CAL);
++						  NL80211_CHAN_WIDTH_160, func_data);
+ 		wait_on_prek_offset += DPD_CH_NUM(BW160_5G) * DPD_PER_CH_GT_BW20_SIZE;
+ 		wait_event_timeout(mdev->mcu.wait, dev->cur_prek_offset == wait_on_prek_offset,
+ 				   30 * HZ);
+@@ -687,10 +690,13 @@
+ 		wait_event_timeout(mdev->mcu.wait, dev->cur_prek_offset == wait_on_prek_offset,
+ 				   30 * HZ);
+ 
++		/* griffin does not support mem dpd cal */
++		func_data = PREK(DPD_MEM_SIZE) ? RF_DPD_FLAT_6G_MEM_CAL : RF_DPD_FLAT_6G_CAL;
++
+ 		/* 6g channel bw80 calibration */
+ 		ret = mt7996_tm_dpd_prek_send_req(phy, &req, dpd_6g_ch_list_bw80,
+ 						  DPD_CH_NUM(BW80_6G),
+-						  NL80211_CHAN_WIDTH_80, RF_DPD_FLAT_6G_MEM_CAL);
++						  NL80211_CHAN_WIDTH_80, func_data);
+ 		if (ret)
+ 			return ret;
+ 		wait_on_prek_offset += DPD_CH_NUM(BW80_6G) * DPD_PER_CH_GT_BW20_SIZE;
+@@ -700,7 +706,7 @@
+ 		/* 6g channel bw160 calibration */
+ 		ret = mt7996_tm_dpd_prek_send_req(phy, &req, dpd_6g_ch_list_bw160,
+ 						  DPD_CH_NUM(BW160_6G),
+-						  NL80211_CHAN_WIDTH_160, RF_DPD_FLAT_6G_MEM_CAL);
++						  NL80211_CHAN_WIDTH_160, func_data);
+ 		if (ret)
+ 			return ret;
+ 		wait_on_prek_offset += DPD_CH_NUM(BW160_6G) * DPD_PER_CH_GT_BW20_SIZE;
+@@ -710,7 +716,7 @@
+ 		/* 6g channel bw320 calibration */
+ 		ret = mt7996_tm_dpd_prek_send_req(phy, &req, dpd_6g_ch_list_bw320,
+ 						  DPD_CH_NUM(BW320_6G),
+-						  NL80211_CHAN_WIDTH_320, RF_DPD_FLAT_6G_MEM_CAL);
++						  NL80211_CHAN_WIDTH_320, func_data);
+ 		wait_on_prek_offset += DPD_CH_NUM(BW320_6G) * DPD_PER_CH_GT_BW20_SIZE;
+ 		wait_event_timeout(mdev->mcu.wait, dev->cur_prek_offset == wait_on_prek_offset,
+ 				   30 * HZ);
+@@ -2159,6 +2165,9 @@
+ 		[DDIE_7992] = {{.start = 0x10, .end = 0x18f, .prot_mask = -1},
+ 			       {.start = 0x1b0, .end = 0x3ff, .prot_mask = -1},
+ 			       {.start = -1}},
++		[DDIE_7990] = {{.start = 0x10, .end = 0x18f, .prot_mask = -1},
++			       {.start = 0x1b0, .end = 0x3ff, .prot_mask = -1},
++			       {.start = -1}},
+ 	};
+ 	static const struct efuse_region adie_prot_offs[][PROT_OFFS_MAX_SIZE] = {
+ 		[ADIE_7975] = {{.start = 0x5c0, .end = 0x62f, .prot_mask = -1},
+@@ -2229,6 +2238,13 @@
+ 		base = EFUSE_BASE_OFFS_DDIE;
+ 		prot_offs = ddie_prot_offs[DDIE_7992];
+ 		break;
++	case MT7990_DEVICE_ID:
++		/* block all the adie region in efuse for griffin */
++		if (offset >= EFUSE_BASE_OFFS_ADIE0)
++			return false;
++		base = EFUSE_BASE_OFFS_DDIE;
++		prot_offs = ddie_prot_offs[DDIE_7990];
++		break;
+ 	default:
+ 		return false;
+ 	}
+diff --git a/mt7996/vendor.c b/mt7996/vendor.c
+--- a/mt7996/vendor.c
++++ b/mt7996/vendor.c
+@@ -882,11 +882,19 @@
+ 		return 0;
+ 
+ 	switch (mode) {
++	case PP_FW_MODE:
++		err = mt7996_mcu_set_pp_alg_ctrl(phy, PP_ALG_SET_TIMER);
++		if (err)
++			return err;
++
++		err = mt7996_mcu_set_pp_alg_ctrl(phy, PP_ALG_SET_THR);
++		if (err)
++			return err;
++		fallthrough;
+ 	case PP_USR_MODE:
+ 		if (tb[MTK_VENDOR_ATTR_PP_BITMAP])
+ 			punct_bitmap = nla_get_u16(tb[MTK_VENDOR_ATTR_PP_BITMAP]);
+ 		fallthrough;
+-	case PP_FW_MODE:
+ 	case PP_DISABLE:
+ 		err = mt7996_mcu_set_pp_en(phy, mode, punct_bitmap);
+ 		break;
+diff --git a/testmode.c b/testmode.c
+--- a/testmode.c
++++ b/testmode.c
+@@ -41,7 +41,7 @@
+ 
+ static inline bool mt76_testmode_offload(struct mt76_dev *dev)
+ {
+-	return is_mt7996(dev) || is_mt7992(dev);
++	return is_mt799x(dev);
+ }
+ 
+ void mt76_testmode_tx_pending(struct mt76_phy *phy)

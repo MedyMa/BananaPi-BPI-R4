@@ -1,0 +1,265 @@
+diff --git a/debug.c b/debug.c
+--- a/debug.c
++++ b/debug.c
+@@ -0,0 +1,67 @@
++// SPDX-License-Identifier: ISC
++/*
++ * Copyright (C) 2024 MediaTek Inc.
++ */
++
++#include <linux/vmalloc.h>
++#include "mt76.h"
++
++void mt76_info(struct mt76_dev *dev, const char *fmt, ...)
++{
++	struct va_format vaf = {
++		.fmt = fmt,
++	};
++	va_list args;
++
++	va_start(args, fmt);
++	vaf.va = &args;
++	dev_info(dev->dev, "%pV", &vaf);
++
++	va_end(args);
++}
++EXPORT_SYMBOL_GPL(mt76_info);
++
++void mt76_err(struct mt76_dev *dev, const char *fmt, ...)
++{
++	struct va_format vaf = {
++		.fmt = fmt,
++	};
++	va_list args;
++
++	va_start(args, fmt);
++	vaf.va = &args;
++	dev_err(dev->dev, "%pV", &vaf);
++
++	va_end(args);
++}
++EXPORT_SYMBOL_GPL(mt76_err);
++
++void mt76_warn(struct mt76_dev *dev, const char *fmt, ...)
++{
++	struct va_format vaf = {
++		.fmt = fmt,
++	};
++	va_list args;
++
++	va_start(args, fmt);
++	vaf.va = &args;
++	dev_warn_ratelimited(dev->dev, "%pV", &vaf);
++
++	va_end(args);
++}
++EXPORT_SYMBOL_GPL(mt76_warn);
++
++void __mt76_dbg(struct mt76_dev *dev, const char *fmt, ...)
++{
++	struct va_format vaf = {
++		.fmt = fmt,
++	};
++	va_list args;
++
++	va_start(args, fmt);
++	vaf.va = &args;
++	dev_printk(KERN_DEBUG, dev->dev, "%pV", &vaf);
++
++	va_end(args);
++}
++EXPORT_SYMBOL_GPL(__mt76_dbg);
+diff --git a/debug.h b/debug.h
+--- a/debug.h
++++ b/debug.h
+@@ -0,0 +1,41 @@
++/* SPDX-License-Identifier: ISC */
++/*
++ * Copyright (C) 2024 MediaTek Inc.
++ */
++#ifndef __MT76_DEBUG_H_
++#define __MT76_DEBUG_H_
++
++struct mt76_dev;
++
++enum mt76_debug_mask {
++	MT76_DBG_DEV = BIT(0),
++	MT76_DBG_BSS = BIT(1),
++	MT76_DBG_STA = BIT(2),
++	MT76_DBG_CHAN = BIT(3),
++	MT76_DBG_MLD = BIT(4),
++	MT76_DBG_TXRX = BIT(5),
++	MT76_DBG_SCAN = BIT(6),
++
++	MT76_DBG_ALL = 0xffffffff,
++};
++
++__printf(2, 3) void mt76_info(struct mt76_dev *dev, const char *fmt, ...);
++__printf(2, 3) void mt76_err(struct mt76_dev *dev, const char *fmt, ...);
++__printf(2, 3) void mt76_warn(struct mt76_dev *dev, const char *fmt, ...);
++
++__printf(2, 3) void __mt76_dbg(struct mt76_dev *dev,
++			       const char *fmt, ...);
++void mt76_dbg_dump(struct mt76_dev *dev,
++		   enum mt76_debug_mask mask,
++		   const char *msg, const char *prefix,
++		   const void *buf, size_t len);
++
++#define mt76_dbg(dev, dbg_mask, fmt, ...)			\
++do {								\
++	typeof(dbg_mask) mask = (dbg_mask);			\
++	typeof(dev) _dev = (dev);				\
++	if ((_dev->debug_mask) & mask)				\
++		__mt76_dbg(_dev, fmt, ##__VA_ARGS__);	\
++} while (0)
++
++#endif /* __MT76_DEBUG_H_ */
+diff --git a/Makefile b/Makefile
+--- a/Makefile
++++ b/Makefile
+@@ -12,7 +12,7 @@
+ 
+ mt76-y := \
+ 	mmio.o util.o trace.o dma.o mac80211.o debugfs.o eeprom.o \
+-	tx.o agg-rx.o mcu.o wed.o scan.o channel.o
++	tx.o agg-rx.o mcu.o wed.o scan.o channel.o debug.o
+ 
+ mt76-$(CONFIG_MT76_NPU) += npu.o
+ mt76-$(CONFIG_PCI) += pci.o
+diff --git a/mt76.h b/mt76.h
+--- a/mt76.h
++++ b/mt76.h
+@@ -28,6 +28,7 @@
+ #endif
+ #include "util.h"
+ #include "testmode.h"
++#include "debug.h"
+ 
+ #define CHAN2G(_idx, _freq) {			\
+ 	.band = NL80211_BAND_2GHZ,		\
+diff --git a/mt7996/mac.c b/mt7996/mac.c
+--- a/mt7996/mac.c
++++ b/mt7996/mac.c
+@@ -13,7 +13,6 @@
+ #include "mcu.h"
+ #include "vendor.h"
+ #include "mt7996_trace.h"
+-#include "debug.h"
+ 
+ static struct mt76_wcid *mt7996_rx_get_wcid(struct mt7996_dev *dev,
+ 					    u16 idx, u8 band_idx)
+diff --git a/mt7996/main.c b/mt7996/main.c
+--- a/mt7996/main.c
++++ b/mt7996/main.c
+@@ -9,10 +9,6 @@
+ #ifdef CONFIG_MTK_DEBUG
+ #include "mtk_mcu.h"
+ #endif
+-
+-unsigned int mt7996_debug_mask = 0x1f;
+-module_param(mt7996_debug_mask, uint, 0644);
+-MODULE_PARM_DESC(mt7996_debug_mask, "Debugging mask");
+ 
+ static void mt7996_testmode_disable_all(struct mt7996_dev *dev)
+ {
+@@ -488,6 +484,11 @@
+ 			WRITE_ONCE(mlink->beacon_mon_last, jiffies);
+ 		}
+ 	}
++
++	mt76_dbg(&dev->mt76, MT76_DBG_BSS,
++		 "%s: band=%u, bss_idx=%u, link_id=%u, wcid=%u\n",
++		 __func__, phy->mt76->band_idx, mlink->idx,
++		 link_id, msta_link->wcid.idx);
+ 
+ 	return 0;
+ }
+diff --git a/mt7996/mcu.c b/mt7996/mcu.c
+--- a/mt7996/mcu.c
++++ b/mt7996/mcu.c
+@@ -3743,6 +3743,11 @@
+ 		mld_setup_link->wcid = cpu_to_le16(msta_link->wcid.idx);
+ 		mld_setup_link->bss_idx = link->mt76.idx;
+ 
++		mt76_dbg(&dev->mt76, MT76_DBG_STA,
++			 "%s: link_id(%d) wcid(%d) bss_idx(%d)\n",
++			 __func__, link_id, mld_setup_link->wcid,
++			 mld_setup_link->bss_idx);
++
+ 		mld_setup_link++;
+ 	}
+ }
+@@ -3784,6 +3789,9 @@
+ 	/* starec basic */
+ 	mt76_connac_mcu_sta_basic_tlv(&dev->mt76, skb, vif, link_conf, link_sta,
+ 				      conn_state, newly);
++	mt76_dbg(&dev->mt76, MT76_DBG_DEV,
++		 "%s: link=%u, wcid=%u, newly=%d, conn_state=%d\n",
++		   __func__, wcid->link_id, wcid->idx, newly, conn_state);
+ 
+ 	if (conn_state == CONN_STATE_DISCONNECT)
+ 		goto out;
+@@ -4028,9 +4036,13 @@
+ 	if (mlink->omac_idx >= REPEATER_BSSID_START)
+ 		return mt7996_mcu_muar_config(dev, mlink, link_conf->addr, false, enable);
+ 
+-	if (link_conf)
++	if (link_conf) {
+ 		memcpy(data.tlv.omac_addr, link_conf->addr, ETH_ALEN);
+-
++		mt76_dbg(&dev->mt76, MT76_DBG_DEV,
++			 "%s: band=%u, omac=%u, addr=%pM, en=%d\n",
++			 __func__, data.hdr.band_idx, data.hdr.omac_idx,
++			 data.tlv.omac_addr, enable);
++	}
+ 	return mt76_mcu_send_msg(&dev->mt76, MCU_WMWA_UNI_CMD(DEV_INFO_UPDATE),
+ 				 &data, sizeof(data), true);
+ }
+@@ -8439,10 +8451,10 @@
+ 		}
+ 	}
+ 
+-	mlo_dbg(mconf->phy, "link:%u, wcid:%d, control:%x, mode:%d, bmp:%x\n",
+-		msta_link->wcid.link_id, msta_link->wcid.idx, eml_omn->control,
+-		!!(eml_omn->control & EML_OMN_CONTROL_EMLSR_MODE),
+-		eml_op->bitmap);
++	mt76_dbg(&dev->mt76, MT76_DBG_MLD,
++		 "%s: link:%u, wcid:%d, control:%x, mode:%d, bmp:%x\n",
++		 __func__, msta_link->wcid.link_id, msta_link->wcid.idx, eml_omn->control,
++		 !!(eml_omn->control & EML_OMN_CONTROL_EMLSR_MODE), eml_op->bitmap);
+ 
+ 	return mt76_mcu_skb_send_msg(&dev->mt76, skb,
+ 			MCU_WMWA_UNI_CMD(STA_REC_UPDATE), true);
+diff --git a/mt7996/mmio.c b/mt7996/mmio.c
+--- a/mt7996/mmio.c
++++ b/mt7996/mmio.c
+@@ -16,6 +16,10 @@
+ 
+ static bool wed_enable = true;
+ module_param(wed_enable, bool, 0644);
++
++unsigned int mt76_debug_mask = 0x1f;
++module_param(mt76_debug_mask, uint, 0644);
++MODULE_PARM_DESC(mt76_debug_mask, "Debugging mask");
+ 
+ static const struct __base mt7996_reg_base[] = {
+ 	[WF_AGG_BASE]		= { { 0x820e2000, 0x820f2000, 0x830e2000 } },
+@@ -699,6 +703,7 @@
+ 	dev->mt76.bus = bus_ops;
+ 
+ 	mdev->rev = (device_id << 16) | (mt76_rr(dev, MT_HW_REV) & 0xff);
++	mdev->debug_mask = mt76_debug_mask;
+ 
+ 	dev_dbg(mdev->dev, "ASIC revision: %04x\n", mdev->rev);
+ 
+diff --git a/mt7996/mt7996.h b/mt7996/mt7996.h
+--- a/mt7996/mt7996.h
++++ b/mt7996/mt7996.h
+@@ -10,6 +10,7 @@
+ #include <linux/ktime.h>
+ #include <linux/pci.h>
+ #include "../mt76_connac.h"
++#include "../debug.h"
+ #include "regs.h"
+ 
+ #define MT7996_MAX_RADIOS		3

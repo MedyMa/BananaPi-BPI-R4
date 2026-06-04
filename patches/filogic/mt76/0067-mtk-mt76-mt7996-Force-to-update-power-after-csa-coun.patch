@@ -1,0 +1,29 @@
+diff --git a/mt7996/main.c b/mt7996/main.c
+--- a/mt7996/main.c
++++ b/mt7996/main.c
+@@ -682,6 +682,14 @@
+ 			mt7996_set_monitor(phy, true);
+ 			phy->mt76->monitor_vif = vif;
+ 		}
++		if (ret)
++			goto out;
++
++		delta = mt76_tx_power_path_delta(hweight16(mphy->chainmask));
++		current_txpower = DIV_ROUND_UP(mphy->txpower_cur + delta, 2);
++		ret = mt7996_mcu_set_txpower_sku(phy, current_txpower);
++		if (ret)
++			goto out;
+ 	}
+ 
+ 	vif->offload_flags |= IEEE80211_OFFLOAD_ENCAP_4ADDR;
+@@ -785,10 +793,6 @@
+ 		goto out;
+ 
+ 	ret = mt7996_mcu_set_chan_info(phy, UNI_CHANNEL_RX_PATH, false);
+-	if (ret)
+-		goto out;
+-
+-	ret = mt7996_mcu_set_txpower_sku(phy);
+ 	if (ret)
+ 		goto out;
+ 

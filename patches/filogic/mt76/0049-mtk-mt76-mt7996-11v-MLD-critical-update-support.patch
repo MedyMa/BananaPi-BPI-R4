@@ -1,0 +1,104 @@
+diff --git a/mt7996/mcu.c b/mt7996/mcu.c
+--- a/mt7996/mcu.c
++++ b/mt7996/mcu.c
+@@ -109,6 +109,8 @@
+ 
+ struct mt7996_mbssid_data {
+ 	struct mbssid_sub_off mbssid_idx;
++	struct mbssid_sub_off ntx_bss_cap;
++	bool is_cu_link;
+ };
+ 
+ #define MCU_PATCH_ADDRESS		0x200000
+@@ -4593,9 +4595,41 @@
+ 	attlm_offset->offset = cpu_to_le16(offset);
+ }
+ 
++static bool
++mt7996_is_nontx_cu_link(struct mt7996_phy *phy,
++			   const struct element *sub_elem, u8 bssid_idx)
++{
++	const struct element *ml_elem;
++	struct mt7996_vif_link *mconf;
++	int bpcc;
++
++	ml_elem = cfg80211_find_ext_elem(WLAN_EID_EXT_EHT_MULTI_LINK,
++					 sub_elem->data, sub_elem->datalen);
++	if (!ml_elem || !ieee80211_mle_type_ok(ml_elem->data + 1,
++					       IEEE80211_ML_CONTROL_TYPE_BASIC,
++					       ml_elem->datalen - 1))
++		return false;
++
++	bpcc = ieee80211_mle_get_bss_param_ch_cnt(ml_elem->data + 1);
++	if (bpcc < 0)
++		return false;
++
++	rcu_read_lock();
++	mconf =	rcu_dereference(phy->mbssid_conf[bssid_idx]);
++	if (!mconf || bpcc == mconf->bpcc) {
++		rcu_read_unlock();
++		return false;
++	}
++
++	mconf->bpcc = bpcc;
++
++	rcu_read_unlock();
++	return true;
++}
++
+ static void
+-mt7996_parse_mbssid_elems(struct sk_buff *skb, u16 mbssid_off,
+-			  struct mt7996_mbssid_data *mbssid_data)
++mt7996_parse_mbssid_elems(struct mt7996_phy *phy, struct sk_buff *skb,
++			  u16 mbssid_off, struct mt7996_mbssid_data *mbssid_data)
+ {
+ 	const struct element *elem;
+ 
+@@ -4609,8 +4643,9 @@
+ 
+ 		for_each_element(sub_elem, elem->data + 1, elem->datalen - 1) {
+ 			const struct ieee80211_bssid_index *idx;
+-			const u8 *idx_ie;
++			const u8 *idx_ie, *ntx_bss_cap_ie;
+ 			u8 bssid_idx;
++			bool cu_flag = false;
+ 
+ 			/* not a valid BSS profile */
+ 			if (sub_elem->id || sub_elem->datalen < 4)
+@@ -4632,11 +4667,35 @@
+ 
+ 			idx = (void *)(idx_ie + 2);
+ 			bssid_idx = idx->bssid_index;
+-			if (!bssid_idx || bssid_idx > MAX_BEACON_NUM - 1)
++			if (!bssid_idx || bssid_idx > MT7996_MAX_MBSSID - 1)
+ 				continue;
+ 
+ 			mbssid_data[bssid_idx].mbssid_idx.offset = idx_ie - skb->data;
+ 			mbssid_data[bssid_idx].mbssid_idx.valid = true;
++
++			/* Find WLAN_EID_NON_TX_BSSID_CAP
++			 * in the merged nontransmitted profile
++			 */
++			ntx_bss_cap_ie = cfg80211_find_ie(WLAN_EID_NON_TX_BSSID_CAP,
++							  sub_elem->data,
++							  sub_elem->datalen);
++
++			if (ntx_bss_cap_ie && ntx_bss_cap_ie[1] == sizeof(u16)) {
++				mbssid_data[bssid_idx].ntx_bss_cap.offset =
++					ntx_bss_cap_ie - skb->data;
++				mbssid_data[bssid_idx].ntx_bss_cap.valid =
++					true;
++				cu_flag = le16_to_cpu(*(u16 *)(ntx_bss_cap_ie + 2)) &
++					  WLAN_CAPABILITY_PBCC;
++			}
++
++			/* Find WLAN_EID_EXT_EHT_MULTI_LINK
++			 * in the merged nontransmitted profile
++			 */
++			if (cu_flag)
++				mbssid_data[bssid_idx].is_cu_link =
++					mt7996_is_nontx_cu_link(phy, sub_elem,
++								bssid_idx);
+ 		}
+ 	}
+ }
