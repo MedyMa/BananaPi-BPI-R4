@@ -133,6 +133,23 @@ do
   [ -f "$src" ] && cp "$src" target/linux/mediatek/patches-6.6/
 done
 
+# Extend the copied BPI 999-2741 patch so nf_flow_table.h is touched once.
+# A separate follow-up patch is brittle here because cached kernel trees or
+# nearby upstream context drift can make the second hunk fail before compile.
+if [ -f target/linux/mediatek/patches-6.6/999-2741-mtkhnat-add-support-for-virtual-interface-a.patch ]; then
+  PATCH_FILE=target/linux/mediatek/patches-6.6/999-2741-mtkhnat-add-support-for-virtual-interface-a.patch \
+    perl -0pi -e 'BEGIN { $file = $ENV{"PATCH_FILE"}; }
+      $count_header = s/@@ -182,6 \+182,7 @@ struct flow_offload \{/@@ -182,6 +182,8 @@ struct flow_offload {/g;
+      $count = s/\+\s+struct net_device \*virt_dev;\n(\s+u32 flags;)/+\tstruct net_device *virt_dev;\n+\tu32 tnl_type;\n$1/g;
+      END {
+        if ($count_header == 1 && $count == 1) {
+          exit 0;
+        }
+        print STDERR "Failed to inject tnl_type into $file\n";
+        exit 2;
+      }' "$PATCH_FILE"
+fi
+
 # 999-2746 failed to apply (context mismatch); inject its defines directly into
 # hnat.h so hnat.c compiles. MTK_FE_INT_STATUS2 is called MTK_INT_STATUS2 in
 # ImmortalWrt — provide both names so the driver builds regardless of base.
@@ -159,15 +176,12 @@ cat >> target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_hnat/hn
 #endif
 EOF
 
-# flow_offload_hw_path.tnl_type is added by BPI-R4PRO's 999-4100 TOPS patch
-# which we do not carry. Keep the local inject patch in the workspace instead
-# of embedding it here.
-cp "$GITHUB_WORKSPACE/patches/filogic/mt76/999-2741b-flow-offload-add-tnl-type.patch" \
-  target/linux/mediatek/patches-6.6/999-2741b-flow-offload-add-tnl-type.patch
-perl -0pi -e 's/\r\n/\n/g; s/\r/\n/g' \
-  target/linux/mediatek/patches-6.6/999-2741b-flow-offload-add-tnl-type.patch
-
 rm -rf bpi-r4pro-src
+
+# Patch stack changes can survive through restored kernel build dirs and cause
+# stale plaintext-patch failures. Force target/linux to repatch from scratch.
+find build_dir -type d \( -name 'linux-*' -o -name 'linux-mediatek_filogic' \) -prune -exec rm -rf {} + 2>/dev/null || true
+find staging_dir -path '*/stamp/.target_compile*' -type f -delete 2>/dev/null || true
 
 # Kernel config symbols introduced by BPI-R4PRO hnat patches (999-2745).
 # Without explicit values, syncconfig blocks in non-interactive CI.
