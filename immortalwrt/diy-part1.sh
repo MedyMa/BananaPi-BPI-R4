@@ -95,23 +95,36 @@ popd
 
 mv bpi-r4pro-src/package/kernel/mt76 package/kernel/mt76
 
+# 39c960c3 already contains the rxfilter default change from BPI patch 0001.
+# Keep it out of the patch stack to avoid a reversed-patch failure.
+rm -f package/kernel/mt76/patches/0001-mtk-mt76-mt7996-config-rxfilter-to-drop-other-unicas.patch
+
+# 2ab64980 already carries the 0004 behavior in refactored mt76 dma init code.
+rm -f package/kernel/mt76/patches/0004-mtk-mt76-mt7996-Remove-wed-rro-ring-add-napi-at-init.patch
+
+# Rebase 0003/0005 onto 2ab64980 via workspace patch files instead of
+# embedding patch bodies in this script.
+cp "$GITHUB_WORKSPACE/patches/filogic/mt76/0003-mtk-mt76-mt7996-Fix-call-trace-happened-when-wed-att.patch" \
+    package/kernel/mt76/patches/0003-mtk-mt76-mt7996-Fix-call-trace-happened-when-wed-att.patch
+cp "$GITHUB_WORKSPACE/patches/filogic/mt76/0005-mtk-mt76-mt7996-Remove-wed_stop-during-L1-SER.patch" \
+    package/kernel/mt76/patches/0005-mtk-mt76-mt7996-Remove-wed_stop-during-L1-SER.patch
+perl -0pi -e 's/\r\n/\n/g; s/\r/\n/g' \
+    package/kernel/mt76/patches/0003-mtk-mt76-mt7996-Fix-call-trace-happened-when-wed-att.patch \
+    package/kernel/mt76/patches/0005-mtk-mt76-mt7996-Remove-wed_stop-during-L1-SER.patch
+
+# Keep the mt76 package Makefile bump as a standalone patch, so the version
+# update is tracked in the workspace and validated with patch(1).
+(cd package/kernel/mt76 && patch -p1 < "$GITHUB_WORKSPACE/patches/filogic/mt76/1005-mt76-makefile-2ab64980.patch")
+
 # Apply BPI-R4PRO mt76 compatibility after the vendor patch series.
 # The compat patch in this workspace may contain mixed line endings.
 # Normalize it to LF so it matches the post-patch mt76 sources in CI.
 cp "$GITHUB_WORKSPACE/patches/filogic/1004-mt76-immortalwrt-24.10-compat.patch" \
     package/kernel/mt76/mt76-compat.patch
 perl -0pi -e 's/\r\n/\n/g; s/\r/\n/g' package/kernel/mt76/mt76-compat.patch
-cat > package/kernel/mt76/compat-fixup.sh << 'EOF'
-#!/bin/sh
-
-build_dir="$1"
-
-perl -0pi -e 's/^.*WLAN_EXT_CAPA5_QOS_MAP.*\r?\n//mg; s/^.*WLAN_EXT_CAPA7_SCS_SUPPORT.*\r?\n//mg; s/^.*WLAN_EXT_CAPA11_MIRRORED_SCS_SUPPORT.*\r?\n//mg; s/^.*NL80211_EXT_FEATURE_STAS_COUNT.*\r?\n//mg' "$build_dir/mt7996/init.c"
-perl -0pi -e 's/\n\s*ieee80211_tsf_offset_notify\(vif, rpted_linkid, rpted_mconf->tsf_offset,\n\s*sizeof\(rpted_mconf->tsf_offset\), GFP_KERNEL\);\n/\n/s' "$build_dir/mt7996/main.c"
-perl -0pi -e 's/\n\s*cfg80211_background_radar_update_channel\(hw->wiphy, c, expand\);\n/\n/s' "$build_dir/mt7996/main.c"
-perl -0pi -e 's/\n\s*ieee80211_tpt_led_trig_tx\(mphy->hw, tx_bytes\);\n\s*ieee80211_tpt_led_trig_rx\(mphy->hw, rx_bytes\);\n/\n/s' "$build_dir/mt7996/mcu.c"
-perl -0pi -e 's/^\s*struct mt7996_mcu_mld_ap_reconf_event \*reconf = \(void \*\)data->data;\n//m; s/\n\s*ieee80211_links_removed\(vif, le16_to_cpu\(reconf->link_bitmap\)\);\n/\n/s' "$build_dir/mt7996/mcu.c"
-EOF
+cp "$GITHUB_WORKSPACE/patches/filogic/mt76/compat-fixup.sh" \
+    package/kernel/mt76/compat-fixup.sh
+perl -0pi -e 's/\r\n/\n/g; s/\r/\n/g' package/kernel/mt76/compat-fixup.sh
 chmod 0755 package/kernel/mt76/compat-fixup.sh
 {
     printf '\n'
@@ -185,19 +198,12 @@ cat >> target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_hnat/hn
 EOF
 
 # flow_offload_hw_path.tnl_type is added by BPI-R4PRO's 999-4100 TOPS patch
-# which we do not carry.  Inject it via a numbered patch so it applies after
-# 999-2741 (which already added virt_dev to the struct).
-cat > target/linux/mediatek/patches-6.6/999-2741b-flow-offload-add-tnl-type.patch << 'PATCH'
---- a/include/net/netfilter/nf_flow_table.h
-+++ b/include/net/netfilter/nf_flow_table.h
-@@ -183,6 +183,7 @@ struct flow_offload_hw_path {
-	struct net_device *dev;
-	struct net_device *virt_dev;
-+	u32 tnl_type;
-	u32 flags;
-
-	u8 eth_src[ETH_ALEN];
-PATCH
+# which we do not carry. Keep the local inject patch in the workspace instead
+# of embedding it here.
+cp "$GITHUB_WORKSPACE/patches/filogic/mt76/999-2741b-flow-offload-add-tnl-type.patch" \
+    target/linux/mediatek/patches-6.6/999-2741b-flow-offload-add-tnl-type.patch
+perl -0pi -e 's/\r\n/\n/g; s/\r/\n/g' \
+    target/linux/mediatek/patches-6.6/999-2741b-flow-offload-add-tnl-type.patch
 
 rm -rf bpi-r4pro-src
 
