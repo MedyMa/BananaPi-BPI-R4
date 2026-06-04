@@ -26,14 +26,29 @@ git clone --depth=1 --filter=blob:none --sparse \
   https://github.com/BPI-SINOVOIP/BPI-R4PRO-8X-OPENWRT-V24.10.0-Master-Devel \
   bpi-r4pro-src
 pushd bpi-r4pro-src
-git sparse-checkout set \
-  dl/backports-6.14-rc7.tar.xz \
-  package/kernel/mac80211 \
-  package/kernel/mt76 \
-  target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek \
-  target/linux/mediatek/files-6.6/include \
-  target/linux/mediatek/patches-6.6
+git sparse-checkout set --no-cone \
+  /dl/backports-6.14-rc7.tar.xz \
+  /package/kernel/mac80211 \
+  /package/kernel/mt76 \
+  /target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek \
+  /target/linux/mediatek/files-6.6/include \
+  /target/linux/mediatek/patches-6.6
 popd
+
+for required_path in \
+  bpi-r4pro-src/dl/backports-6.14-rc7.tar.xz \
+  bpi-r4pro-src/package/kernel/mac80211 \
+  bpi-r4pro-src/package/kernel/mt76 \
+  bpi-r4pro-src/target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_hnat \
+  bpi-r4pro-src/target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_eth_dbg.c \
+  bpi-r4pro-src/target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_eth_dbg.h \
+  bpi-r4pro-src/target/linux/mediatek/patches-6.6
+do
+  [ -e "$required_path" ] || {
+    echo "Missing required BPI path after sparse checkout: $required_path" >&2
+    exit 1
+  }
+done
 
 mkdir -p dl
 cp bpi-r4pro-src/dl/backports-6.14-rc7.tar.xz dl/
