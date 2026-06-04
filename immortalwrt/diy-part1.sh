@@ -129,6 +129,8 @@ xargs -0 perl -0pi -e 's/\r\n/\n/g; s/\r/\n/g'
 
 # Keep the mt76 package Makefile bump as a standalone patch, so the version
 # update is tracked in the workspace and validated with patch(1).
+perl -0pi -e 's/\r\n/\n/g; s/\r/\n/g' \
+    "$GITHUB_WORKSPACE/patches/filogic/mt76/1005-mt76-makefile-2ab64980.patch"
 (cd package/kernel/mt76 && patch -p1 < "$GITHUB_WORKSPACE/patches/filogic/mt76/1005-mt76-makefile-2ab64980.patch")
 
 # Apply BPI-R4PRO mt76 compatibility after the vendor patch series.
