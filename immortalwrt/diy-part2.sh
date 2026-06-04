@@ -152,8 +152,8 @@ done
 # A separate follow-up patch is brittle here because cached kernel trees or
 # nearby upstream context drift can make the second hunk fail before compile.
 if [ -f target/linux/mediatek/patches-6.6/999-2741-mtkhnat-add-support-for-virtual-interface-a.patch ]; then
-  PATCH_FILE=target/linux/mediatek/patches-6.6/999-2741-mtkhnat-add-support-for-virtual-interface-a.patch \
-    perl -0pi -e 'BEGIN { $file = $ENV{"PATCH_FILE"}; }
+  patch_file=target/linux/mediatek/patches-6.6/999-2741-mtkhnat-add-support-for-virtual-interface-a.patch
+  PATCH_FILE="$patch_file" perl -0pi -e 'BEGIN { $file = $ENV{"PATCH_FILE"}; }
       $count_header = s/@@ -182,6 \+182,7 @@ struct flow_offload \{/@@ -182,6 +182,8 @@ struct flow_offload {/g;
       $count = s/\+\s+struct net_device \*virt_dev;\n(\s+u32 flags;)/+\tstruct net_device *virt_dev;\n+\tu32 tnl_type;\n$1/g;
       END {
@@ -162,7 +162,7 @@ if [ -f target/linux/mediatek/patches-6.6/999-2741-mtkhnat-add-support-for-virtu
         }
         print STDERR "Failed to inject tnl_type into $file\n";
         exit 2;
-      }' "$PATCH_FILE"
+      }' "$patch_file"
 fi
 
 # 999-2746 failed to apply (context mismatch); inject its defines directly into
