@@ -102,18 +102,30 @@ rm -f package/kernel/mt76/patches/0001-mtk-mt76-mt7996-config-rxfilter-to-drop-o
 # 2ab64980 already carries the 0004 behavior in refactored mt76 dma init code.
 rm -f package/kernel/mt76/patches/0004-mtk-mt76-mt7996-Remove-wed-rro-ring-add-napi-at-init.patch
 
-# Rebase 0003/0005/0008 onto 2ab64980 via workspace patch files instead of
-# embedding patch bodies in this script.
-cp "$GITHUB_WORKSPACE/patches/filogic/mt76/0003-mtk-mt76-mt7996-Fix-call-trace-happened-when-wed-att.patch" \
-    package/kernel/mt76/patches/0003-mtk-mt76-mt7996-Fix-call-trace-happened-when-wed-att.patch
-cp "$GITHUB_WORKSPACE/patches/filogic/mt76/0005-mtk-mt76-mt7996-Remove-wed_stop-during-L1-SER.patch" \
-    package/kernel/mt76/patches/0005-mtk-mt76-mt7996-Remove-wed_stop-during-L1-SER.patch
-cp "$GITHUB_WORKSPACE/patches/filogic/mt76/0008-mtk-mt76-mt7996-add-critical-update-support.patch" \
-    package/kernel/mt76/patches/0008-mtk-mt76-mt7996-add-critical-update-support.patch
-perl -0pi -e 's/\r\n/\n/g; s/\r/\n/g' \
-    package/kernel/mt76/patches/0003-mtk-mt76-mt7996-Fix-call-trace-happened-when-wed-att.patch \
-    package/kernel/mt76/patches/0005-mtk-mt76-mt7996-Remove-wed_stop-during-L1-SER.patch \
-    package/kernel/mt76/patches/0008-mtk-mt76-mt7996-add-critical-update-support.patch
+# Remove mt76 vendor patches that are already upstreamed or reduced to no-op
+# after rebasing on top of 2ab64980 and earlier workspace overrides.
+if [ -f "$GITHUB_WORKSPACE/patches/filogic/mt76/rebased-skip-list.txt" ]; then
+    while IFS= read -r patch_name; do
+        [ -n "$patch_name" ] || continue
+        rm -f "package/kernel/mt76/patches/$patch_name"
+    done < "$GITHUB_WORKSPACE/patches/filogic/mt76/rebased-skip-list.txt"
+fi
+
+# Copy all workspace mt76 override patches with vendor-style four-digit names.
+find "$GITHUB_WORKSPACE/patches/filogic/mt76" -maxdepth 1 -type f \
+    -regextype posix-extended -regex '.*/0[0-9]{3}-.*\.patch' -print0 | \
+while IFS= read -r -d '' override_patch; do
+    patch_name="$(basename "$override_patch")"
+    if [ -f "$GITHUB_WORKSPACE/patches/filogic/mt76/rebased-skip-list.txt" ] && \
+       grep -qxF "$patch_name" "$GITHUB_WORKSPACE/patches/filogic/mt76/rebased-skip-list.txt"; then
+        continue
+    fi
+    cp "$override_patch" "package/kernel/mt76/patches/$patch_name"
+done
+
+find package/kernel/mt76/patches -maxdepth 1 -type f \
+    -regextype posix-extended -regex '.*/0[0-9]{3}-.*\.patch' -print0 | \
+xargs -0 perl -0pi -e 's/\r\n/\n/g; s/\r/\n/g'
 
 # Keep the mt76 package Makefile bump as a standalone patch, so the version
 # update is tracked in the workspace and validated with patch(1).
