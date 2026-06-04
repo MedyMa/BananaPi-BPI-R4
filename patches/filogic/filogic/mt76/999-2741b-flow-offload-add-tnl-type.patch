@@ -1,0 +1,9 @@
+--- a/include/net/netfilter/nf_flow_table.h
++++ b/include/net/netfilter/nf_flow_table.h
+@@ -183,6 +183,7 @@ struct flow_offload_hw_path {
+ 	struct net_device *dev;
+ 	struct net_device *virt_dev;
++	u32 tnl_type;
+ 	u32 flags;
+ 
+ 	u8 eth_src[ETH_ALEN];
