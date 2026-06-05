@@ -28,21 +28,22 @@ index 729b893..1e21cbd 100644
  define KernelPackage/mt7992-firmware
    $(KernelPackage/mt76-default)
    TITLE:=MediaTek MT7992 firmware
-@@ -665,3 +671,13 @@ endef
+@@ -665,3 +671,14 @@ endef
  endef
  
 +define KernelPackage/mt7990-firmware/install
-+  $(INSTALL_DIR) $(1)/lib/firmware/mediatek/mt7996
-+  cp \
-+          $(PKG_BUILD_DIR)/firmware/mt7996/mt7990_eeprom.bin \
-+          $(PKG_BUILD_DIR)/firmware/mt7996/mt7990_eeprom_2i5i.bin \
-+          $(PKG_BUILD_DIR)/firmware/mt7996/mt7990_rom_patch.bin \
-+          $(PKG_BUILD_DIR)/firmware/mt7996/mt7990_wm.bin \
-+          $(1)/lib/firmware/mediatek/mt7996
++	$(INSTALL_DIR) $(1)/lib/firmware/mediatek/mt7996
++	cp \
++		$(PKG_BUILD_DIR)/firmware/mt7996/mt7990_eeprom.bin \
++		$(PKG_BUILD_DIR)/firmware/mt7996/mt7990_eeprom_2i5i.bin \
++		$(PKG_BUILD_DIR)/firmware/mt7996/mt7990_rom_patch.bin \
++		$(PKG_BUILD_DIR)/firmware/mt7996/mt7990_wm.bin \
++		$(PKG_BUILD_DIR)/firmware/mt7996/mt7990_wm_tm.bin \
++		$(1)/lib/firmware/mediatek/mt7996
 +endef
 +
  define KernelPackage/mt7992-firmware/install
-@@ -768,6 +784,7 @@ $(eval $(call KernelPackage,mt7921e))
+@@ -767,11 +784,12 @@ $(eval $(call KernelPackage,mt7921e))
  $(eval $(call KernelPackage,mt7925u))
  $(eval $(call KernelPackage,mt7925e))
  $(eval $(call KernelPackage,mt7996e))
@@ -50,3 +51,7 @@ index 729b893..1e21cbd 100644
  $(eval $(call KernelPackage,mt7992-firmware))
  $(eval $(call KernelPackage,mt7992-23-firmware))
  $(eval $(call KernelPackage,mt7996-firmware-common))
+ $(eval $(call KernelPackage,mt7996-firmware))
+ $(eval $(call KernelPackage,mt7996-233-firmware))
+ $(eval $(call KernelPackage,mt76))
+ $(eval $(call BuildPackage,mt76-test))
