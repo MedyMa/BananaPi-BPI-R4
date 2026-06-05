@@ -3,42 +3,19 @@
 # Modify default IP
 sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generate
 
-# Workaround: GCC 14 + musl fortify "always_inline memset: target specific option mismatch" in mbedtls
-# Root cause: When building for aarch64_cortex-a53 with GCC 14, TARGET_CFLAGS includes
-# target-specific CPU flags (e.g. -mcpu=cortex-a53+crypto) that conflict with the
-# always_inline memset declared in musl's fortify/string.h. GCC 14 enforces strict
-# target-option consistency for always_inline functions and raises an error.
-# Fix: Disable _FORTIFY_SOURCE only for mbedtls so the fortify inline is not attempted,
-# resolving the mismatch without affecting any other package's compilation.
-if ! grep -q '_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile; then
-  if grep -q 'TARGET_CFLAGS := \$(filter-out -O%' package/libs/mbedtls/Makefile; then
-    sed -i '/TARGET_CFLAGS := \$(filter-out -O%/a TARGET_CFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile
-  else
-    echo 'TARGET_CFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0' >> package/libs/mbedtls/Makefile
-  fi
-fi
-
-# Replace immortalwrt mac80211/mt76 with BPI-R4PRO wireless stack;
-# also pull the required backports tarball, mtk_hnat driver,
-# mtk_eth_dbg dependency and hnat kernel patches.
-rm -rf package/kernel/mac80211 package/kernel/mt76
+# Keep the upstream package tree intact; only reuse BPI hnat assets
+# and the mt76 version bump patch from the workspace.
 git clone --depth=1 --filter=blob:none --sparse \
   https://github.com/BPI-SINOVOIP/BPI-R4PRO-8X-OPENWRT-V24.10.0-Master-Devel \
   bpi-r4pro-src
 pushd bpi-r4pro-src
 git sparse-checkout set --no-cone \
-  /dl/backports-6.14-rc7.tar.xz \
-  /package/kernel/mac80211 \
-  /package/kernel/mt76 \
   /target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek \
   /target/linux/mediatek/files-6.6/include \
   /target/linux/mediatek/patches-6.6
 popd
 
 for required_path in \
-  bpi-r4pro-src/dl/backports-6.14-rc7.tar.xz \
-  bpi-r4pro-src/package/kernel/mac80211 \
-  bpi-r4pro-src/package/kernel/mt76 \
   bpi-r4pro-src/target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_hnat \
   bpi-r4pro-src/target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_eth_dbg.c \
   bpi-r4pro-src/target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_eth_dbg.h \
@@ -50,74 +27,11 @@ do
   }
 done
 
-mkdir -p dl
-cp bpi-r4pro-src/dl/backports-6.14-rc7.tar.xz dl/
-mv bpi-r4pro-src/package/kernel/mac80211 package/kernel/mac80211
-mv bpi-r4pro-src/package/kernel/mt76 package/kernel/mt76
-
-# 39c960c3 already contains the rxfilter default change from BPI patch 0001.
-# Keep it out of the patch stack to avoid a reversed-patch failure.
-rm -f package/kernel/mt76/patches/0001-mtk-mt76-mt7996-config-rxfilter-to-drop-other-unicas.patch
-
-# 2ab64980 already carries the 0004 behavior in refactored mt76 dma init code.
-rm -f package/kernel/mt76/patches/0004-mtk-mt76-mt7996-Remove-wed-rro-ring-add-napi-at-init.patch
-
-# Remove mt76 vendor patches that are already upstreamed or reduced to no-op
-# after rebasing on top of 2ab64980 and earlier workspace overrides.
-if [ -f "$GITHUB_WORKSPACE/patches/filogic/mt76/rebased-skip-list.txt" ]; then
-  while IFS= read -r patch_name; do
-    [ -n "$patch_name" ] || continue
-    rm -f "package/kernel/mt76/patches/$patch_name"
-  done < "$GITHUB_WORKSPACE/patches/filogic/mt76/rebased-skip-list.txt"
-fi
-
-# Copy all workspace mt76 override patches with vendor-style four-digit names.
-find "$GITHUB_WORKSPACE/patches/filogic/mt76" -maxdepth 1 -type f \
-  -regextype posix-extended -regex '.*/0[0-9]{3}-.*\.patch' -print0 | \
-while IFS= read -r -d '' override_patch; do
-  patch_name="$(basename "$override_patch")"
-  if [ -f "$GITHUB_WORKSPACE/patches/filogic/mt76/rebased-skip-list.txt" ] && \
-     grep -qxF "$patch_name" "$GITHUB_WORKSPACE/patches/filogic/mt76/rebased-skip-list.txt"; then
-    continue
-  fi
-  cp "$override_patch" "package/kernel/mt76/patches/$patch_name"
-done
-
-find package/kernel/mt76/patches -maxdepth 1 -type f \
-  -regextype posix-extended -regex '.*/0[0-9]{3}-.*\.patch' -print0 | \
-xargs -0 perl -0pi -e 's/\r\n/\n/g; s/\r/\n/g'
-
 # Keep the mt76 package Makefile bump as a standalone patch, so the version
 # update is tracked in the workspace and validated with patch(1).
 perl -0pi -e 's/\r\n/\n/g; s/\r/\n/g' \
   "$GITHUB_WORKSPACE/patches/filogic/mt76/1005-mt76-makefile-2ab64980.patch"
 (cd package/kernel/mt76 && patch -p1 < "$GITHUB_WORKSPACE/patches/filogic/mt76/1005-mt76-makefile-2ab64980.patch")
-
-# Apply BPI-R4PRO mt76 compatibility after the vendor patch series.
-# The compat patch in this workspace may contain mixed line endings.
-# Normalize it to LF so it matches the post-patch mt76 sources in CI.
-cp "$GITHUB_WORKSPACE/patches/filogic/1004-mt76-immortalwrt-24.10-compat.patch" \
-  package/kernel/mt76/mt76-compat.patch
-perl -0pi -e 's/\r\n/\n/g; s/\r/\n/g' package/kernel/mt76/mt76-compat.patch
-cp "$GITHUB_WORKSPACE/patches/filogic/mt76/compat-fixup.sh" \
-  package/kernel/mt76/compat-fixup.sh
-perl -0pi -e 's/\r\n/\n/g; s/\r/\n/g' package/kernel/mt76/compat-fixup.sh
-chmod 0755 package/kernel/mt76/compat-fixup.sh
-{
-  printf '\n'
-  printf '%s\n' 'define Build/Prepare'
-  printf '\t%s\n' '$(call Build/Prepare/Default)'
-  printf '\t%s\n' '(cd $(PKG_BUILD_DIR) && patch -p1 < $(TOPDIR)/package/kernel/mt76/mt76-compat.patch)'
-  printf '\t%s\n' '$(TOPDIR)/package/kernel/mt76/compat-fixup.sh $(PKG_BUILD_DIR)'
-  printf '%s\n' 'endef'
-} > package/kernel/mt76/compat-prepare.mk
-awk 'FNR == NR { block = block $0 "\n"; next }
-  /^\$\(eval \$\(call KernelPackage,/ && !done { print block; done = 1 }
-     { print }' \
-    package/kernel/mt76/compat-prepare.mk package/kernel/mt76/Makefile \
-    > package/kernel/mt76/Makefile.tmp \
-  && mv package/kernel/mt76/Makefile.tmp package/kernel/mt76/Makefile
-rm -f package/kernel/mt76/compat-prepare.mk
 
 mkdir -p target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek
 cp -r bpi-r4pro-src/target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_hnat \
