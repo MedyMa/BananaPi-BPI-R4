@@ -129,7 +129,6 @@ CONFIG_PACKAGE_kmod-inet-diag=y
 CONFIG_PACKAGE_kmod-mt76-connac=y
 CONFIG_PACKAGE_kmod-mt76-core=y
 CONFIG_PACKAGE_kmod-mt7996-233-firmware=y
-CONFIG_PACKAGE_kmod-mt7990-firmware=y
 CONFIG_PACKAGE_kmod-mt7996-firmware=y
 CONFIG_PACKAGE_kmod-mt7996-firmware-common=y
 CONFIG_PACKAGE_kmod-mt7996e=y
