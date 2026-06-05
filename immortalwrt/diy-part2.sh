@@ -4,7 +4,7 @@
 sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generate
 
 # Keep the upstream package tree intact; only reuse BPI hnat assets
-# and the mt76 version bump patch from the workspace.
+# and the local mt76 packaging patch from the workspace.
 git clone --depth=1 --filter=blob:none --sparse \
   https://github.com/BPI-SINOVOIP/BPI-R4PRO-8X-OPENWRT-V24.10.0-Master-Devel \
   bpi-r4pro-src
@@ -27,8 +27,8 @@ do
   }
 done
 
-# Keep the mt76 package Makefile bump as a standalone patch, so the version
-# update is tracked in the workspace and validated with patch(1).
+# Keep the mt76 package Makefile patch as a standalone patch so the local
+# packaging changes stay tracked in the workspace and validated with patch(1).
 perl -0pi -e 's/\r\n/\n/g; s/\r/\n/g' \
   "$GITHUB_WORKSPACE/patches/filogic/mt76/1005-mt76-makefile-2ab64980.patch"
 (cd package/kernel/mt76 && patch -p1 < "$GITHUB_WORKSPACE/patches/filogic/mt76/1005-mt76-makefile-2ab64980.patch")
@@ -129,8 +129,9 @@ EOF
 
 rm -rf bpi-r4pro-src
 
-# Patch stack changes can survive through restored kernel build dirs and cause
-# stale plaintext-patch failures. Force target/linux to repatch from scratch.
+# Patch stack and package metadata changes can survive through restored caches.
+# Force both target/linux and package metadata to regenerate from scratch.
+rm -rf tmp
 find build_dir -type d \( -name 'linux-*' -o -name 'linux-mediatek_filogic' \) -prune -exec rm -rf {} + 2>/dev/null || true
 find staging_dir -path '*/stamp/.target_compile*' -type f -delete 2>/dev/null || true
 
