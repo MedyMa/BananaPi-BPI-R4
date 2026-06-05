@@ -33,6 +33,28 @@ perl -0pi -e 's/\r\n/\n/g; s/\r/\n/g' \
   "$GITHUB_WORKSPACE/patches/filogic/mt76/1005-mt76-makefile-2ab64980.patch"
 (cd package/kernel/mt76 && patch -p1 < "$GITHUB_WORKSPACE/patches/filogic/mt76/1005-mt76-makefile-2ab64980.patch")
 
+# The copied HNAT driver sources only add kernel code; OpenWrt still needs a
+# KernelPackage definition so kmod-mediatek_hnat exists for defconfig and LuCI.
+if ! grep -qF 'define KernelPackage/mediatek_hnat' target/linux/mediatek/modules.mk; then
+cat >> target/linux/mediatek/modules.mk << 'EOF'
+
+define KernelPackage/mediatek_hnat
+  SUBMENU:=Network Devices
+  TITLE:=MediaTek HNAT support
+  DEPENDS:=@TARGET_mediatek_filogic +kmod-nf-flow
+  KCONFIG:=CONFIG_NET_MEDIATEK_HNAT
+  FILES:=$(LINUX_DIR)/drivers/net/ethernet/mediatek/mtk_hnat/mtkhnat.ko
+  AUTOLOAD:=$(call AutoProbe,mtkhnat)
+endef
+
+define KernelPackage/mediatek_hnat/description
+  MediaTek hardware NAT offload module for Filogic targets.
+endef
+
+$(eval $(call KernelPackage,mediatek_hnat))
+EOF
+fi
+
 mkdir -p target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek
 cp -r bpi-r4pro-src/target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/mtk_hnat \
   target/linux/mediatek/files-6.6/drivers/net/ethernet/mediatek/
