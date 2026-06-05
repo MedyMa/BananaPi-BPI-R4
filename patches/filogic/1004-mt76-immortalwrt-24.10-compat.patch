@@ -122,14 +122,260 @@ diff --git a/mt7996/mac.c b/mt7996/mac.c
  
  void mt7996_mac_sta_rc_work(struct work_struct *work)
 diff --git a/mt7996/main.c b/mt7996/main.c
+index aec55fb..2de55c3 100644
 --- a/mt7996/main.c
 +++ b/mt7996/main.c
-@@ -2836,21 +2836,6 @@
- 	mt7996_for_each_phy(dev, phy)
- 		ieee80211_queue_delayed_work(hw, &phy->mt76->mac_work,
- 					     MT7996_WATCHDOG_TIME);
+@@ -39,12 +39,7 @@ int mt7996_run(struct mt7996_phy *phy)
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = mt7996_mcu_set_chan_info(phy, UNI_CHANNEL_RX_PATH, false);
+-	if (ret)
+-		return ret;
+-
+-	/* set a parking channel */
+-	ret = mt7996_mcu_set_chan_info(phy, UNI_CHANNEL_SWITCH, false);
++	ret = mt7996_mcu_set_chan_info(phy, UNI_CHANNEL_RX_PATH);
+ 	if (ret)
+ 		return ret;
+ 
+@@ -56,28 +51,6 @@ int mt7996_run(struct mt7996_phy *phy)
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = mt7996_mcu_set_scs(phy, SCS_ENABLE);
+-	if (ret)
+-		return ret;
+-
+-#ifdef CONFIG_MTK_DEBUG
+-	phy->sr_enable = true;
+-	phy->enhanced_sr_enable = true;
+-	phy->thermal_protection_enable = true;
+-	ret = mt7996_mcu_set_tx_power_ctrl(phy, UNI_TXPOWER_SKU_POWER_LIMIT_CTRL,
+-					   dev->dbg.sku_disable ? 0 : phy->sku_limit_en);
+-
+-	ret = mt7996_mcu_set_tx_power_ctrl(phy, UNI_TXPOWER_BACKOFF_POWER_LIMIT_CTRL,
+-					   dev->dbg.sku_disable ? 0 : phy->sku_path_en);
+-#else
+-	ret = mt7996_mcu_set_tx_power_ctrl(phy, UNI_TXPOWER_SKU_POWER_LIMIT_CTRL,
+-					   phy->sku_limit_en);
+-	ret = mt7996_mcu_set_tx_power_ctrl(phy, UNI_TXPOWER_BACKOFF_POWER_LIMIT_CTRL,
+-					   phy->sku_path_en);
+-#endif
+-	if (ret)
+-		return ret;
+-
+ 	set_bit(MT76_STATE_RUNNING, &phy->mt76->state);
+ 
+ 	ieee80211_queue_delayed_work(dev->mphy.hw, &phy->mt76->mac_work,
+@@ -214,33 +187,6 @@ static int get_own_mld_idx(u64 mask, bool group_mld)
+ 	return -EINVAL;
+ }
+ 
+-static int get_own_mld_idx(u64 mask, bool group_mld)
+-{
+-	u8 start, end;
+-	int i;
+-
+-	if (group_mld) {
+-		start = 0;
+-		end = 15;
+-	} else {
+-		start = 16;
+-		end = 63;
+-	}
+-
+-	i = get_free_idx(mask, start, end);
+-	if (i)
+-		return i - 1;
+-
+-	/* if 16-63 are fully used, find again from 0-15 */
+-	if (!group_mld && !i) {
+-		i = get_free_idx(mask, 0, 15);
+-		if (i)
+-			return i - 1;
+-	}
+-
+-	return -1;
 -}
 -
+ static int get_mld_remap_idx(u64 mask)
+ {
+ 	u8 start = 0, end = 15;
+@@ -645,33 +591,15 @@ static int mt7996_add_interface(struct ieee80211_hw *hw,
+ 	struct mt7996_vif *mvif = (struct mt7996_vif *)vif->drv_priv;
+ 	struct wireless_dev *wdev = ieee80211_vif_to_wdev(vif);
+ 	struct mt7996_dev *dev = mt7996_hw_dev(hw);
+-	struct mt7996_phy *phy;
+ 	int i, err = 0;
+ 
+ 	mutex_lock(&dev->mt76.mutex);
+-	if (dev->testmode_enable && vif->type != NL80211_IFTYPE_MONITOR) {
+-		mutex_unlock(&dev->mt76.mutex);
+-		dev_err(dev->mt76.dev, "Only monitor interface is allowed in testmode\n");
+-		return -EINVAL;
+-	}
+-
+-	mt7996_testmode_disable_all(dev);
+ 
+ 	for (i = 0; i < MT7996_MAX_RADIOS; i++) {
+-		/* FIXME: only set the required radio temporarily for testmode.
+-		 * The TX speed of testmode will be affected if the unused radio is enabled.
+-		 * Normal mode should also skip enabling the unused radio once the
+-		 * real single wiphy codebase is stable.
+-		 */
+-		if (dev->testmode_enable && !(wdev->radio_mask & BIT(i)))
+-			continue;
+-
+-		phy = dev->radio_phy[i];
+-
+-		if (phy && !mvif->deflink.phy && (wdev->radio_mask & BIT(i)))
+-			mvif->deflink.phy = phy;
++		struct mt7996_phy *phy = dev->radio_phy[i];
+ 
+-		if (!phy || test_bit(MT76_STATE_RUNNING, &phy->mt76->state))
++		if (!phy || !(wdev->radio_mask & BIT(i)) ||
++		    test_bit(MT76_STATE_RUNNING, &phy->mt76->state))
+ 			continue;
+ 
+ 		err = mt7996_run(phy);
+@@ -680,30 +608,13 @@ static int mt7996_add_interface(struct ieee80211_hw *hw,
+ 
+ 		if (vif->type == NL80211_IFTYPE_MONITOR) {
+ 			mt7996_set_monitor(phy, true);
+-			phy->mt76->monitor_vif = vif;
+ 		}
+-		if (ret)
+-			goto out;
+-
+-		delta = mt76_tx_power_path_delta(hweight16(mphy->chainmask));
+-		current_txpower = DIV_ROUND_UP(mphy->txpower_cur + delta, 2);
+-		ret = mt7996_mcu_set_txpower_sku(phy, current_txpower);
+-		if (ret)
+-			goto out;
+ 	}
+ 
+-	vif->offload_flags |= IEEE80211_OFFLOAD_ENCAP_4ADDR;
+-
+-	INIT_DELAYED_WORK(&mvif->beacon_mon_work, mt7996_beacon_mon_work);
+-	mvif->dev = dev;
+-	mvif->sta.vif = mvif;
+-	/* TODO: temporaily set this to prevent some crashes */
+-	mvif->deflink.mt76.mvif = &mvif->mt76;
+-	memset(mvif->mt76.band_to_link, IEEE80211_LINK_UNSPECIFIED,
+-	       sizeof(mvif->mt76.band_to_link));
++	mt76_vif_init(vif, &mvif->mt76);
+ 
+-	if (vif->type == NL80211_IFTYPE_STATION && mvif->deflink.phy)
+-		err = mt7996_vif_link_add(mvif->deflink.phy->mt76, vif, &vif->bss_conf, NULL);
++	vif->offload_flags |= IEEE80211_OFFLOAD_ENCAP_4ADDR;
++	mvif->mt76.deflink_id = IEEE80211_LINK_UNSPECIFIED;
+ 
+ out:
+ 	mutex_unlock(&dev->mt76.mutex);
+@@ -776,23 +687,15 @@ int mt7996_set_channel(struct mt76_phy *mphy)
+ 	if (mphy->offchannel)
+ 		mt7996_mac_update_beacons(phy);
+ 
+-
+-	if (phy->dev->cal) {
+-		ret = mt7996_mcu_apply_tx_dpd(phy);
+-		if (ret)
+-			goto out;
+-	}
+-
+-	if (mt76_testmode_enabled(mphy) || mt76_testmode_bf_enabled(mphy)) {
+-		mt7996_tm_update_channel(phy);
++	ret = mt7996_mcu_set_chan_info(phy, UNI_CHANNEL_SWITCH);
++	if (ret)
+ 		goto out;
+-	}
+ 
+-	ret = mt7996_mcu_set_chan_info(phy, UNI_CHANNEL_SWITCH, false);
++	ret = mt7996_mcu_set_chan_info(phy, UNI_CHANNEL_RX_PATH);
+ 	if (ret)
+ 		goto out;
+ 
+-	ret = mt7996_mcu_set_chan_info(phy, UNI_CHANNEL_RX_PATH, false);
++	ret = mt7996_mcu_set_txpower_sku(phy);
+ 	if (ret)
+ 		goto out;
+ 
+@@ -2761,70 +2664,6 @@ out:
+ 	return ret;
+ }
+ 
+-static int
+-mt7996_set_ttlm(struct ieee80211_hw *hw, struct ieee80211_vif *vif)
+-{
+-	struct ieee80211_neg_ttlm merged_ttlm;
+-	struct mt7996_dev *dev = mt7996_hw_dev(hw);
+-	struct ieee80211_sta *sta;
+-	int ret;
+-
+-	/* TODO check the intersection between Adv-TTLM and Neg-TTLM */
+-	if (vif->type != NL80211_IFTYPE_STATION ||
+-	    (vif->adv_ttlm.active && vif->neg_ttlm.valid))
+-		return -EOPNOTSUPP;
+-
+-	mutex_lock(&dev->mt76.mutex);
+-	sta = ieee80211_find_sta(vif, vif->cfg.ap_addr);
+-	if (!sta) {
+-		mutex_unlock(&dev->mt76.mutex);
+-		return -EINVAL;
+-	}
+-
+-	mt7996_get_merged_ttlm(vif, &merged_ttlm);
+-
+-	ret = mt7996_mcu_peer_mld_ttlm_req(dev, vif, sta, &merged_ttlm);
+-	mutex_unlock(&dev->mt76.mutex);
+-	return ret;
+-}
+-
+-static int
+-mt7996_set_sta_ttlm(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
+-		    struct ieee80211_sta *sta, struct ieee80211_neg_ttlm *neg_ttlm)
+-{
+-	struct mt7996_dev *dev = mt7996_hw_dev(hw);
+-	int ret;
+-
+-	mutex_lock(&dev->mt76.mutex);
+-	ret = mt7996_mcu_peer_mld_ttlm_req(dev, vif, sta, neg_ttlm);
+-	mutex_unlock(&dev->mt76.mutex);
+-	return ret;
+-}
+-
+-static int
+-mt7996_set_attlm(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
+-		 u16 disabled_links, u16 switch_time, u32 duration)
+-{
+-	struct mt7996_dev *dev = mt7996_hw_dev(hw);
+-	int ret;
+-
+-	mutex_lock(&dev->mt76.mutex);
+-	ret = mt7996_mcu_mld_set_attlm(dev, vif, disabled_links, switch_time, duration);
+-	mutex_unlock(&dev->mt76.mutex);
+-	return ret;
+-}
+-
+-static enum ieee80211_neg_ttlm_res
+-mt7996_can_neg_ttlm(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
+-		    struct ieee80211_neg_ttlm *neg_ttlm)
+-{
+-	/* TODO check intersection between adv-TTLM and neg-TTLM
+-	 * For now, we reject all possible overlapping cases of Adv-TTLM and
+-	 * Neg-TTLM
+-	 */
+-	return vif->adv_ttlm.active ? NEG_TTLM_RES_REJECT : NEG_TTLM_RES_ACCEPT;
+-}
+-
+ static void
+ mt7996_reconfig_complete(struct ieee80211_hw *hw,
+ 			 enum ieee80211_reconfig_type reconfig_type)
+@@ -2838,89 +2677,6 @@ mt7996_reconfig_complete(struct ieee80211_hw *hw,
+ 					     MT7996_WATCHDOG_TIME);
+ }
+ 
 -static int
 -mt7996_set_eml_op_mode(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
 -		       struct ieee80211_sta *sta,
@@ -143,15 +389,95 @@ diff --git a/mt7996/main.c b/mt7996/main.c
 -	mutex_unlock(&dev->mt76.mutex);
 -
 -	return ret;
- }
+-}
+-
+-static int
+-mt7996_set_qos_map(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
+-		   struct cfg80211_qos_map *qos_map)
+-{
+-	struct mt7996_dev *dev = mt7996_hw_dev(hw);
+-	unsigned long valid_links = vif->valid_links ?: BIT(0);
+-	unsigned int link_id;
+-	int ret = 0;
+-
+-	mutex_lock(&dev->mt76.mutex);
+-	for_each_set_bit(link_id, &valid_links, IEEE80211_MLD_MAX_NUM_LINKS) {
+-		struct mt7996_vif_link *mconf =
+-			mt7996_vif_link(dev, vif, link_id);
+-
+-		if (!mconf)
+-			continue;
+-
+-		ret = mt7996_mcu_set_qos_map(dev, mconf, qos_map);
+-		if(ret)
+-			break;
+-	}
+-	mutex_unlock(&dev->mt76.mutex);
+-
+-	return ret;
+-}
+-
+-static void
+-mt7996_sta_channel_switch(struct ieee80211_hw *hw,
+-			  struct ieee80211_vif *vif,
+-			  struct ieee80211_channel_switch *ch_switch)
+-{
+-#define TX_PAUSED_GRACE_PERIOD		2000
+-	struct mt7996_vif *mvif = (struct mt7996_vif *)vif->drv_priv;
+-	struct mt7996_dev *dev = mt7996_hw_dev(hw);
+-	struct ieee80211_bss_conf *conf;
+-	struct mt7996_vif_link *mconf;
+-	unsigned int link_id = ch_switch->link_id;
+-	int csa_time;
+-
+-	if (vif->type != NL80211_IFTYPE_STATION)
+-		return;
+-
+-	mutex_lock(&dev->mt76.mutex);
+-
+-	conf = link_conf_dereference_protected(vif, link_id);
+-	mconf = mt7996_vif_link(dev, vif, link_id);
+-	if (!conf || !mconf) {
+-		mutex_unlock(&dev->mt76.mutex);
+-		return;
+-	}
+-
+-	/* a new csa occurred while the original one was still in progress */
+-	if (mconf->state != MT7996_STA_CHSW_IDLE)
+-		mvif->tx_paused_links &= ~BIT(link_id);
+-
+-	csa_time = (max_t(u8, ch_switch->count, 1) - 1) * conf->beacon_int;
+-	mconf->pause_timeout = TX_PAUSED_GRACE_PERIOD +
+-			       MT7996_MAX_BEACON_LOSS * conf->beacon_int +
+-			       cfg80211_chandef_dfs_cac_time(hw->wiphy,
+-							     &ch_switch->chandef);
+-	mconf->next_state = MT7996_STA_CHSW_PAUSE_TX;
+-	mutex_unlock(&dev->mt76.mutex);
+-
+-	cancel_delayed_work(&mconf->sta_chsw_work);
+-	ieee80211_queue_delayed_work(hw, &mconf->sta_chsw_work,
+-				     msecs_to_jiffies(csa_time));
+-}
+-
  
- static int
-@@ -2985,5 +2970,4 @@
+ const struct ieee80211_ops mt7996_ops = {
+ 	.add_chanctx = mt76_add_chanctx,
+@@ -2940,7 +2696,7 @@ const struct ieee80211_ops mt7996_ops = {
+ 	.vif_cfg_changed = mt7996_vif_cfg_changed,
+ 	.link_info_changed = mt7996_link_info_changed,
+ 	.sta_state = mt7996_sta_state,
+-	.sta_pre_rcu_remove = mt7996_sta_pre_rcu_remove,
++	.sta_pre_rcu_remove = mt76_sta_pre_rcu_remove,
+ 	.link_sta_rc_update = mt7996_link_sta_rc_update,
+ 	.set_key = mt7996_set_key,
+ 	.ampdu_action = mt7996_ampdu_action,
+@@ -2985,5 +2741,4 @@ const struct ieee80211_ops mt7996_ops = {
  	.change_vif_links = mt7996_change_vif_links,
  	.change_sta_links = mt7996_mac_sta_change_links,
  	.reconfig_complete = mt7996_reconfig_complete,
 -	.set_eml_op_mode = mt7996_set_eml_op_mode,
  };
+
 diff --git a/mt7996/mcu.c b/mt7996/mcu.c
 --- a/mt7996/mcu.c
 +++ b/mt7996/mcu.c
