@@ -393,6 +393,58 @@ diff --git a/mt7996/mt7996.h b/mt7996/mt7996.h
  #ifdef CONFIG_MAC80211_DEBUGFS
  void mt7996_sta_add_debugfs(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
  			    struct ieee80211_sta *sta, struct dentry *dir);
+@@ -760,6 +760,15 @@ struct mt7996_dev {
+ 
+ 	u8 eeprom_mode;
+ 	bool has_eht:1;
++	bool flash_mode:1;
++	bool bin_file_mode:1;
++	u32 cur_prek_offset;
++	u8 *cal;
++	const char *bin_file_name;
++	struct {
++		const u32 *rev;
++		u32 dpd_ch_num[DPD_CH_NUM_TYPE_MAX];
++	} prek;
+ 
+ 	struct {
+ 		struct {
+ 			void *ptr;
+diff --git a/mt7996/eeprom.c b/mt7996/eeprom.c
+--- a/mt7996/eeprom.c
++++ b/mt7996/eeprom.c
+@@ -301,6 +301,10 @@ static int mt7996_eeprom_load(struct mt7996_dev *dev)
+ 	}
+ 
+ out:
++	dev->flash_mode = dev->eeprom_mode == EEPROM_MODE_FLASH ||
++			  dev->eeprom_mode == EEPROM_MODE_EXT;
++	dev->bin_file_mode = false;
++	dev->bin_file_name = NULL;
+ 	return mt7996_eeprom_check_or_use_default(dev, use_default);
+ }
+ 
+@@ -422,7 +426,7 @@ mt7996_eeprom_load_precal_binfile(struct mt7996_dev *dev, u32 offs, u32 size)
+ 	const struct firmware *fw = NULL;
+ 	int ret;
+ 
+-	ret = request_firmware(&fw, dev->mt76.bin_file_name, dev->mt76.dev);
++	ret = request_firmware(&fw, dev->bin_file_name, dev->mt76.dev);
+ 	if (ret)
+ 		return ret;
+ 
+diff --git a/mt7996/mtk_debugfs.c b/mt7996/mtk_debugfs.c
+--- a/mt7996/mtk_debugfs.c
++++ b/mt7996/mtk_debugfs.c
+@@ -2931,7 +2931,7 @@ static int mt7996_show_eeprom_mode(struct seq_file *s, void *data)
+ 			seq_printf(s, "   flash mode\n");
+ 		break;
+ 	case BIN_FILE_MODE:
+-		seq_printf(s, "   bin file mode\n   filename = %s\n", dev->mt76.bin_file_name);
++		seq_printf(s, "   bin file mode\n   filename = %s\n", dev->bin_file_name ?: "(unset)");
+ 		break;
+ 	default:
+ 		break;
 diff --git a/mt7996/pci.c b/mt7996/pci.c
 --- a/mt7996/pci.c
 +++ b/mt7996/pci.c
