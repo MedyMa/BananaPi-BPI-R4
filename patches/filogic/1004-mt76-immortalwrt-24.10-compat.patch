@@ -379,21 +379,7 @@ diff --git a/mt7996/mt7996.h b/mt7996/mt7996.h
  };
  
  enum mt7992_var_type {
-@@ -1340,10 +1353,9 @@
- int mt7996_mcu_ps_leave(struct mt7996_dev *dev, struct mt7996_vif_link *mconf,
- 			struct mt7996_sta_link *msta_link);
- int mt7996_mcu_cp_support(struct mt7996_dev *dev, u8 mode);
--int mt7996_mcu_set_emlsr_mode(struct mt7996_dev *dev,
--			      struct ieee80211_vif *vif,
--			      struct ieee80211_sta *sta,
--			      struct ieee80211_eml_params *eml_params);
-+int mt7996_mcu_set_tpo(struct mt7996_dev *dev, u8 type, u8 val);
-+int mt7996_mcu_set_lp_option(struct mt7996_dev *dev, u8 *arg);
-+int mt7996_mcu_set_pst(struct mt7996_dev *dev, u32 band, u32 cmd, u32 val);
- #ifdef CONFIG_MAC80211_DEBUGFS
- void mt7996_sta_add_debugfs(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
- 			    struct ieee80211_sta *sta, struct dentry *dir);
-@@ -760,6 +760,15 @@ struct mt7996_dev {
+@@ -760,7 +760,16 @@ struct mt7996_dev {
  
  	u8 eeprom_mode;
  	bool has_eht:1;
@@ -410,6 +396,20 @@ diff --git a/mt7996/mt7996.h b/mt7996/mt7996.h
  	struct {
  		struct {
  			void *ptr;
+@@ -1340,10 +1353,9 @@
+ int mt7996_mcu_ps_leave(struct mt7996_dev *dev, struct mt7996_vif_link *mconf,
+ 			struct mt7996_sta_link *msta_link);
+ int mt7996_mcu_cp_support(struct mt7996_dev *dev, u8 mode);
+-int mt7996_mcu_set_emlsr_mode(struct mt7996_dev *dev,
+-			      struct ieee80211_vif *vif,
+-			      struct ieee80211_sta *sta,
+-			      struct ieee80211_eml_params *eml_params);
++int mt7996_mcu_set_tpo(struct mt7996_dev *dev, u8 type, u8 val);
++int mt7996_mcu_set_lp_option(struct mt7996_dev *dev, u8 *arg);
++int mt7996_mcu_set_pst(struct mt7996_dev *dev, u32 band, u32 cmd, u32 val);
+ #ifdef CONFIG_MAC80211_DEBUGFS
+ void mt7996_sta_add_debugfs(struct ieee80211_hw *hw, struct ieee80211_vif *vif,
+ 			    struct ieee80211_sta *sta, struct dentry *dir);
 diff --git a/mt7996/eeprom.c b/mt7996/eeprom.c
 --- a/mt7996/eeprom.c
 +++ b/mt7996/eeprom.c
