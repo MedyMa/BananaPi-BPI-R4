@@ -26,7 +26,15 @@ validate_and_apply_mt76_patch() {
     (cd package/kernel/mt76 && patch -p1 < "$patch_file")
 }
 
-# Keep the mt76 package Makefile patch as a standalone patch so the local
-# packaging changes stay tracked in the workspace and validated before apply.
+# Select the correct mt76 Makefile patch based on the branch.
+# master branch upstream already includes mt7990-firmware, so only
+# the MODPARAMS addition is needed there.  openwrt-24.10 needs the
+# full patch that also adds mt7990-firmware support.
+if [ "$REPO_BRANCH" = "master" ]; then
+    MT76_PATCH="1005-mt76-makefile-2ab64980-master.patch"
+else
+    MT76_PATCH="1005-mt76-makefile-2ab64980.patch"
+fi
+
 validate_and_apply_mt76_patch \
-  "$GITHUB_WORKSPACE/patches/filogic/mt76/1005-mt76-makefile-2ab64980.patch"
+  "$GITHUB_WORKSPACE/patches/filogic/mt76/$MT76_PATCH"
