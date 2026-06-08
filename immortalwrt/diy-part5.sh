@@ -55,7 +55,7 @@ rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2sock
 # Clone community packages to package/community
 mkdir -p package/community
 pushd package/community
-git clone --depth=1 -b dev https://github.com/fw876/helloworld
+git clone --depth=1 https://github.com/fw876/helloworld
 # rm -rf helloworld/{naiveproxy,shadowsocks-libev,shadowsocksr-libev,shadow-tls,simple-obfs,tcping,tuic-client,v2ray-plugin,xray-core,xray-plugin}
 git clone --depth=1 -b main https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git
 [ -f openwrt-passwall-packages/haproxy/Makefile ] && sed -i '/^[[:space:]]*ADDON+=USE_QUIC=1$/d' openwrt-passwall-packages/haproxy/Makefile
@@ -93,6 +93,17 @@ pushd package/OpenClash
 git clone --depth=1 https://github.com/vernesong/OpenClash
 popd
 
+# Re-run feeds update AFTER manual feed modifications so the index matches
+# the current state.  This ensures "feeds install" below finds packages that
+# were replaced (golang, mosdns) and packages from feeds that are needed by
+# community clones (c-ares, udns, etc.).
+./scripts/feeds update -a
+
+# Re-apply golang replacement — "feeds update" above reverts it because the
+# packages feed is a single git repo (git pull overwrites our sbwml clone).
+rm -rf feeds/packages/lang/golang
+git clone --depth=1 https://github.com/sbwml/packages_lang_golang -b 26.x feeds/packages/lang/golang
+
 # merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/package/mtk/applications/mtkhqos_util
 
 # Compatibility fixes for floating packages feed metadata.
@@ -120,7 +131,25 @@ patch_makefile_dep \
     'CONFIG_BOOTDELAY=30' \
     'CONFIG_BOOTDELAY=10'
 
+# Workaround: GCC 14 + musl fortify "always_inline memset: target specific option mismatch"
+# Shadowsocks-libev depends on mbedtls via DEPENDS:=+libmbedtls, so mbedtls must build.
+if ! grep -q '_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile; then
+  if grep -q 'TARGET_CFLAGS := \$(filter-out -O%' package/libs/mbedtls/Makefile; then
+    sed -i '/TARGET_CFLAGS := \$(filter-out -O%/a TARGET_CFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile
+  else
+    echo 'TARGET_CFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0' >> package/libs/mbedtls/Makefile
+  fi
+fi
+
 ./scripts/feeds install -a
+
+# Explicitly install feed packages that community clones (helloworld) need as
+# build-time or runtime dependencies but may not be automatically picked up.
+./scripts/feeds install c-ares pcre2 udns
+
+# Set GO proxy for Chinese network (sing-box downloads Go modules at build time).
+export GOEXPERIMENT=
+export GOPROXY=https://proxy.golang.org,direct
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1000-luci-status-overview-wifi7-mlo-master.patch"
 
