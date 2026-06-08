@@ -12,7 +12,7 @@ permissions:
 env:
   REPO_URL: https://github.com/immortalwrt/immortalwrt
   REPO_BRANCH: master
-  CONFIG_FILE: immortalwrt/mediatek/defconfig
+  CONFIG_FILE: immortalwrt/MTK/defconfig
   DIY_P1_SH: immortalwrt/diy-part5.sh
   DIY_P2_SH: immortalwrt/diy-part6.sh
   UPLOAD_FIRMWARE: true
