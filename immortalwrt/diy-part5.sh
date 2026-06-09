@@ -155,6 +155,20 @@ fi
 # build-time or runtime dependencies but may not be automatically picked up.
 ./scripts/feeds install c-ares pcre2 udns
 
+# Verify that libmbedtls (required by shadowsocks-libev) is present in the
+# build tree.  On ImmortalWrt master, mbedtls lives under package/libs/mbedtls
+# (not in feeds).  If the Makefile is missing or broken, nothing can depend on
+# libmbedtls and shadowsocks-libev will fail to build.
+if [ ! -f package/libs/mbedtls/Makefile ]; then
+  echo "ERROR: package/libs/mbedtls/Makefile not found in the main tree." >&2
+  echo "The ImmortalWrt master branch is expected to carry it." >&2
+  exit 1
+fi
+grep -q 'define Package/libmbedtls' package/libs/mbedtls/Makefile || {
+  echo "ERROR: package/libs/mbedtls/Makefile does not define libmbedtls." >&2
+  exit 1
+}
+
 # Set GO proxy for Chinese network (sing-box downloads Go modules at build time).
 export GOEXPERIMENT=
 export GOPROXY=https://proxy.golang.org,direct
