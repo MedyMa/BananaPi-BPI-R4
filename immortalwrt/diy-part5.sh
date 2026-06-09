@@ -78,7 +78,7 @@ merge_package "-b ddnsto-beta https://github.com/linkease/nas-packages-luci" nas
 merge_package "-b ddnsto-beta https://github.com/linkease/nas-packages" nas-packages/network/services/ddnsto
 popd
 
-# Wireless stack migration lives in diy-part6.sh to keep diy-part5 focused on
+# Wireless stack migration lives in diy6.sh to keep diy5 focused on
 # feed/package preparation.
 
 # add luci-app-mosdns
@@ -92,17 +92,6 @@ mkdir -p package/OpenClash
 pushd package/OpenClash
 git clone --depth=1 https://github.com/vernesong/OpenClash
 popd
-
-# Re-run feeds update AFTER manual feed modifications so the index matches
-# the current state.  This ensures "feeds install" below finds packages that
-# were replaced (golang, mosdns) and packages from feeds that are needed by
-# community clones (c-ares, udns, etc.).
-./scripts/feeds update -a
-
-# Re-apply golang replacement — "feeds update" above reverts it because the
-# packages feed is a single git repo (git pull overwrites our sbwml clone).
-rm -rf feeds/packages/lang/golang
-git clone --depth=1 https://github.com/sbwml/packages_lang_golang -b 26.x feeds/packages/lang/golang
 
 # merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/package/mtk/applications/mtkhqos_util
 
@@ -125,42 +114,30 @@ patch_makefile_dep \
     'libnetsnmp-ssl' \
     'libnetsnmp'
 
+# Fix outdated PKG_MIRROR_HASH in helloworld/shadowsocks-libev.
+patch_makefile_dep \
+    package/community/helloworld/shadowsocks-libev/Makefile \
+    'b3898ad0a557bc8b0bbb2f3888101d461944239b0b7d4d4c6f164d73694a4595' \
+    '9d2293f16629d1e30ede304ccddbaaa4e922c1c5e7ea04cef0e9d274aafa6109'
+
 # Shrink the BPI-R4 U-Boot autoboot wait so boot time is not dominated by a 30s delay.
 patch_makefile_dep \
     package/boot/uboot-mediatek/patches/450-add-bpi-r4.patch \
     'CONFIG_BOOTDELAY=30' \
     'CONFIG_BOOTDELAY=10'
 
-# Workaround: GCC 14 + musl fortify "always_inline memset: target specific option mismatch"
-# Shadowsocks-libev depends on mbedtls via DEPENDS:=+libmbedtls, so mbedtls must build.
-if ! grep -q '_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile; then
-  if grep -q 'TARGET_CFLAGS := \$(filter-out -O%' package/libs/mbedtls/Makefile; then
-    sed -i '/TARGET_CFLAGS := \$(filter-out -O%/a TARGET_CFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile
-  else
-    echo 'TARGET_CFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0' >> package/libs/mbedtls/Makefile
-  fi
-fi
-
 ./scripts/feeds install -a
-
-# Explicitly install feed packages that community clones (helloworld) need as
-# build-time or runtime dependencies but may not be automatically picked up.
-./scripts/feeds install c-ares pcre2 udns
-
-# Set GO proxy for Chinese network (sing-box downloads Go modules at build time).
-export GOEXPERIMENT=
-export GOPROXY=https://proxy.golang.org,direct
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1000-luci-status-overview-wifi7-mlo-master.patch"
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1000-luci-status-overview-wifi7-mlo.patch"
 
 [ -f feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1001-luci-network-wireless-station-hints-master.patch"
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1001-luci-network-wireless-station-hints.patch"
 
 [ -f feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/999-luci-wireless-mtk-mode-matrix-master.patch"
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/999-luci-wireless-mtk-mode-matrix.patch"
 
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1002-luci-status-overview-rate-mhz-hi-master.patch"
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1002-luci-status-overview-rate-mhz-hi.patch"
 
 [ -f feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1003-luci-wireless-mtk-mlo-ofdma-controls-master.patch"
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1003-luci-wireless-mtk-mlo-ofdma-controls.patch"
