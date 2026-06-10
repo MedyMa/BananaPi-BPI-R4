@@ -65,15 +65,12 @@ git clone --depth=1 https://github.com/nikkinikki-org/OpenWrt-nikki
 git clone --depth=1 https://github.com/1522042029/luci-app-socat
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
-# git clone --depth=1 https://github.com/Siriling/5G-Modem-Support
 # merge_package https://github.com/DHDAXCW/dhdaxcw-app dhdaxcw-app/luci-app-adguardhome
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-fan
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-sfp-status
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-adguardhome
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-modemband
 merge_package https://github.com/kenzok8/jell jell/wrtbwmon
-# merge_package "-b Immortalwrt https://github.com/shidahuilang/openwrt-package" openwrt-package/relevance/ddnsto
-# merge_package "-b Immortalwrt https://github.com/shidahuilang/openwrt-package" openwrt-package/luci-app-ddnsto
 merge_package "-b main https://github.com/linkease/nas-packages-luci" nas-packages-luci/luci/luci-app-ddnsto
 merge_package "-b master https://github.com/linkease/nas-packages" nas-packages/network/services/ddnsto
 popd
@@ -131,47 +128,12 @@ patch_makefile_dep \
     'CONFIG_BOOTDELAY=30' \
     'CONFIG_BOOTDELAY=10'
 
-# Fix outdated PKG_MIRROR_HASH in helloworld/shadowsocks-libev.
-# The git checkout + repack at commit 9afa3ca now produces a different
-# tarball hash than what is recorded in the fw876/helloworld Makefile.
-patch_makefile_dep \
-    package/community/helloworld/shadowsocks-libev/Makefile \
-    'b3898ad0a557bc8b0bbb2f3888101d461944239b0b7d4d4c6f164d73694a4595' \
-    '9d2293f16629d1e30ede304ccddbaaa4e922c1c5e7ea04cef0e9d274aafa6109'
 
-# Workaround: GCC 14 + musl fortify "always_inline memset: target specific option mismatch"
-# Shadowsocks-libev depends on mbedtls via DEPENDS:=+libmbedtls, so mbedtls must build.
-if ! grep -q '_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile; then
-  if grep -q 'TARGET_CFLAGS := \$(filter-out -O%' package/libs/mbedtls/Makefile; then
-    sed -i '/TARGET_CFLAGS := \$(filter-out -O%/a TARGET_CFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile
-  else
-    echo 'TARGET_CFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0' >> package/libs/mbedtls/Makefile
-  fi
-fi
 
 ./scripts/feeds install -a
 
-# Explicitly install feed packages that community clones (helloworld) need as
-# build-time or runtime dependencies but may not be automatically picked up.
-./scripts/feeds install c-ares pcre2 udns
-
-# Verify that libmbedtls (required by shadowsocks-libev) is present in the
-# build tree.  On ImmortalWrt master, mbedtls lives under package/libs/mbedtls
-# (not in feeds).  If the Makefile is missing or broken, nothing can depend on
-# libmbedtls and shadowsocks-libev will fail to build.
-if [ ! -f package/libs/mbedtls/Makefile ]; then
-  echo "ERROR: package/libs/mbedtls/Makefile not found in the main tree." >&2
-  echo "The ImmortalWrt master branch is expected to carry it." >&2
-  exit 1
-fi
-grep -q 'define Package/libmbedtls' package/libs/mbedtls/Makefile || {
-  echo "ERROR: package/libs/mbedtls/Makefile does not define libmbedtls." >&2
-  exit 1
-}
-
-# Set GO proxy for Chinese network (sing-box downloads Go modules at build time).
-export GOEXPERIMENT=
-export GOPROXY=https://proxy.golang.org,direct
+# openwrt-25.12 使用 master 版 patch（上游 LuCI 已切换为 ES6+ 语法，
+# 非 master 版 patch 针对 ES5 语法，不兼容 openwrt-25.12）
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1000-luci-status-overview-wifi7-mlo-master.patch"
 

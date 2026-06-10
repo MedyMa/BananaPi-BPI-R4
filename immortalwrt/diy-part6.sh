@@ -26,15 +26,9 @@ validate_and_apply_mt76_patch() {
     (cd package/kernel/mt76 && patch -p1 < "$patch_file")
 }
 
-# Select the correct mt76 Makefile patch based on the branch.
-# master branch upstream already includes mt7990-firmware, so only
-# the MODPARAMS addition is needed there.  openwrt-24.10 needs the
-# full patch that also adds mt7990-firmware support.
-if [ "$REPO_BRANCH" = "master" ]; then
-    MT76_PATCH="1005-mt76-makefile-2ab64980-master.patch"
-else
-    MT76_PATCH="1005-mt76-makefile-2ab64980.patch"
-fi
+# openwrt-25.12 上游已自带 mt7990-firmware，只需追加 wed_enable=1 参数。
+# 使用 master 版 patch（仅添加 MODPARAMS），非 master 版会重复添加 mt7990-firmware。
+MT76_PATCH="1005-mt76-makefile-2ab64980-master.patch"
 
 validate_and_apply_mt76_patch \
   "$GITHUB_WORKSPACE/patches/filogic/mt76/$MT76_PATCH"
