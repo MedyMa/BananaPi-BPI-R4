@@ -113,12 +113,17 @@ patch_makefile_dep \
 # Workaround: GCC 14 + musl fortify "always_inline memset: target specific option mismatch"
 # Shadowsocks-libev depends on mbedtls via DEPENDS:=+libmbedtls, so mbedtls must build.
 if ! grep -q '_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile; then
-  if grep -q 'TARGET_CFLAGS := \$(filter-out -O%' package/libs/mbedtls/Makefile; then
-    sed -i '/TARGET_CFLAGS := \$(filter-out -O%/a TARGET_CFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile
+    if grep -q '\$(if \$(findstring cortex-a53,\$(CONFIG_CPU_TYPE)),-march=armv8-a)' package/libs/mbedtls/Makefile; then
+        sed -i '/$(if $(findstring cortex-a53,$(CONFIG_CPU_TYPE)),-march=armv8-a)/a TARGET_CFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile
   else
     echo 'TARGET_CFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0' >> package/libs/mbedtls/Makefile
   fi
 fi
+
+# packages/openwrt-25.12 currently ships onionshare-cli with unresolved
+# python3-pysocks / python3-unidecode metadata. It is not selected by our
+# configs, so drop it to keep feeds metadata clean.
+rm -rf feeds/packages/net/onionshare-cli
 
 ./scripts/feeds install -a
 
