@@ -56,7 +56,7 @@ rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2sock
 mkdir -p package/community
 pushd package/community
 git clone --depth=1 -b dev https://github.com/fw876/helloworld
-rm -rf helloworld/{shadowsocks-libev,shadowsocksr-libev}
+# rm -rf helloworld/{naiveproxy,shadowsocks-libev,shadowsocksr-libev,shadow-tls,simple-obfs,tcping,tuic-client,v2ray-plugin,xray-core,xray-plugin}
 git clone --depth=1 -b main https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git
 [ -f openwrt-passwall-packages/haproxy/Makefile ] && sed -i '/^[[:space:]]*ADDON+=USE_QUIC=1$/d' openwrt-passwall-packages/haproxy/Makefile
 git clone --depth=1 -b main https://github.com/Openwrt-Passwall/openwrt-passwall.git
@@ -90,6 +90,7 @@ pushd package/OpenClash
 git clone --depth=1 https://github.com/vernesong/OpenClash
 popd
 
+
 # Re-run feeds update AFTER manual feed modifications so the index matches
 # the current state.  This ensures "feeds install" below finds packages that
 # were replaced (golang, mosdns) and packages from feeds that are needed by
@@ -101,7 +102,43 @@ popd
 rm -rf feeds/packages/lang/golang
 git clone --depth=1 https://github.com/sbwml/packages_lang_golang -b 26.x feeds/packages/lang/golang
 
-# merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/package/mtk/applications/mtkhqos_util
+# Fix outdated PKG_MIRROR_HASH in helloworld/shadowsocks-libev.
+# The git checkout + repack at commit 9afa3ca produces a non-deterministic
+# tarball hash that varies by git version / compression settings.
+patch_makefile_dep \
+    package/community/helloworld/shadowsocks-libev/Makefile \
+    'PKG_MIRROR_HASH:=b3898ad0a557bc8b0bbb2f3888101d461944239b0b7d4d4c6f164d73694a4595' \
+    'PKG_MIRROR_HASH:=skip'
+
+# Workaround: GCC 14 + musl fortify "always_inline memset: target specific option mismatch"
+# Shadowsocks-libev depends on mbedtls via DEPENDS:=+libmbedtls, so mbedtls must build.
+if ! grep -q '_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile; then
+  if grep -q 'TARGET_CFLAGS := \$(filter-out -O%' package/libs/mbedtls/Makefile; then
+    sed -i '/TARGET_CFLAGS := \$(filter-out -O%/a TARGET_CFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile
+  else
+    echo 'TARGET_CFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0' >> package/libs/mbedtls/Makefile
+  fi
+fi
+
+./scripts/feeds install -a
+
+# Explicitly install feed packages that community clones (helloworld) need as
+# build-time or runtime dependencies but may not be automatically picked up.
+./scripts/feeds install c-ares pcre2 udns
+
+# Verify that libmbedtls (required by shadowsocks-libev) is present.
+if [ ! -f package/libs/mbedtls/Makefile ]; then
+  echo "ERROR: package/libs/mbedtls/Makefile not found in the main tree." >&2
+  exit 1
+fi
+grep -q 'define Package/libmbedtls' package/libs/mbedtls/Makefile || {
+  echo "ERROR: package/libs/mbedtls/Makefile does not define libmbedtls." >&2
+  exit 1
+}
+
+# Set GO proxy for Chinese network (sing-box downloads Go modules at build time).
+export GOEXPERIMENT=
+export GOPROXY=https://proxy.golang.org,direct
 
 # Compatibility fixes for floating packages feed metadata.
 patch_makefile_dep \
@@ -127,10 +164,6 @@ patch_makefile_dep \
     package/boot/uboot-mediatek/patches/450-add-bpi-r4.patch \
     'CONFIG_BOOTDELAY=30' \
     'CONFIG_BOOTDELAY=10'
-
-
-
-./scripts/feeds install -a
 
 # openwrt-25.12 使用 master 版 patch（上游 LuCI 已切换为 ES6+ 语法，
 # 非 master 版 patch 针对 ES5 语法，不兼容 openwrt-25.12）
