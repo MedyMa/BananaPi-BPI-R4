@@ -110,12 +110,12 @@ patch_makefile_dep \
     'PKG_MIRROR_HASH:=b3898ad0a557bc8b0bbb2f3888101d461944239b0b7d4d4c6f164d73694a4595' \
     'PKG_MIRROR_HASH:=skip'
 
-# shadowsocksr-libev is an old codebase and its upstream Makefile forces LTO,
-# which is brittle with current toolchains in passwall builds.
+# shadowsocksr-libev forces LTO in its upstream Makefile, which is brittle with
+# current toolchains.  Replace the LTO line with an explicit no-lto flag.
 patch_makefile_dep \
     package/community/openwrt-passwall-packages/shadowsocksr-libev/Makefile \
     'TARGET_CFLAGS += -flto' \
-    ''
+    'PKG_BUILD_FLAGS+=no-lto'
 
 # Workaround: GCC 14 + musl fortify "always_inline memset: target specific option mismatch"
 # Shadowsocks-libev depends on mbedtls via DEPENDS:=+libmbedtls, so mbedtls must build.
