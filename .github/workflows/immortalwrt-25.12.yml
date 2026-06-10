@@ -264,7 +264,7 @@ jobs:
       if: steps.tag.outputs.status == 'success' && !cancelled()
       uses: MedyMa/delete-older-releases@v0.3.4
       with:
-        keep_latest: 30
+        keep_latest: 2
         delete_tags: true
         delete_tag_pattern: '^.*-immortalwrt_25_12$'
       env:
