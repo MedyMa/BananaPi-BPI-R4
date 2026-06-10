@@ -1,4 +1,4 @@
-name: immortalwrt_25_12
+name: immortalwrt_25.12
 
 on:
   schedule:
