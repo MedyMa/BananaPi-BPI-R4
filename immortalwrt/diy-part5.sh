@@ -114,9 +114,16 @@ patch_makefile_dep \
 # current toolchains.  Replace the LTO line with an explicit no-lto flag.
 # Use sed (not patch_makefile_dep) because the leading whitespace (tab) makes
 # the literal-string approach miss the line.
-[ -f package/community/openwrt-passwall-packages/shadowsocksr-libev/Makefile ] && \
+[ -f package/community/openwrt-passwall-packages/shadowsocksr-libev/Makefile ] && {
     sed -i '/^[[:space:]]*TARGET_CFLAGS += -flto$/c\PKG_BUILD_FLAGS+=no-lto' \
         package/community/openwrt-passwall-packages/shadowsocksr-libev/Makefile
+    # Same PKG_MIRROR_HASH problem as shadowsocks-libev: git checkout + repack
+    # produces a non-deterministic tarball hash.
+    patch_makefile_dep \
+        package/community/openwrt-passwall-packages/shadowsocksr-libev/Makefile \
+        '146fa4511a52da2aaa1e11ea0294cfb450e62643156c5da3b10e037ef43961f6' \
+        'skip'
+}
 
 # Workaround: GCC 14 + musl fortify "always_inline memset: target specific option mismatch"
 # Shadowsocks-libev depends on mbedtls via DEPENDS:=+libmbedtls, so mbedtls must build.
