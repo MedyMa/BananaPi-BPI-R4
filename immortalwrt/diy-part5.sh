@@ -74,8 +74,8 @@ merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-mode
 merge_package https://github.com/kenzok8/jell jell/wrtbwmon
 # merge_package "-b Immortalwrt https://github.com/shidahuilang/openwrt-package" openwrt-package/relevance/ddnsto
 # merge_package "-b Immortalwrt https://github.com/shidahuilang/openwrt-package" openwrt-package/luci-app-ddnsto
-merge_package "-b ddnsto-beta https://github.com/linkease/nas-packages-luci" nas-packages-luci/luci/luci-app-ddnsto
-merge_package "-b ddnsto-beta https://github.com/linkease/nas-packages" nas-packages/network/services/ddnsto
+merge_package "-b main https://github.com/linkease/nas-packages-luci" nas-packages-luci/luci/luci-app-ddnsto
+merge_package "-b master https://github.com/linkease/nas-packages" nas-packages/network/services/ddnsto
 popd
 
 # Wireless stack migration lives in diy-part6.sh to keep diy-part5 focused on
