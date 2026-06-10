@@ -265,7 +265,7 @@ jobs:
       uses: MedyMa/delete-older-releases@v0.3.4
 
       with:
-        keep_latest: 30
+        keep_latest: 2
         delete_tags: true
         delete_tag_pattern: '^.*-immortalwrt_openwrt-24\.10$'
       env:
