@@ -147,14 +147,15 @@ rm -rf feeds/packages/net/onionshare-cli
 ./scripts/feeds install c-ares pcre2 udns
 
 # Verify that libmbedtls (required by shadowsocks-libev) is present.
+# On 25.12 the system defaults to libustream-openssl; mbedtls may be absent
+# from the built-in package set but is still needed by community clones.
+# Warn instead of hard-exiting so the build can continue if the actual
+# consumer packages are not selected.
 if [ ! -f package/libs/mbedtls/Makefile ]; then
-  echo "ERROR: package/libs/mbedtls/Makefile not found in the main tree." >&2
-  exit 1
+  echo "WARNING: package/libs/mbedtls/Makefile not found — libmbedtls-dependent packages may fail" >&2
+elif ! grep -q 'define Package/libmbedtls' package/libs/mbedtls/Makefile; then
+  echo "WARNING: package/libs/mbedtls/Makefile does not define libmbedtls" >&2
 fi
-grep -q 'define Package/libmbedtls' package/libs/mbedtls/Makefile || {
-  echo "ERROR: package/libs/mbedtls/Makefile does not define libmbedtls." >&2
-  exit 1
-}
 
 # Set GO proxy for Chinese network (sing-box downloads Go modules at build time).
 export GOEXPERIMENT=
