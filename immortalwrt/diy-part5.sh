@@ -140,6 +140,13 @@ fi
 # configs, so drop it to keep feeds metadata clean.
 rm -rf feeds/packages/net/onionshare-cli
 
+# vpnc Build/Compile uses mkdir (without -p) for $(PKG_BUILD_DIR)/bin.
+# If the bin directory already exists (cache/rerun), mkdir fails with
+# "File exists" and aborts the build.  Add -p for idempotency.
+if grep -q 'mkdir $(PKG_BUILD_DIR)/bin' feeds/packages/net/vpnc/Makefile 2>/dev/null; then
+    sed -i '/mkdir $(PKG_BUILD_DIR)\/bin/s/mkdir /mkdir -p /' feeds/packages/net/vpnc/Makefile
+fi
+
 ./scripts/feeds install -a
 
 # Explicitly install feed packages that community clones (helloworld) need as
