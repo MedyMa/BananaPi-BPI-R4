@@ -153,6 +153,34 @@ fi
 # build-time or runtime dependencies but may not be automatically picked up.
 ./scripts/feeds install c-ares pcre2 udns
 
+# Remove the kiddin9 repository from APK repo config files.
+# The kiddin9 feed triggers APK auto-discovery of the sibling video/
+# sub-repository on mirrors.vsean.net. The video feed for aarch64_cortex-a53
+# often has a truncated packages.adb, causing "unexpected end of file" and
+# "UNTRUSTED signature" errors during apk update / apk add.
+# Only remove kiddin9 — keep base, luci, packages, routing, telephony, and
+# targets repos since they work fine.
+for f in \
+    package/base-files/files/etc/apk/repositories.d/* \
+    package/utils/alpine-repositories/files/repositories; do
+    [ -f "$f" ] && sed -i '/kiddin9/d' "$f" 2>/dev/null || true
+done
+
+# Allow installation of unsigned APK packages on the running system.
+# The /sbin/apk wrapper (with --allow-untrusted) must be created at
+# runtime — see the README for instructions.
+#
+# To make this automatic in custom firmware, the following can be added
+# to a package's postinst or uci-defaults script:
+#   if [ ! -f /sbin/apk.real ]; then
+#       cp /sbin/apk /sbin/apk.real
+#       cat > /sbin/apk << 'APKEOF'
+#   #!/bin/sh
+#   exec /sbin/apk.real --allow-untrusted "$@"
+#   APKEOF
+#       chmod 0755 /sbin/apk
+#   fi
+
 # Verify that libmbedtls (required by shadowsocks-libev) is present.
 # On 25.12 the system defaults to libustream-openssl; mbedtls may be absent
 # from the built-in package set but is still needed by community clones.
