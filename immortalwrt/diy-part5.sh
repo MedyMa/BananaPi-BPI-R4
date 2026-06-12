@@ -1,10 +1,8 @@
 #!/bin/bash
 
-# Merge_package
-function merge_package(){
+merge_package(){
     repo=`echo $1 | rev | cut -d'/' -f 1 | rev`
     pkg=`echo $2 | rev | cut -d'/' -f 1 | rev`
-    # find package/ -follow -name $pkg -not -path "package/openwrt-packages/*" | xargs -rt rm -rf
     git clone --depth=1 --single-branch $1
     [ -d package/openwrt-packages ] || mkdir -p package/openwrt-packages
     mv $2 package/openwrt-packages/
@@ -44,28 +42,24 @@ apply_workspace_patch() {
     git apply --ignore-space-change --ignore-whitespace "$patch_file"
 }
 
-# Remove feeds packages that will be replaced by community clones below.
-# This MUST run after the workflow's initial feeds update but BEFORE feeds install.
+# Remove upstream feeds replaced by community clones below
 rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/luci/applications/luci-app-argon-config
 rm -rf feeds/luci/applications/luci-app-passwall
 rm -rf feeds/luci/applications/luci-app-modemband
 rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2socks,hysteria,ipt2socks,microsocks,naiveproxy,shadowsocks-libev,shadowsocks-rust,shadowsocksr-libev,simple-obfs,tcping,trojan-plus,tuic-client,v2ray-plugin,xray-plugin,geoview,shadow-tls}
 
-# Clone community packages to package/community
+# Clone community packages
 mkdir -p package/community
 pushd package/community
 git clone --depth=1 -b dev https://github.com/fw876/helloworld
-# rm -rf helloworld/{naiveproxy,shadowsocks-libev,shadowsocksr-libev,shadow-tls,simple-obfs,tcping,tuic-client,v2ray-plugin,xray-core,xray-plugin}
 git clone --depth=1 -b main https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git
 [ -f openwrt-passwall-packages/haproxy/Makefile ] && sed -i '/^[[:space:]]*ADDON+=USE_QUIC=1$/d' openwrt-passwall-packages/haproxy/Makefile
 git clone --depth=1 -b main https://github.com/Openwrt-Passwall/openwrt-passwall.git
 git clone --depth=1 https://github.com/nikkinikki-org/OpenWrt-nikki
-# rm -rf OpenWrt-nikki/{mihomo-meta,mihomo-alpha}
 git clone --depth=1 https://github.com/1522042029/luci-app-socat
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
-# merge_package https://github.com/DHDAXCW/dhdaxcw-app dhdaxcw-app/luci-app-adguardhome
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-fan
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-sfp-status
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-adguardhome
@@ -75,58 +69,42 @@ merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnst
 merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnsto-openwrt-package/luci-app-ddnsto
 popd
 
-# Wireless stack migration lives in diy-part6.sh to keep diy-part5 focused on
-# feed/package preparation.
-
-# add luci-app-mosdns
+# luci-app-mosdns
 rm -rf feeds/packages/lang/golang
 git clone --depth=1 https://github.com/sbwml/packages_lang_golang -b 26.x feeds/packages/lang/golang
 rm -rf feeds/packages/net/mosdns
 git clone --depth=1 https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
 
-# add luci-app-OpenClash
+# luci-app-OpenClash
 mkdir -p package/OpenClash
 pushd package/OpenClash
 git clone --depth=1 https://github.com/vernesong/OpenClash
 popd
 
-
-# Re-run feeds update AFTER manual feed modifications so the index matches
-# the current state.  This ensures "feeds install" below finds packages that
-# were replaced (golang, mosdns) and packages from feeds that are needed by
-# community clones (c-ares, udns, etc.).
+# Re-run feeds update after manual feed modifications
 ./scripts/feeds update -a
 
-# Re-apply golang replacement — "feeds update" above reverts it because the
-# packages feed is a single git repo (git pull overwrites our sbwml clone).
+# Re-apply golang replacement (feeds update reverts it)
 rm -rf feeds/packages/lang/golang
 git clone --depth=1 https://github.com/sbwml/packages_lang_golang -b 26.x feeds/packages/lang/golang
 
-# Fix outdated PKG_MIRROR_HASH in helloworld/shadowsocks-libev.
-# The git checkout + repack at commit 9afa3ca produces a non-deterministic
-# tarball hash that varies by git version / compression settings.
+# Fix non-deterministic PKG_MIRROR_HASH in helloworld/shadowsocks-libev
 patch_makefile_dep \
     package/community/helloworld/shadowsocks-libev/Makefile \
     'PKG_MIRROR_HASH:=b3898ad0a557bc8b0bbb2f3888101d461944239b0b7d4d4c6f164d73694a4595' \
     'PKG_MIRROR_HASH:=skip'
 
-# shadowsocksr-libev forces LTO in its upstream Makefile, which is brittle with
-# current toolchains.  Replace the LTO line with an explicit no-lto flag.
-# Use sed (not patch_makefile_dep) because the leading whitespace (tab) makes
-# the literal-string approach miss the line.
+# shadowsocksr-libev: replace brittle LTO with no-lto
 [ -f package/community/openwrt-passwall-packages/shadowsocksr-libev/Makefile ] && {
     sed -i '/^[[:space:]]*TARGET_CFLAGS += -flto$/c\PKG_BUILD_FLAGS+=no-lto' \
         package/community/openwrt-passwall-packages/shadowsocksr-libev/Makefile
-    # Same PKG_MIRROR_HASH problem as shadowsocks-libev: git checkout + repack
-    # produces a non-deterministic tarball hash.
     patch_makefile_dep \
         package/community/openwrt-passwall-packages/shadowsocksr-libev/Makefile \
         '146fa4511a52da2aaa1e11ea0294cfb450e62643156c5da3b10e037ef43961f6' \
         'skip'
 }
 
-# Workaround: GCC 14 + musl fortify "always_inline memset: target specific option mismatch"
-# Shadowsocks-libev depends on mbedtls via DEPENDS:=+libmbedtls, so mbedtls must build.
+# GCC 14 + musl fortify workaround for mbedtls
 if ! grep -q '_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile; then
     if grep -q '\$(if \$(findstring cortex-a53,\$(CONFIG_CPU_TYPE)),-march=armv8-a)' package/libs/mbedtls/Makefile; then
         sed -i '/$(if $(findstring cortex-a53,$(CONFIG_CPU_TYPE)),-march=armv8-a)/a TARGET_CFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile
@@ -135,42 +113,28 @@ if ! grep -q '_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile; then
   fi
 fi
 
-# packages/openwrt-25.12 currently ships onionshare-cli with unresolved
-# python3-pysocks / python3-unidecode metadata. It is not selected by our
-# configs, so drop it to keep feeds metadata clean.
+# Drop onionshare-cli (unresolved metadata, not in our config)
 rm -rf feeds/packages/net/onionshare-cli
 
-# vpnc Build/Compile uses mkdir (without -p) for $(PKG_BUILD_DIR)/bin.
-# If the bin directory already exists (cache/rerun), mkdir fails with
-# "File exists" and aborts the build.  Add -p for idempotency.
+# vpnc: add -p to mkdir for idempotency
 if grep -q 'mkdir $(PKG_BUILD_DIR)/bin' feeds/packages/net/vpnc/Makefile 2>/dev/null; then
     sed -i '/mkdir $(PKG_BUILD_DIR)\/bin/s/mkdir /mkdir -p /' feeds/packages/net/vpnc/Makefile
 fi
 
 ./scripts/feeds install -a
 
-# pcre2 is in the main tree (package/libs/pcre2) since 25.12, not a feed package.
+# Feed deps needed by community clones (pcre2 is in main tree since 25.12)
 ./scripts/feeds install c-ares udns
 
-# Remove the kiddin9 repository from APK repo config files.
-# The kiddin9 feed triggers APK auto-discovery of the sibling video/
-# sub-repository on mirrors.vsean.net. The video feed for aarch64_cortex-a53
-# often has a truncated packages.adb, causing "unexpected end of file" and
-# "UNTRUSTED signature" errors during apk update / apk add.
-# Only remove kiddin9 — keep base, luci, packages, routing, telephony, and
-# targets repos since they work fine.
+# Remove kiddin9 APK repo (triggers broken video/ sub-repo)
 for f in \
     package/base-files/files/etc/apk/repositories \
     package/base-files/files/etc/apk/repositories.d/* \
     package/utils/alpine-repositories/files/repositories; do
     [ -f "$f" ] && grep -q 'kiddin9' "$f" 2>/dev/null && sed -i '/kiddin9/d' "$f" 2>/dev/null || true
-    # Also remove any remaining mirrors.vsean.net entries that reference
-    # broken feeds (video, routing, telephony if needed)
 done
 
-# Install APK allow-untrusted wrapper as a uci-defaults script so it
-# survives reboots. Without this, the LuCI package manager's "apk add"
-# command fails with "UNTRUSTED signature" for custom unsigned .apk files.
+# APK allow-untrusted uci-defaults (for custom unsigned .apk)
 cat > package/base-files/files/etc/uci-defaults/99-apk-untrusted << 'APKUCI'
 #!/bin/sh
 [ -x /sbin/apk ] || exit 0
@@ -186,22 +150,18 @@ exit 0
 APKUCI
 chmod 0755 package/base-files/files/etc/uci-defaults/99-apk-untrusted
 
-# Verify that libmbedtls (required by shadowsocks-libev) is present.
-# On 25.12 the system defaults to libustream-openssl; mbedtls may be absent
-# from the built-in package set but is still needed by community clones.
-# Warn instead of hard-exiting so the build can continue if the actual
-# consumer packages are not selected.
+# Verify libmbedtls presence (required by shadowsocks-libev)
 if [ ! -f package/libs/mbedtls/Makefile ]; then
-  echo "WARNING: package/libs/mbedtls/Makefile not found — libmbedtls-dependent packages may fail" >&2
+  echo "WARNING: package/libs/mbedtls/Makefile not found" >&2
 elif ! grep -q 'define Package/libmbedtls' package/libs/mbedtls/Makefile; then
   echo "WARNING: package/libs/mbedtls/Makefile does not define libmbedtls" >&2
 fi
 
-# Set GO proxy for Chinese network (sing-box downloads Go modules at build time).
+# GO proxy for sing-box
 export GOEXPERIMENT=
 export GOPROXY=https://proxy.golang.org,direct
 
-# Compatibility fixes for floating packages feed metadata.
+# Compatibility fixes for floating feeds metadata
 patch_makefile_dep \
     feeds/packages/lang/python/python-ubus/Makefile \
     'PKG_BUILD_DEPENDS:=python-setuptools/host' \
@@ -220,14 +180,13 @@ patch_makefile_dep \
     'libnetsnmp-ssl' \
     'libnetsnmp'
 
-# Shrink the BPI-R4 U-Boot autoboot wait so boot time is not dominated by a 30s delay.
+# Reduce BPI-R4 U-Boot bootdelay
 patch_makefile_dep \
     package/boot/uboot-mediatek/patches/450-add-bpi-r4.patch \
     'CONFIG_BOOTDELAY=30' \
     'CONFIG_BOOTDELAY=10'
 
-# openwrt-25.12 使用 master 版 patch（上游 LuCI 已切换为 ES6+ 语法，
-# 非 master 版 patch 针对 ES5 语法，不兼容 openwrt-25.12）
+# Apply LuCI patches (master-branch for ES6+ syntax on 25.12)
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1000-luci-status-overview-wifi7-mlo-master.patch"
 
