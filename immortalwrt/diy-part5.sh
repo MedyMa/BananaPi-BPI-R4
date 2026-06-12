@@ -149,9 +149,8 @@ fi
 
 ./scripts/feeds install -a
 
-# Explicitly install feed packages that community clones (helloworld) need as
-# build-time or runtime dependencies but may not be automatically picked up.
-./scripts/feeds install c-ares pcre2 udns
+# pcre2 is in the main tree (package/libs/pcre2) since 25.12, not a feed package.
+./scripts/feeds install c-ares udns
 
 # Remove the kiddin9 repository from APK repo config files.
 # The kiddin9 feed triggers APK auto-discovery of the sibling video/
