@@ -161,25 +161,31 @@ fi
 # Only remove kiddin9 — keep base, luci, packages, routing, telephony, and
 # targets repos since they work fine.
 for f in \
+    package/base-files/files/etc/apk/repositories \
     package/base-files/files/etc/apk/repositories.d/* \
     package/utils/alpine-repositories/files/repositories; do
-    [ -f "$f" ] && sed -i '/kiddin9/d' "$f" 2>/dev/null || true
+    [ -f "$f" ] && grep -q 'kiddin9' "$f" 2>/dev/null && sed -i '/kiddin9/d' "$f" 2>/dev/null || true
+    # Also remove any remaining mirrors.vsean.net entries that reference
+    # broken feeds (video, routing, telephony if needed)
 done
 
-# Allow installation of unsigned APK packages on the running system.
-# The /sbin/apk wrapper (with --allow-untrusted) must be created at
-# runtime — see the README for instructions.
-#
-# To make this automatic in custom firmware, the following can be added
-# to a package's postinst or uci-defaults script:
-#   if [ ! -f /sbin/apk.real ]; then
-#       cp /sbin/apk /sbin/apk.real
-#       cat > /sbin/apk << 'APKEOF'
-#   #!/bin/sh
-#   exec /sbin/apk.real --allow-untrusted "$@"
-#   APKEOF
-#       chmod 0755 /sbin/apk
-#   fi
+# Install APK allow-untrusted wrapper as a uci-defaults script so it
+# survives reboots. Without this, the LuCI package manager's "apk add"
+# command fails with "UNTRUSTED signature" for custom unsigned .apk files.
+cat > package/base-files/files/etc/uci-defaults/99-apk-untrusted << 'APKUCI'
+#!/bin/sh
+[ -x /sbin/apk ] || exit 0
+if [ ! -f /sbin/apk.real ]; then
+  cp /sbin/apk /sbin/apk.real
+  cat > /sbin/apk << 'WRAP'
+#!/bin/sh
+exec /sbin/apk.real --allow-untrusted "$@"
+WRAP
+  chmod 0755 /sbin/apk
+fi
+exit 0
+APKUCI
+chmod 0755 package/base-files/files/etc/uci-defaults/99-apk-untrusted
 
 # Verify that libmbedtls (required by shadowsocks-libev) is present.
 # On 25.12 the system defaults to libustream-openssl; mbedtls may be absent
