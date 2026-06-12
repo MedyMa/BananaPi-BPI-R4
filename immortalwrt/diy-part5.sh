@@ -116,6 +116,9 @@ fi
 # Drop onionshare-cli (unresolved metadata, not in our config)
 rm -rf feeds/packages/net/onionshare-cli
 
+[ -f feeds/luci/applications/luci-app-package-manager/root/usr/libexec/package-manager-call ] && \
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1004-luci-package-manager-apk-upload-untrusted-master.patch"
+
 # vpnc: add -p to mkdir for idempotency
 if grep -q 'mkdir $(PKG_BUILD_DIR)/bin' feeds/packages/net/vpnc/Makefile 2>/dev/null; then
     sed -i '/mkdir $(PKG_BUILD_DIR)\/bin/s/mkdir /mkdir -p /' feeds/packages/net/vpnc/Makefile
@@ -134,21 +137,10 @@ for f in \
     [ -f "$f" ] && grep -q 'kiddin9' "$f" 2>/dev/null && sed -i '/kiddin9/d' "$f" 2>/dev/null || true
 done
 
-# APK allow-untrusted uci-defaults (for custom unsigned .apk)
-cat > package/base-files/files/etc/uci-defaults/99-apk-untrusted << 'APKUCI'
-#!/bin/sh
-[ -x /sbin/apk ] || exit 0
-if [ ! -f /sbin/apk.real ]; then
-  cp /sbin/apk /sbin/apk.real
-  cat > /sbin/apk << 'WRAP'
-#!/bin/sh
-exec /sbin/apk.real --allow-untrusted "$@"
-WRAP
-  chmod 0755 /sbin/apk
-fi
-exit 0
-APKUCI
-chmod 0755 package/base-files/files/etc/uci-defaults/99-apk-untrusted
+# APK runtime fixes: allow local unsigned APK uploads and disable broken feed entries
+rm -f package/base-files/files/etc/uci-defaults/99-apk-untrusted
+[ -d package/base-files/files/etc/uci-defaults ] && \
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1005-base-files-apk-manager-fixes-master.patch"
 
 # Verify libmbedtls presence (required by shadowsocks-libev)
 if [ ! -f package/libs/mbedtls/Makefile ]; then
