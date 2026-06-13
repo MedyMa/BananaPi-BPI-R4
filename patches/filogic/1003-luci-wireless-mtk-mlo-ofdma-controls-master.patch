@@ -92,6 +92,7 @@
  	return s;
  }
  
+@@ -289,35 +239,0 @@
 -function getStationHint(hosts, stationhints, mac) {
 -	const alias = stationhints[(mac || '').toUpperCase()] || stationhints[mac] || null;
 -	const source_mac = alias ? alias.source_mac : null;
