@@ -13,7 +13,7 @@
  function count_changes(section_id) {
  	const changes = ui.changes.changes?.wireless;
  	if (!Array.isArray(changes)) return 0;
-@@ -211,77 +205,33 @@
+@@ -211,62 +205,32 @@
  	return node;
  }
  
@@ -92,7 +92,7 @@
  	return s;
  }
  
-@@ -289,20 +239,1 @@
+@@ -289,22 +253,3 @@
 -function getStationHint(hosts, stationhints, mac) {
 -	const alias = stationhints[(mac || '').toUpperCase()] || stationhints[mac] || null;
 -	const source_mac = alias ? alias.source_mac : null;
@@ -115,7 +115,7 @@
  function radio_restart(id, ev) {
  	const row = document.querySelector('.cbi-section-table-row[data-sid="%s"]'.format(id));
  	const dsc = row.querySelector('[data-name="_stat"] > div');
-@@ -345,101 +295,6 @@
+@@ -345,101 +290,6 @@
  	res.forEach(dep => o.depends(dep));
  }
  
@@ -217,7 +217,7 @@
  // Define a class CBIWifiFrequencyValue that extends form.Value
  var CBIWifiFrequencyValue = form.Value.extend({
  	// Declare an RPC method to get the frequency list for a given device
-@@ -466,11 +321,10 @@
+@@ -466,11 +316,10 @@
  			const freqlist = data[1];
  
  			freqlist.forEach(freq => {
@@ -231,7 +231,7 @@
  				const available = (freq.restricted && freq.no_ir) ? false: true;
  
  				this.channels[band].push(
-@@ -484,36 +338,22 @@
+@@ -484,36 +333,22 @@
  				);
  			});
  
@@ -273,7 +273,7 @@
  			this.htmodes = {
  				'': [ '', '-', { available: true } ],
  				'n': [
-@@ -524,21 +364,18 @@
+@@ -524,21 +359,18 @@
  					'VHT20', '20 MHz', { available: htmodelist.VHT20 },
  					'VHT40', '40 MHz', { available: htmodelist.VHT40 },
  					'VHT80', '80 MHz', { available: htmodelist.VHT80 },
@@ -295,7 +295,7 @@
  					'EHT160', '160 MHz', { available: htmodelist.EHT160 },
  					'EHT320', '320 MHz', { available: htmodelist.EHT320 }
  				]
-@@ -557,8 +394,7 @@
+@@ -557,8 +389,7 @@
  					'5g', '5 GHz', { available: this.channels['5g'].length > 3 }
  				],
  				'ac': [
@@ -305,7 +305,7 @@
  				],
  				'ax': [
  					'2g', '2.4 GHz', { available: this.channels['2g'].length > 3 },
-@@ -649,11 +485,11 @@
+@@ -649,11 +480,11 @@
  		this.setValues(mode, this.modes);
  
  		// Determine mode based on htmode value
@@ -320,7 +320,7 @@
  			mode.value = 'ac';
  		else if (/HT20|HT40/.test(htval))
  			mode.value = 'n';
-@@ -838,8 +674,8 @@
+@@ -838,8 +669,8 @@
  
  		rows.forEach(row => {
  			const section_id = row.getAttribute('data-sid');
@@ -331,7 +331,7 @@
  			const badge = row.querySelector('[data-name="_badge"] > div');
  			const stat = row.querySelector('[data-name="_stat"]');
  			const btns = row.querySelectorAll('.cbi-section-actions button');
-@@ -848,7 +684,7 @@
+@@ -848,7 +679,7 @@
  
  			if (radioDev) {
  				dom.content(badge, render_radio_badge(radioDev));
@@ -340,7 +340,7 @@
  			}
  			else {
  				dom.content(badge, render_network_badge(radioNet));
-@@ -856,7 +692,7 @@
+@@ -856,7 +687,7 @@
  			}
  
  			if (stat.hasAttribute('restart'))
@@ -349,7 +349,7 @@
  
  			btns[0].disabled = isReadonlyView || busy;
  			btns[1].disabled = (isReadonlyView && radioDev) || busy;
-@@ -865,17 +701,15 @@
+@@ -865,17 +696,15 @@
  
  		const table = document.querySelector('#wifi_assoclist_table');
  		const hosts = data[0];
@@ -373,7 +373,7 @@
  
  			let hint;
  
-@@ -884,7 +718,7 @@
+@@ -884,7 +713,7 @@
  			else if (name && (ipv4 ?? ipv6))
  				hint = `${'%h'.format(name)} <span class="hide-xs">(${ipv4 || ipv6})</span>`;
  			else
@@ -382,75 +382,7 @@
  
  			let row = [
  				E('span', {
-@@ -2595,7 +2429,7 @@
- 					});
- 				});
- 			}).then(L.bind(function() {
--				ui.showModal(null, E('p', { 'class': 'spinning' }, [ _('Loading data...') ]));
-+				ui.showModal(null, E('p', { 'class': 'spinning' }, [ _('Loading data...') ]));
- 
- 				return this.renderMoreOptionsModal(section_id);
- 			}, this));
-@@ -2726,7 +2560,7 @@
- 
- 		return m.render().then(L.bind(function(m, nodes) {
- 			poll.add(L.bind(function() {
--				const tasks = [ network.getHostHints(), L.resolveDefault(callWifiStationHints(), {}), network.getWifiDevices() ];
-+				const tasks = [ network.getHostHints(), network.getWifiDevices() ];
- 
- 				m?.children[0]?.cfgsections?.().forEach(s => {
- 					const row = nodes.querySelector('.cbi-section-table-row[data-sid="%s"]'.format(s));
-@@ -2747,37 +2581,37 @@
- 				});
- 
- 				return Promise.all(tasks)
--					.then(L.bind(function(hosts_stationhints_radios) {
-+					.then(L.bind(function(hosts_radios) {
- 						const tasks = [];
- 
--						hosts_stationhints_radios[2].forEach(r => tasks.push(r.getWifiNetworks()) );
-+						hosts_radios[1].forEach(r => tasks.push(r.getWifiNetworks()) );
- 
- 						return Promise.all(tasks).then(function(data) {
--							hosts_stationhints_radios[3] = [];
-+							hosts_radios[2] = [];
- 
- 							for (let d of data)
--								hosts_stationhints_radios[3].push.apply(hosts_stationhints_radios[3], d);
-+								hosts_radios[2].push.apply(hosts_radios[2], d);
- 
--							return hosts_stationhints_radios;
-+							return hosts_radios;
- 						});
- 					}, network))
--					.then(L.bind(function(hosts_stationhints_radios_wifis) {
-+					.then(L.bind(function(hosts_radios_wifis) {
- 						const tasks = [];
- 
--						hosts_stationhints_radios_wifis[3].forEach(hrw => tasks.push(hrw.getAssocList()) );
-+						hosts_radios_wifis[2].forEach(hrw => tasks.push(hrw.getAssocList()) );
- 
- 						return Promise.all(tasks).then(function(data) {
--							hosts_stationhints_radios_wifis[4] = [];
-+							hosts_radios_wifis[3] = [];
- 
- 							for (let i = 0; i < data.length; i++) {
--								const wifiNetwork = hosts_stationhints_radios_wifis[3][i];
--								const radioDev = hosts_stationhints_radios_wifis[2].filter(function(d) { return d.getName() == wifiNetwork.getWifiDeviceName(); })[0];
-+								const wifiNetwork = hosts_radios_wifis[2][i];
-+								const radioDev = hosts_radios_wifis[1].filter(function(d) { return d.getName() == wifiNetwork.getWifiDeviceName(); })[0];
- 
- 								for (let dy of data[i])
--									hosts_stationhints_radios_wifis[4].push(Object.assign({ radio: radioDev, network: wifiNetwork }, dy));
-+									hosts_radios_wifis[3].push(Object.assign({ radio: radioDev, network: wifiNetwork }, dy));
- 							}
- 
--							return hosts_stationhints_radios_wifis;
-+							return hosts_radios_wifis;
- 						});
- 					}, network))
- 					.then(L.bind(function(zones, data) {
-@@ -962,7 +796,74 @@ return view.extend({
+@@ -962,7 +791,74 @@ return view.extend({
  		s.addModalOptions = function(s) {
  			return network.getWifiNetwork(s.section).then(function(radioNet) {
  				const hwtype = uci.get('wireless', radioNet.getWifiDeviceName(), 'type');
@@ -525,7 +457,7 @@
  				let o, ss;
  
  				o = s.option(form.SectionValue, '_device', form.NamedSection, radioNet.getWifiDeviceName(), 'wifi-device', _('Device Configuration'));
-@@ -1008,6 +909,32 @@ return view.extend({
+@@ -1008,6 +904,32 @@ return view.extend({
  					o = ss.taboption('advanced', form.Flag, 'mu_beamformer', _('MU-MIMO'));
  					o.default = o.disabled;
  
@@ -558,7 +490,7 @@
  					o = ss.taboption('advanced', form.Value, 'distance', _('Distance Optimization'), _('Distance to farthest network member in meters. Set only for distances above one kilometer; otherwise it is harmful.'));
  					o.datatype = 'or(range(0,114750),"auto")';
  					o.placeholder = 'auto';
-@@ -1262,6 +1189,24 @@ return view.extend({
+@@ -1262,4 +1184,22 @@ return view.extend({
  
  					o = ss.taboption('advanced', form.Flag, 'disassoc_low_ack', _('Disassociate On Low Acknowledgement'), _('Allow AP mode to disconnect STAs based on low ACK condition'));
  					o.default = o.enabled;
@@ -581,3 +513,71 @@
 +						o.remove = section_id => uci.unset('wireless', section_id, 'mld_id');
 +					}
  				}
+@@ -2595,7 +2535,7 @@
+ 					});
+ 				});
+ 			}).then(L.bind(function() {
+-				ui.showModal(null, E('p', { 'class': 'spinning' }, [ _('Loading data...') ]));
++				ui.showModal(null, E('p', { 'class': 'spinning' }, [ _('Loading data...') ]));
+ 
+ 				return this.renderMoreOptionsModal(section_id);
+ 			}, this));
+@@ -2726,7 +2666,7 @@
+ 
+ 		return m.render().then(L.bind(function(m, nodes) {
+ 			poll.add(L.bind(function() {
+-				const tasks = [ network.getHostHints(), L.resolveDefault(callWifiStationHints(), {}), network.getWifiDevices() ];
++				const tasks = [ network.getHostHints(), network.getWifiDevices() ];
+ 
+ 				m?.children[0]?.cfgsections?.().forEach(s => {
+ 					const row = nodes.querySelector('.cbi-section-table-row[data-sid="%s"]'.format(s));
+@@ -2747,37 +2687,37 @@
+ 				});
+ 
+ 				return Promise.all(tasks)
+-					.then(L.bind(function(hosts_stationhints_radios) {
++					.then(L.bind(function(hosts_radios) {
+ 						const tasks = [];
+ 
+-						hosts_stationhints_radios[2].forEach(r => tasks.push(r.getWifiNetworks()) );
++						hosts_radios[1].forEach(r => tasks.push(r.getWifiNetworks()) );
+ 
+ 						return Promise.all(tasks).then(function(data) {
+-							hosts_stationhints_radios[3] = [];
++							hosts_radios[2] = [];
+ 
+ 							for (let d of data)
+-								hosts_stationhints_radios[3].push.apply(hosts_stationhints_radios[3], d);
++								hosts_radios[2].push.apply(hosts_radios[2], d);
+ 
+-							return hosts_stationhints_radios;
++							return hosts_radios;
+ 						});
+ 					}, network))
+-					.then(L.bind(function(hosts_stationhints_radios_wifis) {
++					.then(L.bind(function(hosts_radios_wifis) {
+ 						const tasks = [];
+ 
+-						hosts_stationhints_radios_wifis[3].forEach(hrw => tasks.push(hrw.getAssocList()) );
++						hosts_radios_wifis[2].forEach(hrw => tasks.push(hrw.getAssocList()) );
+ 
+ 						return Promise.all(tasks).then(function(data) {
+-							hosts_stationhints_radios_wifis[4] = [];
++							hosts_radios_wifis[3] = [];
+ 
+ 							for (let i = 0; i < data.length; i++) {
+-								const wifiNetwork = hosts_stationhints_radios_wifis[3][i];
+-								const radioDev = hosts_stationhints_radios_wifis[2].filter(function(d) { return d.getName() == wifiNetwork.getWifiDeviceName(); })[0];
++								const wifiNetwork = hosts_radios_wifis[2][i];
++								const radioDev = hosts_radios_wifis[1].filter(function(d) { return d.getName() == wifiNetwork.getWifiDeviceName(); })[0];
+ 
+ 								for (let dy of data[i])
+-									hosts_stationhints_radios_wifis[4].push(Object.assign({ radio: radioDev, network: wifiNetwork }, dy));
++									hosts_radios_wifis[3].push(Object.assign({ radio: radioDev, network: wifiNetwork }, dy));
+ 							}
+ 
+-							return hosts_stationhints_radios_wifis;
++							return hosts_radios_wifis;
+ 						});
+ 					}, network))
+ 					.then(L.bind(function(zones, data) {
