@@ -2,7 +2,7 @@ diff --git a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/vi
 index f486c36..2705479 100644
 --- a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
 +++ b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
-@@ -965,7 +965,74 @@ return view.extend({
+@@ -966,7 +966,75 @@ return view.extend({
  		s.addModalOptions = function(s) {
  			return network.getWifiNetwork(s.section).then(function(radioNet) {
  				const hwtype = uci.get('wireless', radioNet.getWifiDeviceName(), 'type');
@@ -77,7 +77,7 @@ index f486c36..2705479 100644
  				let o, ss;
  
  				o = s.option(form.SectionValue, '_device', form.NamedSection, radioNet.getWifiDeviceName(), 'wifi-device', _('Device Configuration'));
-@@ -1008,6 +1075,32 @@ return view.extend({
+@@ -1012,6 +1080,32 @@ return view.extend({
  					o = ss.taboption('advanced', form.Flag, 'mu_beamformer', _('MU-MIMO'));
  					o.default = o.disabled;
  
@@ -110,7 +110,7 @@ index f486c36..2705479 100644
  					o = ss.taboption('advanced', form.Value, 'distance', _('Distance Optimization'), _('Distance to farthest network member in meters. Set only for distances above one kilometer; otherwise it is harmful.'));
  					o.datatype = 'or(range(0,114750),"auto")';
  					o.placeholder = 'auto';
-@@ -1262,6 +1355,24 @@ return view.extend({
+@@ -1271,6 +1365,24 @@ return view.extend({
  
  					o = ss.taboption('advanced', form.Flag, 'disassoc_low_ack', _('Disassociate On Low Acknowledgement'), _('Allow AP mode to disconnect STAs based on low ACK condition'));
  					o.default = o.enabled;
