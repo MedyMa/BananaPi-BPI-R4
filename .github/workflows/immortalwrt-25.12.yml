@@ -266,6 +266,6 @@ jobs:
       with:
         keep_latest: 2
         delete_tags: true
-        delete_tag_pattern: '^.*-immortalwrt_25_12$'
+        delete_tag_pattern: '^.*-immortalwrt_25.12$'
       env:
         GITHUB_TOKEN: ${{ secrets.RELEASES_TOKEN }}
