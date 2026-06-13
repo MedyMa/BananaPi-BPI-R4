@@ -1,13 +1,13 @@
 diff --git a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
-index f486c36..2705479 100644
+index ce31a85..7f9029f 100644
 --- a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
 +++ b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
-@@ -966,7 +966,75 @@ return view.extend({
+@@ -969,6 +969,74 @@ return view.extend({
  		s.addModalOptions = function(s) {
  			return network.getWifiNetwork(s.section).then(function(radioNet) {
  				const hwtype = uci.get('wireless', radioNet.getWifiDeviceName(), 'type');
 +				const isMtkMac80211 = (hwtype == 'mac80211' && L.hasSystemFeature('hostapd', '11be'));
- 				const have_mesh = L.hasSystemFeature('hostapd', 'mesh') || L.hasSystemFeature('wpasupplicant', 'mesh');
++
 +				const getMtkMuOnOff = function(section_id) {
 +					const value = parseInt(uci.get('wireless', section_id, 'mu_onoff') || '15', 10);
 +
@@ -48,7 +48,7 @@ index f486c36..2705479 100644
 +					const ssid = getMtkIfaceOptionValue(section_id, 'ssid', 'MT76_AP_MLD');
 +					const key = getMtkIfaceOptionValue(section_id, 'key', '12345678');
 +					const saePwe = getMtkIfaceOptionValue(section_id, 'sae_pwe', '2');
-+					let mld = uci.sections('wireless', 'wifi-mld').find(section => String(section.mld_id || '') == mldId);
++					let mld = uci.sections('wireless', 'wifi-mld').find(function(s) { return String(s.mld_id || '') == mldId; });
 +					let sid = mld ? mld['.name'] : null;
 +
 +					if (!sid)
@@ -72,65 +72,68 @@ index f486c36..2705479 100644
 +					if (!uci.get('wireless', sid, 'encryption_rsno_2'))
 +						uci.set('wireless', sid, 'encryption_rsno_2', 'sae-ext');
 +
-+					return { sid, mldId };
++					return { sid: sid, mldId: mldId };
 +				};
+ 				const have_mesh = L.hasSystemFeature('hostapd', 'mesh') || L.hasSystemFeature('wpasupplicant', 'mesh');
  				let o, ss;
  
- 				o = s.option(form.SectionValue, '_device', form.NamedSection, radioNet.getWifiDeviceName(), 'wifi-device', _('Device Configuration'));
-@@ -1012,6 +1080,32 @@
+@@ -1012,6 +1080,34 @@ return view.extend({
  					o.value('2', _('High'));
  					o.value('3', _('Very High'));
  
++
++
 +					if (isMtkMac80211) {
 +						o = ss.taboption('advanced', form.Flag, '_mtk_dl_ofdma', _('DL OFDMA'), _('MediaTek 调度位图 bit0，控制下行 OFDMA 传输。'));
 +						o.rmempty = false;
-+						o.cfgvalue = section_id => (getMtkMuOnOff(section_id) & 0x1) ? '1' : '0';
-+						o.write = (section_id, value) => setMtkMuBit(section_id, 0, value == '1');
-+						o.remove = section_id => setMtkMuBit(section_id, 0, false);
++						o.cfgvalue = function(section_id) { return (getMtkMuOnOff(section_id) & 0x1) ? '1' : '0'; };
++						o.write = function(section_id, value) { setMtkMuBit(section_id, 0, value == '1'); };
++						o.remove = function(section_id) { setMtkMuBit(section_id, 0, false); };
 +
 +						o = ss.taboption('advanced', form.Flag, '_mtk_ul_ofdma', _('UL OFDMA'), _('MediaTek 调度位图 bit1，控制上行 OFDMA 传输。'));
 +						o.rmempty = false;
-+						o.cfgvalue = section_id => (getMtkMuOnOff(section_id) & 0x2) ? '1' : '0';
-+						o.write = (section_id, value) => setMtkMuBit(section_id, 1, value == '1');
-+						o.remove = section_id => setMtkMuBit(section_id, 1, false);
++						o.cfgvalue = function(section_id) { return (getMtkMuOnOff(section_id) & 0x2) ? '1' : '0'; };
++						o.write = function(section_id, value) { setMtkMuBit(section_id, 1, value == '1'); };
++						o.remove = function(section_id) { setMtkMuBit(section_id, 1, false); };
 +
 +						o = ss.taboption('advanced', form.Flag, '_mtk_dl_mumimo', _('DL MU-MIMO'), _('MediaTek 调度位图 bit2，控制下行 MU-MIMO 传输。'));
 +						o.rmempty = false;
-+						o.cfgvalue = section_id => (getMtkMuOnOff(section_id) & 0x4) ? '1' : '0';
-+						o.write = (section_id, value) => setMtkMuBit(section_id, 2, value == '1');
-+						o.remove = section_id => setMtkMuBit(section_id, 2, false);
++						o.cfgvalue = function(section_id) { return (getMtkMuOnOff(section_id) & 0x4) ? '1' : '0'; };
++						o.write = function(section_id, value) { setMtkMuBit(section_id, 2, value == '1'); };
++						o.remove = function(section_id) { setMtkMuBit(section_id, 2, false); };
 +
 +						o = ss.taboption('advanced', form.Flag, '_mtk_ul_mumimo', _('UL MU-MIMO'), _('MediaTek 调度位图 bit3，控制上行 MU-MIMO 传输。'));
 +						o.rmempty = false;
-+						o.cfgvalue = section_id => (getMtkMuOnOff(section_id) & 0x8) ? '1' : '0';
-+						o.write = (section_id, value) => setMtkMuBit(section_id, 3, value == '1');
-+						o.remove = section_id => setMtkMuBit(section_id, 3, false);
++						o.cfgvalue = function(section_id) { return (getMtkMuOnOff(section_id) & 0x8) ? '1' : '0'; };
++						o.write = function(section_id, value) { setMtkMuBit(section_id, 3, value == '1'); };
++						o.remove = function(section_id) { setMtkMuBit(section_id, 3, false); };
 +					}
 +
  					o = ss.taboption('advanced', form.Value, 'distance', _('Distance Optimization'), _('Distance to farthest network member in meters. Set only for distances above one kilometer; otherwise it is harmful.'));
  					o.datatype = 'or(range(0,114750),"auto")';
  					o.placeholder = 'auto';
-@@ -1271,6 +1365,24 @@ return view.extend({
+@@ -1269,6 +1365,25 @@ return view.extend({
  
  					o = ss.taboption('advanced', form.Flag, 'disassoc_low_ack', _('Disassociate On Low Acknowledgement'), _('Allow AP mode to disconnect STAs based on low ACK condition'));
  					o.default = o.enabled;
++
 +
 +					if (isMtkMac80211 && /^EHT/.test(uci.get('wireless', radioNet.getWifiDeviceName(), 'htmode') || '')) {
 +						o = ss.taboption('advanced', form.Flag, '_mtk_mlo', _('MLO'), _('为当前 AP 启用 MediaTek 多链路聚合（MLO）。仅当无线已保存为 BE/EHT 模式时显示此选项。'));
 +						o.depends('mode', 'ap');
 +						o.depends('mode', 'ap-wds');
 +						o.rmempty = false;
-+						o.cfgvalue = section_id => uci.get('wireless', section_id, 'mld_id') ? '1' : '0';
++						o.cfgvalue = function(section_id) { return uci.get('wireless', section_id, 'mld_id') ? '1' : '0'; };
 +						o.write = function(section_id, value) {
 +							if (value == '1') {
-+								const { mldId } = ensureMtkMldSection(section_id);
-+								uci.set('wireless', section_id, 'mld_id', mldId);
++								var mldInfo = ensureMtkMldSection(section_id);
++								uci.set('wireless', section_id, 'mld_id', mldInfo.mldId);
 +							}
 +							else {
 +								uci.unset('wireless', section_id, 'mld_id');
 +							}
 +						};
-+						o.remove = section_id => uci.unset('wireless', section_id, 'mld_id');
++						o.remove = function(section_id) { uci.unset('wireless', section_id, 'mld_id'); };
 +					}
  				}
  
