@@ -77,9 +77,9 @@ index f486c36..2705479 100644
  				let o, ss;
  
  				o = s.option(form.SectionValue, '_device', form.NamedSection, radioNet.getWifiDeviceName(), 'wifi-device', _('Device Configuration'));
-@@ -1012,6 +1080,32 @@ return view.extend({
- 					o = ss.taboption('advanced', form.Flag, 'mu_beamformer', _('MU-MIMO'));
- 					o.default = o.disabled;
+@@ -1012,6 +1080,32 @@
+ 					o.value('2', _('High'));
+ 					o.value('3', _('Very High'));
  
 +					if (isMtkMac80211) {
 +						o = ss.taboption('advanced', form.Flag, '_mtk_dl_ofdma', _('DL OFDMA'), _('MediaTek 调度位图 bit0，控制下行 OFDMA 传输。'));
