@@ -44,12 +44,23 @@ apply_workspace_patch() {
     git apply --ignore-space-change --ignore-whitespace "$patch_file"
 }
 
+install_kernel_patch() {
+    local patch_file="$1"
+    local patch_name="$2"
+    local patch_dir="target/linux/mediatek/patches-6.6"
+
+    [ -f "$patch_file" ] || return 0
+    [ -d "$patch_dir" ] || return 0
+
+    install -m 0644 "$patch_file" "$patch_dir/$patch_name"
+}
+
 
 rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/luci/applications/luci-app-argon-config
 rm -rf feeds/luci/applications/luci-app-passwall
 rm -rf feeds/luci/applications/luci-app-modemband
-# rm -rf package/mtk/applications/luci-app-turboacc-mtk
+rm -rf package/mtk/applications/luci-app-turboacc-mtk
 rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2socks,hysteria,ipt2socks,microsocks,naiveproxy,shadowsocks-libev,shadowsocks-rust,shadowsocksr-libev,simple-obfs,tcping,trojan-plus,tuic-client,v2ray-plugin,xray-plugin,geoview,shadow-tls}
 
 # Clone community packages to package/community
@@ -69,7 +80,7 @@ merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-fan
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-adguardhome
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-modemband
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-sfp-status
-# merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-turboacc-mtk
+merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-turboacc-mtk
 merge_package https://github.com/kenzok8/jell jell/wrtbwmon
 merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnsto-openwrt-package/ddnsto
 merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnsto-openwrt-package/luci-app-ddnsto
@@ -157,11 +168,15 @@ patch_makefile_dep \
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1002-luci-status-overview-rate-mhz-hi.patch"
 
-# Allow RTL8672/RTL9601C locked GPON ONT sticks (Chinese ISP modules) that
-# return all-zero EEPROM to be accepted as standard SFP, fixing the error:
-#   sfp sfp1: module is not supported - phys id 0x00 0x00
-[ -f drivers/net/phy/sfp.c ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/997-sfp-rtl8672-accept-zero-phys-id-24.10.patch"
+# Allow RTL8672/RTL9601C locked GPON ONT sticks that return all-zero EEPROM
+# and reduce false-positive RTL8672 warnings on MT7988 SFP I2C.
+install_kernel_patch \
+    "$GITHUB_WORKSPACE/patches/filogic/997-sfp-rtl8672-accept-zero-phys-id-24.10.patch" \
+    "999-2767-01-net-phy-sfp-rtl8672-accept-zero-phys-id.patch"
+
+install_kernel_patch \
+    "$GITHUB_WORKSPACE/patches/filogic/998-sfp-rtl8672-reduce-false-positive-warning.patch" \
+    "999-2767-02-net-phy-sfp-reduce-rtl8672-warning-false-positive.patch"
 
 patch_makefile_dep \
     feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js \
