@@ -126,17 +126,37 @@ if ! grep -q '_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile; then
   fi
 fi
 
+# Search multiple path variants: base package dir, feeds/base, and the feeds-installed symlink target.
+_purge_libcrypt_compat() {
+    local pattern='+USE_GLIBC:libcrypt-compat'
+    local paths=(
+        package/utils/busybox/Makefile
+        package/network/services/dropbear/Makefile
+        package/libs/libpcap/Makefile
+        package/network/services/ppp/Makefile
+        package/system/rpcd/Makefile
+        package/network/services/uhttpd/Makefile
+    )
+    # Alternative locations after feeds update/install.
+    # The base feed may preserve the full "package/" prefix or strip it.
+    for basedir in feeds/base package/feeds/base; do
+        for pfx in '' 'package/'; do
+            paths+=(
+                "${pfx}utils/busybox/Makefile"
+                "${pfx}network/services/dropbear/Makefile"
+                "${pfx}libs/libpcap/Makefile"
+                "${pfx}network/services/ppp/Makefile"
+                "${pfx}system/rpcd/Makefile"
+                "${pfx}network/services/uhttpd/Makefile"
+            )
+        done
+    done
+    for f in "${paths[@]}"; do
+        patch_makefile_dep "$f" "$pattern" ''
+    done
+}
 
-# Remove the conditional +USE_GLIBC:libcrypt-compat dependency from packages
-for makepath in \
-    package/utils/busybox/Makefile \
-    package/network/services/dropbear/Makefile \
-    package/libs/libpcap/Makefile \
-    package/network/services/ppp/Makefile \
-    package/system/rpcd/Makefile \
-    package/network/services/uhttpd/Makefile; do
-    patch_makefile_dep "$makepath" '+USE_GLIBC:libcrypt-compat' ''
-done
+_purge_libcrypt_compat
 
 # openwrt-24.10 compatibility fixes for floating packages feed metadata.
 patch_makefile_dep \
@@ -186,6 +206,9 @@ patch_makefile_dep \
 	install -m 0755 "$GITHUB_WORKSPACE/scripts/tempinfo" package/emortal/autocore/files/arm/tempinfo
 
 ./scripts/feeds install -a
+
+# Re-patch libcrypt-compat after feeds install in case feed symlinks/copies brought it back
+_purge_libcrypt_compat
 
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1000-luci-status-overview-wifi7-mlo.patch"
