@@ -126,6 +126,18 @@ if ! grep -q '_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile; then
   fi
 fi
 
+# openwrt-24.10: libcrypt-compat no longer exists as a separate package;
+# libcrypt functions are now provided by the standard C library directly.
+for makepath in \
+    package/utils/busybox/Makefile \
+    package/network/services/dropbear/Makefile \
+    package/libs/libpcap/Makefile \
+    package/network/services/ppp/Makefile \
+    package/system/rpcd/Makefile \
+    package/network/services/uhttpd/Makefile; do
+    patch_makefile_dep "$makepath" '+libcrypt-compat' ''
+done
+
 # openwrt-24.10 compatibility fixes for floating packages feed metadata.
 patch_makefile_dep \
     feeds/packages/lang/python/python-ubus/Makefile \
