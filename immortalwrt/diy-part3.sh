@@ -117,6 +117,15 @@ patch_makefile_dep \
         'skip'
 }
 
+# GCC 14 + musl fortify workaround for mbedtls
+if ! grep -q '_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile; then
+    if grep -q '\$(if \$(findstring cortex-a53,\$(CONFIG_CPU_TYPE)),-march=armv8-a)' package/libs/mbedtls/Makefile; then
+        sed -i '/$(if $(findstring cortex-a53,$(CONFIG_CPU_TYPE)),-march=armv8-a)/a TARGET_CFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile
+  else
+    echo 'TARGET_CFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0' >> package/libs/mbedtls/Makefile
+  fi
+fi
+
 # openwrt-24.10 compatibility fixes for floating packages feed metadata.
 patch_makefile_dep \
     feeds/packages/lang/python/python-ubus/Makefile \
