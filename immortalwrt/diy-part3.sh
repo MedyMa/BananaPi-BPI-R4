@@ -101,6 +101,12 @@ popd
 
 ./scripts/feeds update -a
 
+# Fix non-deterministic PKG_MIRROR_HASH in helloworld/shadowsocks-libev
+patch_makefile_dep \
+    package/community/helloworld/shadowsocks-libev/Makefile \
+    'PKG_MIRROR_HASH:=b3898ad0a557bc8b0bbb2f3888101d461944239b0b7d4d4c6f164d73694a4595' \
+    'PKG_MIRROR_HASH:=skip'
+
 # openwrt-24.10 compatibility fixes for floating packages feed metadata.
 patch_makefile_dep \
     feeds/packages/lang/python/python-ubus/Makefile \
