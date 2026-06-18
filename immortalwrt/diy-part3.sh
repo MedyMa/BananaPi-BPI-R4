@@ -126,8 +126,8 @@ if ! grep -q '_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile; then
   fi
 fi
 
-# openwrt-24.10: libcrypt-compat no longer exists as a separate package;
-# libcrypt functions are now provided by the standard C library directly.
+
+# Remove the conditional +USE_GLIBC:libcrypt-compat dependency from packages
 for makepath in \
     package/utils/busybox/Makefile \
     package/network/services/dropbear/Makefile \
@@ -135,7 +135,7 @@ for makepath in \
     package/network/services/ppp/Makefile \
     package/system/rpcd/Makefile \
     package/network/services/uhttpd/Makefile; do
-    patch_makefile_dep "$makepath" '+libcrypt-compat' ''
+    patch_makefile_dep "$makepath" '+USE_GLIBC:libcrypt-compat' ''
 done
 
 # openwrt-24.10 compatibility fixes for floating packages feed metadata.
