@@ -29,14 +29,13 @@ Signed-off-by: BananaPi-R4 community <openwrt@bananapi.org>
  1 file changed, 7 insertions(+)
 
 diff --git a/drivers/net/phy/sfp.c b/drivers/net/phy/sfp.c
-index aaaaaaa..bbbbbbb 100644
+index 165c624..88f0bad 100644
 --- a/drivers/net/phy/sfp.c
 +++ b/drivers/net/phy/sfp.c
-@@ -313,6 +313,13 @@ static bool sfp_module_supported(const struct sfp_eeprom_id *id)
- 	if (id->base.phys_id == SFF8024_ID_SFP &&
+@@ -314,6 +314,13 @@ static bool sfp_module_supported(const struct sfp_eeprom_id *id)
  	    id->base.phys_ext_id == SFP_PHYS_EXT_ID_SFP)
  		return true;
-+
+ 
 +	/* RTL8672/RTL9601C based GPON ONT sticks (e.g. locked Chinese ISP
 +	 * modules) return all-zero EEPROM even after byte-by-byte I/O.
 +	 * Accept (phys_id, phys_ext_id) == (0x00, 0x00) as standard SFP.
@@ -47,5 +46,5 @@ index aaaaaaa..bbbbbbb 100644
  	/* SFP GPON module Ubiquiti U-Fiber Instant has in its EEPROM stored
  	 * phys id SFF instead of SFP. Therefore mark this module explicitly
  	 * as supported based on vendor name and pn match.
---
+-- 
 2.45.2
