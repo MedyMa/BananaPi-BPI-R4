@@ -219,10 +219,7 @@ _purge_libcrypt_compat
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/998-iwinfo-mtk-fix-6ghz-reporting.patch"
 
 [ -f feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1001-luci-network-wireless-station-hints.patch"
-
-[ -f feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/999-luci-wireless-mtk-mode-matrix.patch"
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1004-luci-wireless-combined.patch"
 
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1002-luci-status-overview-rate-mhz-hi.patch"
@@ -236,8 +233,3 @@ install_kernel_patch \
 install_kernel_patch \
     "$GITHUB_WORKSPACE/patches/filogic/998-sfp-rtl8672-reduce-false-positive-warning.patch" \
     "999-2767-02-net-phy-sfp-reduce-rtl8672-warning-false-positive.patch"
-
-patch_makefile_dep \
-    feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js \
-    "\t\t\t\thint = name || ipv4 || ipv6 || '?';" \
-    "\t\t\t\thint = (name == '?' ? null : name) || ipv4 || ipv6 || bss.mac;"
