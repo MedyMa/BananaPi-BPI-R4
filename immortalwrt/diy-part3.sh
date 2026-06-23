@@ -62,6 +62,7 @@ rm -rf feeds/luci/applications/luci-app-passwall
 rm -rf feeds/luci/applications/luci-app-modemband
 rm -rf package/mtk/applications/luci-app-turboacc-mtk
 rm -f target/linux/mediatek/patches-6.6/999-2001-arm64-dts-mt7988-aqr-10gphy-disable-eee.patch
+rm -f target/linux/mediatek/patches-6.6/999-2003-arm64-dts-mt7988-use-software-reset-for-aqr-10gphy.patch
 rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2socks,hysteria,ipt2socks,microsocks,naiveproxy,shadowsocks-libev,shadowsocks-rust,shadowsocksr-libev,simple-obfs,tcping,trojan-plus,tuic-client,v2ray-plugin,xray-plugin,geoview,shadow-tls}
 
 # Clone community packages to package/community
