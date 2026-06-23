@@ -234,8 +234,8 @@ _purge_libcrypt_compat
 [ -f package/network/utils/iwinfo/src/iwinfo_mtk.c ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/998-iwinfo-mtk-fix-6ghz-reporting.patch"
 
-[ -f feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1004-luci-wireless-combined.patch"
+[ -f package/mtk/applications/luci-app-mtwifi-cfg/root/usr/share/luci-app-mtwifi-cfg/wireless-mtk.js ] && \
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1005-luci-wireless-mtk-station-and-rate-fixes.patch"
 
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1002-luci-status-overview-rate-mhz-hi.patch"
