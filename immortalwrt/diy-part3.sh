@@ -61,6 +61,7 @@ rm -rf feeds/luci/applications/luci-app-argon-config
 rm -rf feeds/luci/applications/luci-app-passwall
 rm -rf feeds/luci/applications/luci-app-modemband
 rm -rf package/mtk/applications/luci-app-turboacc-mtk
+rm -f target/linux/mediatek/patches-6.6/999-2001-arm64-dts-mt7988-aqr-10gphy-disable-eee.patch
 rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2socks,hysteria,ipt2socks,microsocks,naiveproxy,shadowsocks-libev,shadowsocks-rust,shadowsocksr-libev,simple-obfs,tcping,trojan-plus,tuic-client,v2ray-plugin,xray-plugin,geoview,shadow-tls}
 
 # Clone community packages to package/community
@@ -197,7 +198,7 @@ patch_makefile_dep \
 	sed -i '/groups = "mdc_mdio0";/{N; s/drive-strength = <MTK_DRIVE_8mA>/drive-strength = <MTK_DRIVE_10mA>/}' \
 		target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a.dtsi
 
-	# Remove wrong reset-gpios from AQR/CUX3410 overlays (BPI-R4 pin mismatch)
+	# Remove wrong reset-gpios and disable EEE from AQR/CUX3410 overlays (BPI-R4 pin mismatch + MTK 2001)
 	for dtso in \
 		mt7988a-rfb-eth1-aqr.dtso \
 		mt7988a-rfb-eth1-cux3410.dtso \
@@ -205,7 +206,10 @@ patch_makefile_dep \
 		mt7988a-rfb-eth2-cux3410.dtso
 	do
 		dtso_path="target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/$dtso"
-		[ -f "$dtso_path" ] && sed -i '/reset-gpios\|reset-assert-us\|reset-deassert-us/d' "$dtso_path"
+		[ -f "$dtso_path" ] && sed -i \
+			-e '/reset-gpios\|reset-assert-us\|reset-deassert-us/d' \
+			-e '/firmware-name.*\.cld"/s/$/\n\t\teee-broken-10gt;\n\t\teee-broken-1000t;/' \
+			"$dtso_path"
 	done
 }
 
