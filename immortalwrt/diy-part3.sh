@@ -194,10 +194,19 @@ patch_makefile_dep \
 		target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a.dtsi
 
 	# MDIO drive 8mA→10mA for AQR113C 10G PHY (MTK 1010)
-	( cd target/linux/mediatek/files-6.6 && patch -p1 -N -r- < "$GITHUB_WORKSPACE/patches/filogic/992-dts-mt7988a-mdio-drive-10ma.patch" ) || true
+	sed -i '/groups = "mdc_mdio0";/{N; s/drive-strength = <MTK_DRIVE_8mA>/drive-strength = <MTK_DRIVE_10mA>/}' \
+		target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a.dtsi
 
 	# Remove wrong reset-gpios from AQR/CUX3410 overlays (BPI-R4 pin mismatch)
-	( cd target/linux/mediatek/files-6.6 && patch -p1 -N -r- < "$GITHUB_WORKSPACE/patches/filogic/991-dts-mt7988-aqr-remove-reset-gpios.patch" ) || true
+	for dtso in \
+		mt7988a-rfb-eth1-aqr.dtso \
+		mt7988a-rfb-eth1-cux3410.dtso \
+		mt7988a-rfb-eth2-aqr.dtso \
+		mt7988a-rfb-eth2-cux3410.dtso
+	do
+		dtso_path="target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/$dtso"
+		[ -f "$dtso_path" ] && sed -i '/reset-gpios\|reset-assert-us\|reset-deassert-us/d' "$dtso_path"
+	done
 }
 
 [ -f "$GITHUB_WORKSPACE/scripts/cpuinfo" ] && \
