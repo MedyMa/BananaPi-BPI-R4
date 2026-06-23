@@ -188,14 +188,16 @@ patch_makefile_dep \
     '+(TARGET_mediatek||TARGET_mvebu):mhz \
     +TARGET_mediatek:wireless-tools'
 
-[ -f target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a.dtsi ] && {
+[ -d target/linux/mediatek/files-6.6 ] && {
 	# Enable LVTS thermal sensor
 	sed -i '/lvts: lvts@1100a000 {/,/^[[:space:]]*};/ { /status = "disabled";/d; }' \
 		target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a.dtsi
-	# Increase MDIO drive strength from 8mA to 10mA for GMAC1 and GMAC2 AQR113C 10G PHY
-	# (MTK upstream patch 1010; required for reliable 10G link at high frequencies)
-	sed -i '/groups = "mdc_mdio0";/{N; s/drive-strength = <MTK_DRIVE_8mA>/drive-strength = <MTK_DRIVE_10mA>/}' \
-		target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a.dtsi
+
+	# MDIO drive 8mA→10mA for AQR113C 10G PHY (MTK 1010)
+	( cd target/linux/mediatek/files-6.6 && patch -p1 -N -r- < "$GITHUB_WORKSPACE/patches/filogic/992-dts-mt7988a-mdio-drive-10ma.patch" ) || true
+
+	# Remove wrong reset-gpios from AQR/CUX3410 overlays (BPI-R4 pin mismatch)
+	( cd target/linux/mediatek/files-6.6 && patch -p1 -N -r- < "$GITHUB_WORKSPACE/patches/filogic/991-dts-mt7988-aqr-remove-reset-gpios.patch" ) || true
 }
 
 [ -f "$GITHUB_WORKSPACE/scripts/cpuinfo" ] && \
