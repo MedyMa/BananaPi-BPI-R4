@@ -55,7 +55,6 @@ install_kernel_patch() {
     install -m 0644 "$patch_file" "$patch_dir/$patch_name"
 }
 
-
 rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/luci/applications/luci-app-argon-config
 rm -rf feeds/luci/applications/luci-app-passwall
@@ -209,6 +208,7 @@ patch_makefile_dep \
 		dtso_path="target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/$dtso"
 		[ -f "$dtso_path" ] && sed -i \
 			-e '/reset-gpios\|reset-assert-us\|reset-deassert-us/d' \
+			-e '/eee-broken-10gt;\|eee-broken-1000t;/d' \
 			-e '/firmware-name.*\.cld"/s/$/\n\t\teee-broken-10gt;\n\t\teee-broken-1000t;/' \
 			"$dtso_path"
 	done
@@ -227,6 +227,12 @@ _purge_libcrypt_compat
 
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1000-luci-status-overview-wifi7-mlo.patch"
+
+[ -f feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js ] && \
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1001-luci-network-wireless-station-hints.patch"
+
+[ -f feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js ] && \
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/999-luci-wireless-mtk-mode-matrix.patch"
 
 [ -f package/system/rpcd/patches/0002-iwinfo-Improve-EHT-DCM-support.patch ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/997-rpcd-iwinfo-export-mhz-hi.patch"
