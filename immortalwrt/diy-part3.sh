@@ -78,6 +78,18 @@ install_sfp_warm_reboot_patches() {
     done
 }
 
+install_sfp_retrain_helper() {
+    local workspace_root="${GITHUB_WORKSPACE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+    local src_script="$workspace_root/patches/filogic/99-bpi-r4-sfp-retrain"
+    local dst_dir="target/linux/mediatek/filogic/base-files/etc/hotplug.d/net"
+    local dst_script="$dst_dir/99-bpi-r4-sfp-retrain"
+
+    [ -f "$src_script" ] || return 0
+
+    mkdir -p "$dst_dir"
+    install -m 0755 "$src_script" "$dst_script"
+}
+
 create_aqr10g_phy_fw_package() {
     local pkg_dir="package/kernel/aqr10g-phy-fw"
 
@@ -166,6 +178,10 @@ create_aqr10g_phy_fw_package
 # BPI-R4 SFP warm reboot recovery: allow shared MOD_DEF0 probing, extend
 # copper-module quirks, and force Aquantia AQR/CUX PHY software reset on probe.
 install_sfp_warm_reboot_patches
+
+# BPI-R4 SFP retrain hotplug helper: wait for SFP netdevs after warm reboot
+# and retrain the link if carrier is not yet detected.
+install_sfp_retrain_helper
 
 # add luci-app-OpenClash
 mkdir -p package/OpenClash
@@ -284,6 +300,21 @@ patch_makefile_dep \
 			sed -i '/compatible = "nxp,pca9545";/a\
 		i2c-mux-idle-disconnect;' "$dts_path"
 	done
+
+	# Add USXGMII PCS RX polarity swap hint for BPI-R4 SFP reliability.
+	bpi_dtsi="target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4.dtsi"
+	if [ -f "$bpi_dtsi" ] && ! grep -q 'mediatek,pnswap-rx' "$bpi_dtsi"; then
+		cat >> "$bpi_dtsi" <<'DTSEOF'
+
+&usxgmiisys0 {
+	mediatek,pnswap-rx;
+};
+
+&usxgmiisys1 {
+	mediatek,pnswap-rx;
+};
+DTSEOF
+	fi
 }
 
 [ -f "$GITHUB_WORKSPACE/scripts/cpuinfo" ] && \
