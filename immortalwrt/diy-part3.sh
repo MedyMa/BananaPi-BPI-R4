@@ -328,6 +328,9 @@ DTSEOF
 # Re-patch libcrypt-compat after feeds install in case feed symlinks/copies brought it back
 _purge_libcrypt_compat
 
+# Downgrade the usign SHA-512 padding warning from ERROR_MESSAGE (red/scary) 
+sed -i 's/ERROR_MESSAGE,WARNING: Applying padding in/MESSAGE,WARNING: Applying padding in/' package/Makefile
+
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1000-luci-status-overview-wifi7-mlo.patch"
 
