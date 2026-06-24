@@ -55,6 +55,23 @@ install_kernel_patch() {
     install -m 0644 "$patch_file" "$patch_dir/$patch_name"
 }
 
+install_sfp_warm_reboot_patches() {
+    local patch_root="${GITHUB_WORKSPACE:-}/patches/filogic/sfp"
+    local patch_name
+
+    [ -d "$patch_root" ] || return 0
+
+    for patch_name in \
+        999-2753-net-phy-sfp-support-additional-RollBall-modules.patch \
+        999-2754-net-phy-sfp-support-shared-mod-def0-gpio.patch \
+        999-2764-net-phy-sfp-add-some-FS-copper-SFP-fixes.patch \
+        999-2765-net-phy-sfp-add-some-checksum-fail-SFP-war.patch \
+        999-2769-net-phy-aquantia-add-software-reset-to-aqr107_probe.patch
+    do
+        install_kernel_patch "$patch_root/$patch_name" "$patch_name"
+    done
+}
+
 create_aqr10g_phy_fw_package() {
     local pkg_dir="package/kernel/aqr10g-phy-fw"
 
@@ -139,6 +156,10 @@ rm -rf feeds/packages/net/mosdns
 git clone https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
 
 create_aqr10g_phy_fw_package
+
+# BPI-R4 SFP warm reboot recovery: allow shared MOD_DEF0 probing, extend
+# copper-module quirks, and force Aquantia AQR/CUX PHY software reset on probe.
+install_sfp_warm_reboot_patches
 
 # add luci-app-OpenClash
 mkdir -p package/OpenClash
