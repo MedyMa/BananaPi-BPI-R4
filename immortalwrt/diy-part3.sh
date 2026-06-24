@@ -294,13 +294,3 @@ _purge_libcrypt_compat
 
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1002-luci-status-overview-rate-mhz-hi.patch"
-
-# Allow RTL8672/RTL9601C locked GPON ONT sticks that return all-zero EEPROM
-# and reduce false-positive RTL8672 warnings on MT7988 SFP I2C.
-install_kernel_patch \
-    "$GITHUB_WORKSPACE/patches/filogic/997-sfp-rtl8672-accept-zero-phys-id-24.10.patch" \
-    "999-2767-01-net-phy-sfp-rtl8672-accept-zero-phys-id.patch"
-
-install_kernel_patch \
-    "$GITHUB_WORKSPACE/patches/filogic/998-sfp-rtl8672-reduce-false-positive-warning.patch" \
-    "999-2767-02-net-phy-sfp-reduce-rtl8672-warning-false-positive.patch"
