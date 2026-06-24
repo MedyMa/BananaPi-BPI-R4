@@ -44,6 +44,7 @@ CONFIG_MODEMMANAGER_WITH_QMI=y
 CONFIG_MODEMMANAGER_WITH_QRTR=y
 CONFIG_PACKAGE_kmod-eeprom-at24=y
 CONFIG_PACKAGE_kmod-hwmon-pwmfan=y
+CONFIG_PACKAGE_aqr10g-phy-fw=y
 CONFIG_PACKAGE_kmod-i2c-mux-pca954x=y
 CONFIG_PACKAGE_kmod-leds-gpio=y
 CONFIG_PACKAGE_kmod-phy-aquantia=y
