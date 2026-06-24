@@ -257,6 +257,9 @@ index 8406a1a..7222f9e 100644
 +		if (!ipv6 && alias)
 +			ipv6 = L.toArray(alias.ip6addrs || alias.ipv6)[0] || (source_mac ? hosthints.getIP6AddrByMACAddr(source_mac) : null);
 +
++		if (name == '?')
++			name = null;
++
 +		return {
 +			name: name,
 +			ipv4: ipv4,

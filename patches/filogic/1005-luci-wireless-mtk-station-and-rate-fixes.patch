@@ -1,7 +1,7 @@
 diff --git a/package/mtk/applications/luci-app-mtwifi-cfg/root/usr/share/luci-app-mtwifi-cfg/wireless-mtk.js b/package/mtk/applications/luci-app-mtwifi-cfg/root/usr/share/luci-app-mtwifi-cfg/wireless-mtk.js
 --- a/package/mtk/applications/luci-app-mtwifi-cfg/root/usr/share/luci-app-mtwifi-cfg/wireless-mtk.js
 +++ b/package/mtk/applications/luci-app-mtwifi-cfg/root/usr/share/luci-app-mtwifi-cfg/wireless-mtk.js
-@@ -209,13 +209,27 @@ function render_modal_status(node, radioNet) {
+@@ -209,13 +209,30 @@ function render_modal_status(node, radioNet) {
  	return node;
  }
  
@@ -9,7 +9,10 @@ diff --git a/package/mtk/applications/luci-app-mtwifi-cfg/root/usr/share/luci-ap
 +	if (!rate || rate.mhz == null)
 +		return null;
 +
-+	return (((rate.mhz_hi || 0) << 8) + rate.mhz);
++	if (rate.mhz_hi && rate.mhz < 256)
++		return ((rate.mhz_hi << 8) + rate.mhz);
++
++	return rate.mhz;
 +}
 +
  function format_wifirate(rate) {
@@ -52,14 +55,14 @@ diff --git a/package/mtk/applications/luci-app-mtwifi-cfg/root/usr/share/luci-ap
  				'ac': [
  					'VHT160', '160 MHz', htmodelist.VHT160,
  					'VHT80', '80 MHz', htmodelist.VHT80,
-+					'VHT80_80', '80+80 MHz', true,
++					'VHT80_80', '80+80 MHz', htmodelist.VHT80_80,
  					'VHT40', '40 MHz', htmodelist.VHT40,
  					'VHT20', '20 MHz', htmodelist.VHT20
  				],
  				'ax': [
  					'HE160', '160 MHz', htmodelist.HE160,
  					'HE80', '80 MHz', htmodelist.HE80,
-+					'HE80_80', '80+80 MHz', true,
++					'HE80_80', '80+80 MHz', htmodelist.HE80_80,
  					'HE40', '40 MHz', htmodelist.HE40,
  					'HE20', '20 MHz', htmodelist.HE20
  				],
@@ -67,7 +70,7 @@ diff --git a/package/mtk/applications/luci-app-mtwifi-cfg/root/usr/share/luci-ap
  					'EHT320', '320 MHz', htmodelist.EHT320,
  					'EHT160', '160 MHz', htmodelist.EHT160,
  					'EHT80', '80 MHz',  htmodelist.EHT80, 
-+					'EHT80_80', '80+80 MHz', true,
++					'EHT80_80', '80+80 MHz', htmodelist.EHT80_80,
  					'EHT40', '40 MHz',  htmodelist.EHT40, 
  					'EHT20', '20 MHz',  htmodelist.EHT20 
  				]
@@ -86,12 +89,20 @@ diff --git a/package/mtk/applications/luci-app-mtwifi-cfg/root/usr/share/luci-ap
  			mode.value = 'ac';
  		else if (/HT20|HT40/.test(htval))
  			mode.value = 'n';
-@@ -727,7 +744,7 @@ return view.extend({
+@@ -722,12 +739,15 @@ return view.extend({
+ 			var hint = '-';
+ 			if (bss.network.getMode() == 'ap')
+ 			{
++				if (name == '?')
++					name = null;
++
+ 				if (name && ipv4 && ipv6)
+ 					hint = '%s <span class="hide-xs">(%s, %s)</span>'.format(name, ipv4, ipv6);
  				else if (name && (ipv4 || ipv6))
  					hint = '%s <span class="hide-xs">(%s)</span>'.format(name, ipv4 || ipv6);
  				else
 -					hint = name || ipv4 || ipv6 || '?';
-+					hint = (name == '?' ? null : name) || ipv4 || ipv6 || bss.mac;
++					hint = ipv4 || ipv6 || bss.mac;
  			}
  
  			var timestr = '-';

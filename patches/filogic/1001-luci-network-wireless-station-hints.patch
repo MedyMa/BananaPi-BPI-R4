@@ -26,7 +26,7 @@ diff --git a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/vi
  	const ht = rate.ht;
  	const vht = rate.vht;
  	const nss = rate.nss;
-@@ -198,33 +207,55 @@ function format_wifirate(rate) {
+@@ -198,33 +207,58 @@ function format_wifirate(rate) {
  	const he_gi = rate.he_gi;
  	const he_dcm = rate.he_dcm;
  	const eht = rate?.eht ?? false;
@@ -88,6 +88,9 @@ diff --git a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/vi
 +
 +	if (!ipv6 && alias)
 +		ipv6 = L.toArray(alias.ip6addrs || alias.ipv6)[0] || (source_mac ? hosts.getIP6AddrByMACAddr(source_mac) : null);
++
++	if (name == '?')
++		name = null;
 +
 +	return { name, ipv4, ipv6, source_mac };
 +}

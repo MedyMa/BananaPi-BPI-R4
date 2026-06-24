@@ -2,7 +2,7 @@
 index ae8dbac..3faa345 100644
 --- a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
 +++ b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
-@@ -193,11 +193,19 @@ function render_modal_status(node, radioNet) {
+@@ -193,11 +193,22 @@ function render_modal_status(node, radioNet) {
  	return node;
  }
  
@@ -10,7 +10,10 @@ index ae8dbac..3faa345 100644
 +	if (!rate || rate.mhz == null)
 +		return null;
 +
-+	return (((rate.mhz_hi || 0) << 8) + rate.mhz);
++	if (rate.mhz_hi && rate.mhz < 256)
++		return ((rate.mhz_hi << 8) + rate.mhz);
++
++	return rate.mhz;
 +}
 +
  function format_wifirate(rate) {
@@ -33,7 +36,7 @@ index ae8dbac..3faa345 100644
  
  	if (ht || vht) s += [
  		vht && mcs != null && `, VHT-MCS\xa0${mcs}`,
-@@ -319,6 +327,101 @@ function add_dependency_permutations(o, deps) {
+@@ -319,6 +327,97 @@ function add_dependency_permutations(o, deps) {
  	res.forEach(dep => o.depends(dep));
  }
  
@@ -70,7 +73,7 @@ index ae8dbac..3faa345 100644
 +	}
 +}
 +
-+function getFallbackWifiHwModes(band, allow2gAc) {
++function getFallbackWifiHwModes(band) {
 +	const modes = {};
 +
 +	switch (band) {
@@ -80,8 +83,6 @@ index ae8dbac..3faa345 100644
 +		modes.n = true;
 +		modes.ax = true;
 +		modes.be = true;
-+		if (allow2gAc)
-+			modes.ac = true;
 +		break;
 +
 +	case '5g':
@@ -101,15 +102,13 @@ index ae8dbac..3faa345 100644
 +	return modes;
 +}
 +
-+function getFallbackWifiHtModes(band, allow2gAc) {
++function getFallbackWifiHtModes(band) {
 +	const modes = {};
 +	const add = (...entries) => entries.forEach(entry => modes[entry] = true);
 +
 +	switch (band) {
 +	case '2g':
 +		add('HT20', 'HT40', 'HE20', 'HE40', 'EHT20', 'EHT40');
-+		if (allow2gAc)
-+			add('VHT20', 'VHT40');
 +		break;
 +
 +	case '5g':
@@ -149,7 +148,7 @@ index ae8dbac..3faa345 100644
  				const available = (freq.restricted && freq.no_ir) ? false: true;
  
  				this.channels[band].push(
-@@ -362,22 +466,36 @@ var CBIWifiFrequencyValue = form.Value.extend({
+@@ -362,22 +466,35 @@ var CBIWifiFrequencyValue = form.Value.extend({
  				);
  			});
  
@@ -167,19 +166,17 @@ index ae8dbac..3faa345 100644
 +			// Create a list of HT modes based on device capabilities
 +			const htmodelist = L.toArray(wifidevs ? wifidevs.getHTModes() : null)
 +				.reduce(function(o, v) { o[v] = true; return o; }, {});
-+			const allow2gAc = (uci.get('wireless', section_id, 'vendor_vht') == '1' || htmodelist.VHT20 || htmodelist.VHT40);
 +
 +			if (isMtkWifi && deviceBand) {
-+				Object.assign(hwmodelist, getFallbackWifiHwModes(deviceBand, allow2gAc));
-+				Object.assign(htmodelist, getFallbackWifiHtModes(deviceBand, allow2gAc));
++				Object.assign(hwmodelist, getFallbackWifiHwModes(deviceBand));
++				Object.assign(htmodelist, getFallbackWifiHtModes(deviceBand));
 +			}
 +
  			// Define supported modes
  			this.modes = [
  				'', 'Legacy', { available: hwmodelist.a || hwmodelist.b || hwmodelist.g },
  				'n', 'N', { available: hwmodelist.n },
--				'ac', 'AC', { available: L.hasSystemFeature('hostapd', '11ac') && hwmodelist.ac },
-+				'ac', 'AC', { available: L.hasSystemFeature('hostapd', '11ac') && (hwmodelist.ac || allow2gAc) },
+ 				'ac', 'AC', { available: L.hasSystemFeature('hostapd', '11ac') && hwmodelist.ac },
  				'ax', 'AX', { available: L.hasSystemFeature('hostapd', '11ax') && hwmodelist.ax },
  				'be', 'BE', { available: L.hasSystemFeature('hostapd', '11be') && hwmodelist.be }
  			];
@@ -213,12 +210,11 @@ index ae8dbac..3faa345 100644
  					'EHT160', '160 MHz', { available: htmodelist.EHT160 },
  					'EHT320', '320 MHz', { available: htmodelist.EHT320 }
  				]
-@@ -418,7 +539,8 @@ var CBIWifiFrequencyValue = form.Value.extend({
+@@ -418,7 +539,7 @@ var CBIWifiFrequencyValue = form.Value.extend({
  					'5g', '5 GHz', { available: this.channels['5g'].length > 3 }
  				],
  				'ac': [
 -					'5g', '5 GHz', { available: true }
-+					'2g', '2.4 GHz', { available: allow2gAc && this.channels['2g'].length > 3 },
 +					'5g', '5 GHz', { available: this.channels['5g'].length > 3 }
  				],
  				'ax': [

@@ -2,11 +2,12 @@ diff --git a/package/network/utils/iwinfo/src/iwinfo_mtk.c b/package/network/uti
 index bbc7f00..7622f5c 100644
 --- a/package/network/utils/iwinfo/src/iwinfo_mtk.c
 +++ b/package/network/utils/iwinfo/src/iwinfo_mtk.c
-@@ -73,6 +73,341 @@ static int mtk_is_ifup(const char *ifname)
+@@ -73,6 +73,342 @@ static int mtk_is_ifup(const char *ifname)
  	return 0;
  }
  
 +static int mtk_get_freqlist(const char *dev, char *buf, int *len);
++static int mtk_get_assoc_bitrate(const char *dev, int *buf);
 +
 +static int mtk_get_band_from_uci(const char *dev, int *buf)
 +{
@@ -344,6 +345,54 @@ index bbc7f00..7622f5c 100644
  static int mtk_get_mode(const char *dev, int *buf)
  {
  	struct iwreq wrq;
+@@ -156,6 +491,9 @@ static int mtk_get_bitrate(const char *dev, int *buf)
+ 	struct iwreq wrq;
+ 	const char *ifname;
+ 
++	if (!mtk_get_assoc_bitrate(dev, buf))
++		return 0;
++
+ 	ifname = mtk_dev2phy(dev);
+ 	if (!ifname)
+ 		return -1;
+@@ -452,6 +790,37 @@ static int mtk_get_assoclist(const char *dev, char *buf, int *len)
+ 	return 0;
+ }
+ 
++static int mtk_get_assoc_bitrate(const char *dev, int *buf)
++{
++	char res[IWINFO_BUFSIZE] = { 0 };
++	struct iwinfo_assoclist_entry *e;
++	uint32_t rate;
++	int len = 0;
++	int best = 0;
++	int i;
++
++	if (mtk_get_assoclist(dev, res, &len) || len <= 0)
++		return -1;
++
++	for (i = 0; i < len; i += sizeof(struct iwinfo_assoclist_entry)) {
++		e = (struct iwinfo_assoclist_entry *)&res[i];
++
++		rate = e->tx_rate.rate;
++		if (rate > best)
++			best = rate;
++
++		rate = e->rx_rate.rate;
++		if (rate > best)
++			best = rate;
++	}
++
++	if (best <= 0)
++		return -1;
++
++	*buf = best;
++	return 0;
++}
++
+ static int mtk_get_txpwrlist(const char *dev, char *buf, int *len)
+ {
+ 	return -1;
 @@ -203,7 +538,11 @@ static int mtk_get_center_chan2(const char *dev, int *buf)
  
  static int mtk_get_frequency(const char *dev, int *buf)

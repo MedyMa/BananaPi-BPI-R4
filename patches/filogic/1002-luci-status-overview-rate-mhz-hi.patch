@@ -6,7 +6,7 @@ index 95f8368..af95283 100644
  
  		var s = '%.1f\xa0%s'.format(rt.rate / 1000, _('Mbit/s')),
  		    ht = rt.ht, vht = rt.vht,
-+			mhz = (rt.mhz != null) ? (((rt.mhz_hi || 0) << 8) + rt.mhz) : null,
++			mhz = (rt.mhz != null) ? ((rt.mhz_hi && rt.mhz < 256) ? ((rt.mhz_hi << 8) + rt.mhz) : rt.mhz) : null,
  			nss = rt.nss,
  			mcs = rt.mcs, sgi = rt.short_gi,
  			he = rt.he, he_gi = rt.he_gi,

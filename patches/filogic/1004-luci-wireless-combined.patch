@@ -99,6 +99,9 @@ index f486c36..fbc07f9 100644
 +	if (!ipv6 && alias)
 +		ipv6 = L.toArray(alias.ip6addrs || alias.ipv6)[0] || (source_mac ? hosts.getIP6AddrByMACAddr(source_mac) : null);
 +
++	if (name == '?')
++		name = null;
++
 +	return { name, ipv4, ipv6, source_mac };
 +}
 +
