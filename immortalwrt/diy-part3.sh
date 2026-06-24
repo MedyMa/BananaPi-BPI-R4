@@ -55,13 +55,59 @@ install_kernel_patch() {
     install -m 0644 "$patch_file" "$patch_dir/$patch_name"
 }
 
+create_aqr10g_phy_fw_package() {
+    local pkg_dir="package/kernel/aqr10g-phy-fw"
+
+    mkdir -p "$pkg_dir"
+    cat > "$pkg_dir/Makefile" <<'EOF'
+include $(TOPDIR)/rules.mk
+
+PKG_NAME:=aqr10g-phy-fw
+PKG_RELEASE:=1
+PKG_LICENSE:=LicenseRef-Redistributable
+PKG_MAINTAINER:=BananaPi-R4 community
+
+include $(INCLUDE_DIR)/package.mk
+
+define Package/aqr10g-phy-fw
+  SECTION:=firmware
+  CATEGORY:=Firmware
+  TITLE:=Aquantia AQR113C/CUX3410 10G PHY firmware
+endef
+
+define Package/aqr10g-phy-fw/description
+  Firmware blobs referenced by the MT7988 AQR113C and CUX3410 DTS
+  overlays. They allow the Aquantia driver to reload firmware after a
+  software reset, which is needed for reliable warm reboot recovery.
+endef
+
+define Build/Prepare
+	$(INSTALL_DIR) $(PKG_BUILD_DIR)
+	wget -qO $(PKG_BUILD_DIR)/Rhe-05.06-Candidate9-AQR_Mediatek_23B_P5_ID45824_LCLVER1.cld \
+		https://raw.githubusercontent.com/shiyu1314/immortalwrt-mt798x-6.12/25.12-dev/package/kernel/aqr10g-phy-fw/files/Rhe-05.06-Candidate9-AQR_Mediatek_23B_P5_ID45824_LCLVER1.cld
+	wget -qO $(PKG_BUILD_DIR)/AQR-G4_v5.7.0-AQR_EVB_Generic_X3410_StdCfg_MDISwap_USX_ID46316_VER2148.cld \
+		https://raw.githubusercontent.com/shiyu1314/immortalwrt-mt798x-6.12/25.12-dev/package/kernel/aqr10g-phy-fw/files/AQR-G4_v5.7.0-AQR_EVB_Generic_X3410_StdCfg_MDISwap_USX_ID46316_VER2148.cld
+	echo "19d73393d575fbe4018c1685fbdea2ae6fb59be3c995f608920a417c7e3f8d1c  $(PKG_BUILD_DIR)/Rhe-05.06-Candidate9-AQR_Mediatek_23B_P5_ID45824_LCLVER1.cld" | sha256sum -c
+	echo "1c9a67faffe50da1a0efa374ec084a956b6ec64ca9d97d3ad6b1a8708d490a44  $(PKG_BUILD_DIR)/AQR-G4_v5.7.0-AQR_EVB_Generic_X3410_StdCfg_MDISwap_USX_ID46316_VER2148.cld" | sha256sum -c
+endef
+
+define Build/Compile
+endef
+
+define Package/aqr10g-phy-fw/install
+	$(INSTALL_DIR) $(1)/lib/firmware
+	$(INSTALL_DATA) $(PKG_BUILD_DIR)/*.cld $(1)/lib/firmware/
+endef
+
+$(eval $(call BuildPackage,aqr10g-phy-fw))
+EOF
+}
+
 rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/luci/applications/luci-app-argon-config
 rm -rf feeds/luci/applications/luci-app-passwall
 rm -rf feeds/luci/applications/luci-app-modemband
 rm -rf package/mtk/applications/luci-app-turboacc-mtk
-rm -f target/linux/mediatek/patches-6.6/999-2001-arm64-dts-mt7988-aqr-10gphy-disable-eee.patch
-rm -f target/linux/mediatek/patches-6.6/999-2003-arm64-dts-mt7988-use-software-reset-for-aqr-10gphy.patch
 rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2socks,hysteria,ipt2socks,microsocks,naiveproxy,shadowsocks-libev,shadowsocks-rust,shadowsocksr-libev,simple-obfs,tcping,trojan-plus,tuic-client,v2ray-plugin,xray-plugin,geoview,shadow-tls}
 
 # Clone community packages to package/community
@@ -91,6 +137,8 @@ rm -rf feeds/packages/lang/golang
 git clone https://github.com/sbwml/packages_lang_golang -b 26.x feeds/packages/lang/golang
 rm -rf feeds/packages/net/mosdns
 git clone https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
+
+create_aqr10g_phy_fw_package
 
 # add luci-app-OpenClash
 mkdir -p package/OpenClash
@@ -194,23 +242,20 @@ patch_makefile_dep \
 	sed -i '/lvts: lvts@1100a000 {/,/^[[:space:]]*};/ { /status = "disabled";/d; }' \
 		target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a.dtsi
 
-	# MDIO drive 8mA→10mA for AQR113C 10G PHY (MTK 1010)
+	# MDIO drive 8mA -> 10mA for AQR113C 10G PHY (MTK 1010)
 	sed -i '/groups = "mdc_mdio0";/{N; s/drive-strength = <MTK_DRIVE_8mA>/drive-strength = <MTK_DRIVE_10mA>/}' \
 		target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a.dtsi
 
-	# Remove wrong reset-gpios and disable EEE from AQR/CUX3410 overlays (BPI-R4 pin mismatch + MTK 2001)
-	for dtso in \
-		mt7988a-rfb-eth1-aqr.dtso \
-		mt7988a-rfb-eth1-cux3410.dtso \
-		mt7988a-rfb-eth2-aqr.dtso \
-		mt7988a-rfb-eth2-cux3410.dtso
+	# Keep the BPI-R4 SFP I2C mux from leaving an SFP channel selected across
+	# idle periods. This helps warm-reboot SFP reprobe reliability.
+	for dts in \
+		mt7988a-bananapi-bpi-r4.dtsi \
+		mt7988a-bananapi-bpi-r4-pro.dts
 	do
-		dtso_path="target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/$dtso"
-		[ -f "$dtso_path" ] && sed -i \
-			-e '/reset-gpios\|reset-assert-us\|reset-deassert-us/d' \
-			-e '/eee-broken-10gt;\|eee-broken-1000t;/d' \
-			-e '/firmware-name.*\.cld"/s/$/\n\t\teee-broken-10gt;\n\t\teee-broken-1000t;/' \
-			"$dtso_path"
+		dts_path="target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/$dts"
+		[ -f "$dts_path" ] && ! grep -q 'i2c-mux-idle-disconnect;' "$dts_path" && \
+			sed -i '/compatible = "nxp,pca9545";/a\
+		i2c-mux-idle-disconnect;' "$dts_path"
 	done
 }
 
@@ -234,8 +279,12 @@ _purge_libcrypt_compat
 [ -f feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/999-luci-wireless-mtk-mode-matrix.patch"
 
-[ -f package/system/rpcd/patches/0002-iwinfo-Improve-EHT-DCM-support.patch ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/997-rpcd-iwinfo-export-mhz-hi.patch"
+[ -d package/system/rpcd ] && {
+    mkdir -p package/system/rpcd/patches
+    install -m 0644 \
+        "$GITHUB_WORKSPACE/patches/filogic/997-rpcd-iwinfo-export-mhz-hi.patch" \
+        package/system/rpcd/patches/997-iwinfo-export-eht-dcm.patch
+}
 
 [ -f package/network/utils/iwinfo/src/iwinfo_mtk.c ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/998-iwinfo-mtk-fix-6ghz-reporting.patch"
