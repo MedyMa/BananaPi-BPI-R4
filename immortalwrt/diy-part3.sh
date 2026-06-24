@@ -48,15 +48,21 @@ install_kernel_patch() {
     local patch_file="$1"
     local patch_name="$2"
     local patch_dir="target/linux/mediatek/patches-6.6"
+    local target_patch="$patch_dir/$patch_name"
 
     [ -f "$patch_file" ] || return 0
     [ -d "$patch_dir" ] || return 0
 
-    install -m 0644 "$patch_file" "$patch_dir/$patch_name"
+    if [ -f "$target_patch" ] && cmp -s "$patch_file" "$target_patch"; then
+        return 0
+    fi
+
+    install -m 0644 "$patch_file" "$target_patch"
 }
 
 install_sfp_warm_reboot_patches() {
-    local patch_root="${GITHUB_WORKSPACE:-}/patches/filogic/sfp"
+    local workspace_root="${GITHUB_WORKSPACE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+    local patch_root="$workspace_root/patches/filogic/sfp"
     local patch_name
 
     [ -d "$patch_root" ] || return 0
