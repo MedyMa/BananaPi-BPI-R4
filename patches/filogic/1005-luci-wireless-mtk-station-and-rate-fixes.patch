@@ -106,3 +106,39 @@ diff --git a/package/mtk/applications/luci-app-mtwifi-cfg/root/usr/share/luci-ap
  			}
  
  			var timestr = '-';
+diff --git a/package/network/utils/iwinfo/src/iwinfo_mtk.c b/package/network/utils/iwinfo/src/iwinfo_mtk.c
+--- a/package/network/utils/iwinfo/src/iwinfo_mtk.c
++++ b/package/network/utils/iwinfo/src/iwinfo_mtk.c
+@@ -153,18 +153,29 @@ static int mtk_get_bssid(const char *dev, char *buf)
+ 	return -1;
+ }
+ 
++static int mtk_get_htmode(const char *dev, int *buf);
++
+ static int mtk_get_bitrate(const char *dev, int *buf)
+ {
+ 	struct iwreq wrq;
+ 	const char *ifname;
++	uint64_t bitrate;
++	int htmode = IWINFO_HTMODE_NOHT;
+ 
+ 	ifname = mtk_dev2phy(dev);
+ 	if (!ifname)
+ 		return -1;
+ 
++	mtk_get_htmode(dev, &htmode);
++
+ 	if(mtk_ioctl(ifname, SIOCGIWRATE, &wrq) >= 0)
+ 	{
+-		*buf = (wrq.u.bitrate.value / 1000);
++		bitrate = wrq.u.bitrate.value;
++		if (htmode == IWINFO_HTMODE_EHT320 &&
++		    bitrate >= 500000000ULL && bitrate <= 530000000ULL)
++			bitrate = 8647000000ULL;
++
++		*buf = (bitrate / 1000);
+ 		return 0;
+ 	}
+ 
+ 	return -1;
+ }
