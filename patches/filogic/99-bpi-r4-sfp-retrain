@@ -1,0 +1,83 @@
+#!/bin/sh
+# BPI-R4 SFP retrain helper for warm reboot recovery.
+#
+# On warm reboot, netifd may bring up interfaces before SFP netdevs or
+# USXGMII PCS training completes.  This hotplug handler waits for SFP
+# interfaces to appear and retrains them a limited number of times.
+#
+# Only interfaces that ethtool reports as Port: FIBRE (or explicit
+# sfp-* aliases) are touched, to avoid flapping unrelated eth1/eth2.
+#
+# Installed as /etc/hotplug.d/net/99-bpi-r4-sfp-retrain
+
+ACTION="$1"
+INTERFACE="$2"
+
+# Only act on ifup events
+[ "$ACTION" = "ifup" ] || exit 0
+[ -n "$INTERFACE" ] || exit 0
+
+# Avoid re-entrancy: only retrain once per boot per interface
+STAMP_FILE="/var/run/sfp_retrain_${INTERFACE}"
+[ -f "$STAMP_FILE" ] && exit 0
+
+# Determine whether this interface is SFP-backed.
+is_sfp_iface() {
+    local iface="$1"
+
+    # Explicit sfp-* aliases are definitely SFP
+    case "$iface" in
+        sfp-*|sfp_*) return 0 ;;
+    esac
+
+    # Check ethtool for FIBRE port type
+    if command -v ethtool >/dev/null 2>&1; then
+        if ethtool "$iface" 2>/dev/null | grep -q 'Port: FIBRE'; then
+            return 0
+        fi
+    fi
+
+    return 1
+}
+
+is_sfp_iface "$INTERFACE" || exit 0
+
+# Mark this interface as processed
+touch "$STAMP_FILE"
+
+log() {
+    logger -t "sfp-retrain" "$@"
+}
+
+log "SFP interface $INTERFACE came up, starting retrain sequence"
+
+# Wait for link readiness and retrain
+MAX_RETRIES=5
+RETRY_DELAY_SEC=3
+retry=0
+
+while [ "$retry" -lt "$MAX_RETRIES" ]; do
+    retry=$((retry + 1))
+
+    # Check if link is already up with a carrier
+    if ethtool "$INTERFACE" 2>/dev/null | grep -q 'Link detected: yes'; then
+        log "$INTERFACE link detected after $((retry * RETRY_DELAY_SEC))s, retrain complete"
+        break
+    fi
+
+    # Retrain the link
+    if command -v ethtool >/dev/null 2>&1; then
+        ethtool -r "$INTERFACE" 2>/dev/null || true
+        log "$INTERFACE retrain attempt $retry/$MAX_RETRIES"
+    fi
+
+    sleep "$RETRY_DELAY_SEC"
+done
+
+if [ "$retry" -ge "$MAX_RETRIES" ]; then
+    # Last-resort: force renegotiation
+    ip link set "$INTERFACE" down 2>/dev/null || true
+    sleep 1
+    ip link set "$INTERFACE" up 2>/dev/null || true
+    log "$INTERFACE max retries exhausted, forced link down/up"
+fi

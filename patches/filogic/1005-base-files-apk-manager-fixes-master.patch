@@ -1,0 +1,79 @@
+--- /dev/null
++++ b/package/base-files/files/etc/uci-defaults/99-apk-manager-fixes
+@@ -0,0 +1,74 @@
++#!/bin/sh
++
++sanitize_apk_repositories() {
++	local repo_file tmp_file line
++
++	for repo_file in /etc/apk/repositories /etc/apk/repositories.d/*; do
++		[ -f "$repo_file" ] || continue
++		tmp_file="${repo_file}.tmp.$$"
++		: > "$tmp_file"
++
++		while IFS= read -r line || [ -n "$line" ]; do
++			case "$line" in
++				\#*|'')
++					printf '%s\n' "$line" >> "$tmp_file"
++				;;
++				*kiddin9*|*/video/packages.adb)
++					printf '# %s\n' "$line" >> "$tmp_file"
++				;;
++				*)
++					printf '%s\n' "$line" >> "$tmp_file"
++				;;
++			esac
++		done < "$repo_file"
++
++		mv "$tmp_file" "$repo_file"
++	done
++}
++
++wrap_apk_binary() {
++	local apk_path="$1"
++	local real_path
++
++	[ -x "$apk_path" ] || return 0
++
++	real_path="${apk_path}.real"
++	if [ ! -f "$real_path" ]; then
++		mv "$apk_path" "$real_path"
++		cat > "$apk_path" << 'WRAP'
++#!/bin/sh
++real_apk="$(readlink -f "$0").real"
++
++case "$1" in
++	add)
++		shift
++		local_apk=
++		for arg in "$@"; do
++			case "$arg" in
++				*.apk)
++					[ -f "$arg" ] && local_apk=1 && break
++				;;
++			esac
++		done
++
++		if [ -n "$local_apk" ]; then
++			exec "$real_apk" add --allow-untrusted "$@"
++		fi
++
++		exec "$real_apk" add "$@"
++	;;
++	*)
++		exec "$real_apk" "$@"
++	;;
++esac
++WRAP
++		chmod 0755 "$apk_path"
++	fi
++}
++
++sanitize_apk_repositories
++wrap_apk_binary /usr/bin/apk
++
++if [ ! -e /sbin/apk ]; then
++	ln -sf /usr/bin/apk /sbin/apk 2>/dev/null || true
++fi
++
++exit 0
