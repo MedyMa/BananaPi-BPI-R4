@@ -2,7 +2,7 @@ name: MT7988-Action
 
 on:
   schedule:
-    - cron: 0 17 * * 5
+    - cron: 0 17 * * *
   workflow_dispatch:
 
 permissions:
@@ -231,7 +231,7 @@ jobs:
       id: organize
       if: ${{ steps.compile.outputs.status == 'success' && env.UPLOAD_FIRMWARE == 'true' && !cancelled() }}
       run: |
-        cd openwrt/bin/targets/mediatek/filogic_a73
+        cd openwrt/bin/targets/mediatek/filogic
         rm -rf packages *mt798* *.config *.buildinfo *.json sha256sums
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
@@ -264,3 +264,14 @@ jobs:
         name: ${{ steps.tag.outputs.release_tag }}
         tag_name: ${{ steps.tag.outputs.release_tag }}
         body_path: release.txt
+
+    - name: 删除旧的Releases
+      if: steps.tag.outputs.status == 'success' && !cancelled()
+      uses: MedyMa/delete-older-releases@v0.3.4
+
+      with:
+        keep_latest: 3
+        delete_tags: true
+        delete_tag_pattern: '^.*-immortalwrt_MT7988_draft_mt798x-mt799x-6\.6-mtwifi$'
+      env:
+        GITHUB_TOKEN: ${{ secrets.RELEASES_TOKEN }}

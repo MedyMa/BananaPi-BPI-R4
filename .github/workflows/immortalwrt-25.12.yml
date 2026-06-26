@@ -1,4 +1,4 @@
-name: immortalwrt_25.12
+name: immortalwrt_25_12
 
 on:
   schedule:
@@ -264,8 +264,8 @@ jobs:
       if: steps.tag.outputs.status == 'success' && !cancelled()
       uses: MedyMa/delete-older-releases@v0.3.4
       with:
-        keep_latest: 2
+        keep_latest: 3
         delete_tags: true
-        delete_tag_pattern: '^.*-immortalwrt_25.12$'
+        delete_tag_pattern: '^.*-immortalwrt_openwrt-25\.12$'
       env:
         GITHUB_TOKEN: ${{ secrets.RELEASES_TOKEN }}
