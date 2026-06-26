@@ -1,0 +1,212 @@
+diff --git a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
+--- a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
++++ b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
+@@ -13,6 +13,12 @@
+ 
+ const isReadonlyView = !L.hasViewPermission();
+ 
++const callWifiStationHints = rpc.declare({
++	object: 'luci',
++	method: 'getWifiStationHints',
++	expect: { '': {} }
++});
++
+ function count_changes(section_id) {
+ 	const changes = ui.changes.changes?.wireless;
+ 	if (!Array.isArray(changes)) return 0;
+@@ -188,7 +194,10 @@ function render_modal_status(node, radioNet) {
+ }
+ 
+ function format_wifirate(rate) {
+-	let s = `${rate.rate / 1000}\xa0${_('Mbit/s')}, ${rate.mhz}\xa0${_('MHz')}`;
++	if (!rate || rate.rate == null || rate.rate <= 0)
++		return '-';
++
++	let s = `${rate.rate / 1000}\xa0${_('Mbit/s')}`;
+ 	const ht = rate.ht;
+ 	const vht = rate.vht;
+ 	const nss = rate.nss;
+@@ -198,33 +207,58 @@ function format_wifirate(rate) {
+ 	const he_gi = rate.he_gi;
+ 	const he_dcm = rate.he_dcm;
+ 	const eht = rate?.eht ?? false;
+-	const eht_gi = rate?.eht_gi ?? 0;
+-	const eht_dcm = rate?.eht_dcm ?? 0;
++	const eht_gi = rate?.eht_gi;
++	const eht_dcm = rate?.eht_dcm;
++
++	if (rate.mhz != null)
++		s += `, ${rate.mhz}\xa0${_('MHz')}`;
+ 
+ 	if (ht || vht) s += [
+-		vht && `, VHT-MCS\xa0${mcs}`,
+-		nss && `, VHT-NSS\xa0${nss}`,
+-		ht  && `, MCS\xa0${mcs}`,
++		vht && mcs != null && `, VHT-MCS\xa0${mcs}`,
++		vht && nss != null && `, VHT-NSS\xa0${nss}`,
++		ht && mcs != null && `, MCS\xa0${mcs}`,
+ 		sgi && ', ' + _('Short GI').replace(/ /g, '\xa0')
+ 	].filter(Boolean).join('');
+ 
+ 	if (he) s += [
+-		`, HE-MCS\xa0${mcs}`,
+-		nss    && `, HE-NSS\xa0${nss}`,
+-		he_gi  && `, HE-GI\xa0${he_gi}`,
+-		he_dcm && `, HE-DCM\xa0${he_dcm}`
++		mcs != null && `, HE-MCS\xa0${mcs}`,
++		nss != null && `, HE-NSS\xa0${nss}`,
++		he_gi != null && `, HE-GI\xa0${he_gi}`,
++		he_dcm != null && `, HE-DCM\xa0${he_dcm}`
+ 	].filter(Boolean).join('');
+ 
+ 	if (eht) s += [
+-		`, EHT-MCS\xa0${mcs}`,
+-		nss    && `, EHT-NSS\xa0${nss}`,
+-		he_gi  && `, EHT-GI\xa0${eht_gi}`,
+-		he_dcm && `, EHT-DCM\xa0${eht_dcm}`
++		mcs != null && `, EHT-MCS\xa0${mcs}`,
++		nss != null && `, EHT-NSS\xa0${nss}`,
++		eht_gi != null && `, EHT-GI\xa0${eht_gi}`,
++		eht_dcm != null && `, EHT-DCM\xa0${eht_dcm}`
+ 	].filter(Boolean).join('');
+ 
+ 	return s;
+ }
+ 
++function getStationHint(hosts, stationhints, mac) {
++	const alias = stationhints[(mac || '').toUpperCase()] || stationhints[mac] || null;
++	const source_mac = alias ? alias.source_mac : null;
++	let name = hosts.getHostnameByMACAddr(mac);
++	let ipv4 = hosts.getIPAddrByMACAddr(mac);
++	let ipv6 = hosts.getIP6AddrByMACAddr(mac);
++
++	if (!name && alias)
++		name = alias.name || (source_mac ? hosts.getHostnameByMACAddr(source_mac) : null);
++
++	if (!ipv4 && alias)
++		ipv4 = L.toArray(alias.ipaddrs || alias.ipv4)[0] || (source_mac ? hosts.getIPAddrByMACAddr(source_mac) : null);
++
++	if (!ipv6 && alias)
++		ipv6 = L.toArray(alias.ip6addrs || alias.ipv6)[0] || (source_mac ? hosts.getIP6AddrByMACAddr(source_mac) : null);
++
++	if (name == '?')
++		name = null;
++
++	return { name, ipv4, ipv6, source_mac };
++}
++
+ function radio_restart(id, ev) {
+ 	const row = document.querySelector('.cbi-section-table-row[data-sid="%s"]'.format(id));
+ 	const dsc = row.querySelector('[data-name="_stat"] > div');
+@@ -667,8 +698,8 @@ return view.extend({
+ 
+ 		rows.forEach(row => {
+ 			const section_id = row.getAttribute('data-sid');
+-			const radioDev = data[1].filter(function(d) { return d.getName() == section_id; })[0];
+-			const radioNet = data[2].filter(function(n) { return n.getName() == section_id; })[0];
++			const radioDev = data[2].filter(function(d) { return d.getName() == section_id; })[0];
++			const radioNet = data[3].filter(function(n) { return n.getName() == section_id; })[0];
+ 			const badge = row.querySelector('[data-name="_badge"] > div');
+ 			const stat = row.querySelector('[data-name="_stat"]');
+ 			const btns = row.querySelectorAll('.cbi-section-actions button');
+@@ -676,7 +707,7 @@ return view.extend({
+ 
+ 			if (radioDev) {
+ 				dom.content(badge, render_radio_badge(radioDev));
+-				dom.content(stat, render_radio_status(radioDev, data[2].filter(function(n) { return n.getWifiDeviceName() == radioDev.getName(); })));
++				dom.content(stat, render_radio_status(radioDev, data[3].filter(function(n) { return n.getWifiDeviceName() == radioDev.getName(); })));
+ 			}
+ 			else {
+ 				dom.content(badge, render_network_badge(radioNet));
+@@ -693,15 +724,17 @@ return view.extend({
+ 
+ 		const table = document.querySelector('#wifi_assoclist_table');
+ 		const hosts = data[0];
++		const stationhints = data[1];
+ 		let trows = [];
+-		const radios = data[3];
+-		const zones = data[4];
++		const stations = data[4];
++		const zones = data[5];
+ 
+-		radios.forEach(zone => {
++		stations.forEach(zone => {
+ 			const bss = zone;
+-			const name = hosts.getHostnameByMACAddr(bss.mac);
+-			const ipv4 = hosts.getIPAddrByMACAddr(bss.mac);
+-			const ipv6 = hosts.getIP6AddrByMACAddr(bss.mac);
++			const host = getStationHint(hosts, stationhints, bss.mac);
++			const name = host.name;
++			const ipv4 = host.ipv4;
++			const ipv6 = host.ipv6;
+ 
+ 			let hint;
+ 
+@@ -710,7 +743,7 @@ return view.extend({
+ 			else if (name && (ipv4 ?? ipv6))
+ 				hint = `${'%h'.format(name)} <span class="hide-xs">(${ipv4 || ipv6})</span>`;
+ 			else
+-				hint = name || ipv4 || ipv6 || '?';
++				hint = (name == '?' ? null : name) || ipv4 || ipv6 || ((bss.mac && bss.mac != '?') ? bss.mac : '-');
+ 
+ 			let row = [
+ 				E('span', {
+@@ -2352,7 +2385,7 @@ return view.extend({
+ 
+ 		return m.render().then(L.bind(function(m, nodes) {
+ 			poll.add(L.bind(function() {
+-				const tasks = [ network.getHostHints(), network.getWifiDevices() ];
++				const tasks = [ network.getHostHints(), L.resolveDefault(callWifiStationHints(), {}), network.getWifiDevices() ];
+ 
+ 				m?.children[0]?.cfgsections?.().forEach(s => {
+ 					const row = nodes.querySelector('.cbi-section-table-row[data-sid="%s"]'.format(s));
+@@ -2373,37 +2406,37 @@ return view.extend({
+ 				});
+ 
+ 				return Promise.all(tasks)
+-					.then(L.bind(function(hosts_radios) {
++					.then(L.bind(function(hosts_stationhints_radios) {
+ 						const tasks = [];
+ 
+-						hosts_radios[1].forEach(r => tasks.push(r.getWifiNetworks()) );
++						hosts_stationhints_radios[2].forEach(r => tasks.push(r.getWifiNetworks()) );
+ 
+ 						return Promise.all(tasks).then(function(data) {
+-							hosts_radios[2] = [];
++							hosts_stationhints_radios[3] = [];
+ 
+ 							for (let d of data)
+-								hosts_radios[2].push.apply(hosts_radios[2], d);
++								hosts_stationhints_radios[3].push.apply(hosts_stationhints_radios[3], d);
+ 
+-							return hosts_radios;
++							return hosts_stationhints_radios;
+ 						});
+ 					}, network))
+-					.then(L.bind(function(hosts_radios_wifis) {
++					.then(L.bind(function(hosts_stationhints_radios_wifis) {
+ 						const tasks = [];
+ 
+-						hosts_radios_wifis[2].forEach(hrw => tasks.push(hrw.getAssocList()) );
++						hosts_stationhints_radios_wifis[3].forEach(hrw => tasks.push(hrw.getAssocList()) );
+ 
+ 						return Promise.all(tasks).then(function(data) {
+-							hosts_radios_wifis[3] = [];
++							hosts_stationhints_radios_wifis[4] = [];
+ 
+ 							for (let i = 0; i < data.length; i++) {
+-								const wifiNetwork = hosts_radios_wifis[2][i];
+-								const radioDev = hosts_radios_wifis[1].filter(function(d) { return d.getName() == wifiNetwork.getWifiDeviceName(); })[0];
++								const wifiNetwork = hosts_stationhints_radios_wifis[3][i];
++								const radioDev = hosts_stationhints_radios_wifis[2].filter(function(d) { return d.getName() == wifiNetwork.getWifiDeviceName(); })[0];
+ 
+ 								for (let dy of data[i])
+-									hosts_radios_wifis[3].push(Object.assign({ radio: radioDev, network: wifiNetwork }, dy));
++									hosts_stationhints_radios_wifis[4].push(Object.assign({ radio: radioDev, network: wifiNetwork }, dy));
+ 							}
+ 
+-							return hosts_radios_wifis;
++							return hosts_stationhints_radios_wifis;
+ 						});
+ 					}, network))
+ 					.then(L.bind(function(zones, data) {
