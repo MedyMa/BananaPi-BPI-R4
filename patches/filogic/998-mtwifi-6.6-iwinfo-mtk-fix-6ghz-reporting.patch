@@ -542,7 +542,7 @@ index bbc7f00..7622f5c 100644
  	}
  
  	return -1;
-@@ -760,58 +1095,31 @@ uciout:
+@@ -760,57 +1095,30 @@ uciout:
  
  static int mtk_get_htmodelist(const char *dev, int *buf)
  {
