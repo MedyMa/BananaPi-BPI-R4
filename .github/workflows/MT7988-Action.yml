@@ -231,7 +231,7 @@ jobs:
       id: organize
       if: ${{ steps.compile.outputs.status == 'success' && env.UPLOAD_FIRMWARE == 'true' && !cancelled() }}
       run: |
-        cd openwrt/bin/targets/mediatek/filogic
+        cd openwrt/bin/targets/mediatek/filogic_a73
         rm -rf packages *mt798* *.config *.buildinfo *.json sha256sums
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
