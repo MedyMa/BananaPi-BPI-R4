@@ -320,8 +320,8 @@ sed -i 's/ERROR_MESSAGE,WARNING: Applying padding in/MESSAGE,WARNING: Applying p
 [ -d package/system/rpcd ] && {
     mkdir -p package/system/rpcd/patches
     install -m 0644 \
-        "$GITHUB_WORKSPACE/patches/filogic/997-rpcd-iwinfo-export-mhz-hi.patch" \
-        package/system/rpcd/patches/997-mtwifi-6.6-rpcd-iwinfo-export-mhz-hi.patch
+        "$GITHUB_WORKSPACE/patches/filogic/997-mtwifi-6.6-rpcd-iwinfo-export-mhz-hi.patch" \
+        package/system/rpcd/patches/997-iwinfo-export-eht-dcm.patch
 }
 
 [ -f package/network/utils/iwinfo/src/iwinfo_mtk.c ] && \
