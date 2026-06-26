@@ -1,0 +1,445 @@
+diff --git a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
+index f486c36..fbc07f9 100644
+--- a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
++++ b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
+@@ -13,6 +13,12 @@
+ 
+ const isReadonlyView = !L.hasViewPermission();
+ 
++const callWifiStationHints = rpc.declare({
++	object: 'luci',
++	method: 'getWifiStationHints',
++	expect: { '': {} }
++});
++
+ function count_changes(section_id) {
+ 	const changes = ui.changes.changes?.wireless;
+ 	if (!Array.isArray(changes)) return 0;
+@@ -187,8 +193,19 @@ function render_modal_status(node, radioNet) {
+ 	return node;
+ }
+ 
++function getWifiRateMHz(rate) {
++	if (!rate || rate.mhz == null)
++		return null;
++
++	return (((rate.mhz_hi || 0) << 8) + rate.mhz);
++}
++
+ function format_wifirate(rate) {
+-	let s = `${rate.rate / 1000}\xa0${_('Mbit/s')}, ${rate.mhz}\xa0${_('MHz')}`;
++	if (!rate || rate.rate == null || rate.rate <= 0)
++		return '-';
++
++	let s = `${rate.rate / 1000}\xa0${_('Mbit/s')}`;
++	const rateMhz = getWifiRateMHz(rate);
+ 	const ht = rate.ht;
+ 	const vht = rate.vht;
+ 	const nss = rate.nss;
+@@ -198,33 +215,58 @@ function format_wifirate(rate) {
+ 	const he_gi = rate.he_gi;
+ 	const he_dcm = rate.he_dcm;
+ 	const eht = rate?.eht ?? false;
+-	const eht_gi = rate?.eht_gi ?? 0;
+-	const eht_dcm = rate?.eht_dcm ?? 0;
++	const eht_gi = rate?.eht_gi;
++	const eht_dcm = rate?.eht_dcm;
++
++	if (rateMhz != null)
++		s += `, ${rateMhz}\xa0${_('MHz')}`;
+ 
+ 	if (ht || vht) s += [
+-		vht && `, VHT-MCS\xa0${mcs}`,
+-		nss && `, VHT-NSS\xa0${nss}`,
+-		ht  && `, MCS\xa0${mcs}`,
++		vht && mcs != null && `, VHT-MCS\xa0${mcs}`,
++		vht && nss != null && `, VHT-NSS\xa0${nss}`,
++		ht && mcs != null && `, MCS\xa0${mcs}`,
+ 		sgi && ', ' + _('Short GI').replace(/ /g, '\xa0')
+ 	].filter(Boolean).join('');
+ 
+ 	if (he) s += [
+-		`, HE-MCS\xa0${mcs}`,
+-		nss    && `, HE-NSS\xa0${nss}`,
+-		he_gi  && `, HE-GI\xa0${he_gi}`,
+-		he_dcm && `, HE-DCM\xa0${he_dcm}`
++		mcs != null && `, HE-MCS\xa0${mcs}`,
++		nss != null && `, HE-NSS\xa0${nss}`,
++		he_gi != null && `, HE-GI\xa0${he_gi}`,
++		he_dcm != null && `, HE-DCM\xa0${he_dcm}`
+ 	].filter(Boolean).join('');
+ 
+ 	if (eht) s += [
+-		`, EHT-MCS\xa0${mcs}`,
+-		nss    && `, EHT-NSS\xa0${nss}`,
+-		he_gi  && `, EHT-GI\xa0${eht_gi}`,
+-		he_dcm && `, EHT-DCM\xa0${eht_dcm}`
++		mcs != null && `, EHT-MCS\xa0${mcs}`,
++		nss != null && `, EHT-NSS\xa0${nss}`,
++		eht_gi != null && `, EHT-GI\xa0${eht_gi}`,
++		eht_dcm != null && `, EHT-DCM\xa0${eht_dcm}`
+ 	].filter(Boolean).join('');
+ 
+ 	return s;
+ }
+ 
++function getStationHint(hosts, stationhints, mac) {
++	const alias = stationhints[(mac || '').toUpperCase()] || stationhints[mac] || null;
++	const source_mac = alias ? alias.source_mac : null;
++	let name = hosts.getHostnameByMACAddr(mac);
++	let ipv4 = hosts.getIPAddrByMACAddr(mac);
++	let ipv6 = hosts.getIP6AddrByMACAddr(mac);
++
++	if (!name && alias)
++		name = alias.name || (source_mac ? hosts.getHostnameByMACAddr(source_mac) : null);
++
++	if (!ipv4 && alias)
++		ipv4 = L.toArray(alias.ipaddrs || alias.ipv4)[0] || (source_mac ? hosts.getIPAddrByMACAddr(source_mac) : null);
++
++	if (!ipv6 && alias)
++		ipv6 = L.toArray(alias.ip6addrs || alias.ipv6)[0] || (source_mac ? hosts.getIP6AddrByMACAddr(source_mac) : null);
++
++	if (name == '?')
++		name = null;
++
++	return { name, ipv4, ipv6, source_mac };
++}
++
+ function radio_restart(id, ev) {
+ 	const row = document.querySelector('.cbi-section-table-row[data-sid="%s"]'.format(id));
+ 	const dsc = row.querySelector('[data-name="_stat"] > div');
+@@ -288,6 +327,101 @@ function add_dependency_permutations(o, deps) {
+ 	res.forEach(dep => o.depends(dep));
+ }
+ 
++function getWifiBandFromFrequency(freq) {
++	const mhz = freq?.mhz;
++
++	if (mhz >= 57000)
++		return '60g';
++	if (mhz >= 5925)
++		return '6g';
++	if (mhz >= 5000)
++		return '5g';
++	if (mhz >= 2400)
++		return '2g';
++
++	switch (freq?.band) {
++	case 1:
++	case 2:
++		return '2g';
++
++	case 3:
++	case 6:
++		return '6g';
++
++	case 4:
++	case 60:
++		return '60g';
++
++	case 5:
++		return '5g';
++
++	default:
++		return null;
++	}
++}
++
++function getFallbackWifiHwModes(band, allow2gAc) {
++	const modes = {};
++
++	switch (band) {
++	case '2g':
++		modes.b = true;
++		modes.g = true;
++		modes.n = true;
++		modes.ax = true;
++		modes.be = true;
++		if (allow2gAc)
++			modes.ac = true;
++		break;
++
++	case '5g':
++		modes.a = true;
++		modes.n = true;
++		modes.ac = true;
++		modes.ax = true;
++		modes.be = true;
++		break;
++
++	case '6g':
++		modes.ax = true;
++		modes.be = true;
++		break;
++	}
++
++	return modes;
++}
++
++function getFallbackWifiHtModes(band, allow2gAc) {
++	const modes = {};
++	const add = (...entries) => entries.forEach(entry => modes[entry] = true);
++
++	switch (band) {
++	case '2g':
++		add('HT20', 'HT40', 'HE20', 'HE40', 'EHT20', 'EHT40');
++		if (allow2gAc)
++			add('VHT20', 'VHT40');
++		break;
++
++	case '5g':
++		add(
++			'HT20', 'HT40',
++			'VHT20', 'VHT40', 'VHT80', 'VHT80_80', 'VHT160',
++			'HE20', 'HE40', 'HE80', 'HE80_80', 'HE160',
++			'EHT20', 'EHT40', 'EHT80', 'EHT80_80', 'EHT160'
++		);
++		break;
++
++	case '6g':
++		add(
++			'HE20', 'HE40', 'HE80', 'HE80_80', 'HE160',
++			'EHT20', 'EHT40', 'EHT80', 'EHT80_80', 'EHT160', 'EHT320'
++		);
++		break;
++	}
++
++	return modes;
++}
++
+ // Define a class CBIWifiFrequencyValue that extends form.Value
+ var CBIWifiFrequencyValue = form.Value.extend({
+ 	// Declare an RPC method to get the frequency list for a given device
+@@ -314,10 +448,11 @@ var CBIWifiFrequencyValue = form.Value.extend({
+ 			const freqlist = data[1];
+ 
+ 			freqlist.forEach(freq => {
+-				if (!freq.band)
++				const band = getWifiBandFromFrequency(freq);
++
++				if (!band || !this.channels[band])
+ 					return;
+ 
+-				const band = '%dg'.format(freq.band);
+ 				const available = (freq.restricted && freq.no_ir) ? false: true;
+ 
+ 				this.channels[band].push(
+@@ -331,22 +466,36 @@ var CBIWifiFrequencyValue = form.Value.extend({
+ 				);
+ 			});
+ 
++			const deviceSectionId = uci.get('wireless', section_id, 'device') || section_id;
++			const isMtkWifi = (uci.get('wireless', deviceSectionId, 'type') == 'mtwifi');
++			const deviceBand = uci.get('wireless', deviceSectionId, 'band') ||
++				uci.get('wireless', section_id, 'band') ||
++				(this.channels['6g'].length > 3 ? '6g' :
++					this.channels['5g'].length > 3 ? '5g' :
++					this.channels['2g'].length > 3 ? '2g' :
++					this.channels['60g'].length > 0 ? '60g' : null);
+ 			const hwmodelist = L.toArray(wifidevs ? wifidevs.getHWModes() : null)
+ 				.reduce(function(o, v) { o[v] = true; return o; }, {});
+ 
++			// Create a list of HT modes based on device capabilities
++			const htmodelist = L.toArray(wifidevs ? wifidevs.getHTModes() : null)
++				.reduce(function(o, v) { o[v] = true; return o; }, {});
++			const allow2gAc = (uci.get('wireless', section_id, 'vendor_vht') == '1' || htmodelist.VHT20 || htmodelist.VHT40);
++
++			if (isMtkWifi && deviceBand) {
++				Object.assign(hwmodelist, getFallbackWifiHwModes(deviceBand, allow2gAc));
++				Object.assign(htmodelist, getFallbackWifiHtModes(deviceBand, allow2gAc));
++			}
++
+ 			// Define supported modes
+ 			this.modes = [
+ 				'', 'Legacy', { available: hwmodelist.a || hwmodelist.b || hwmodelist.g },
+ 				'n', 'N', { available: hwmodelist.n },
+-				'ac', 'AC', { available: L.hasSystemFeature('hostapd', '11ac') && hwmodelist.ac },
++				'ac', 'AC', { available: L.hasSystemFeature('hostapd', '11ac') && (hwmodelist.ac || allow2gAc) },
+ 				'ax', 'AX', { available: L.hasSystemFeature('hostapd', '11ax') && hwmodelist.ax },
+ 				'be', 'BE', { available: L.hasSystemFeature('hostapd', '11be') && hwmodelist.be }
+ 			];
+ 
+-			// Create a list of HT modes based on device capabilities
+-			const htmodelist = L.toArray(wifidevs ? wifidevs.getHTModes() : null)
+-				.reduce(function(o, v) { o[v] = true; return o; }, {});
+-
+ 			this.htmodes = {
+ 				'': [ '', '-', { available: true } ],
+ 				'n': [
+@@ -357,18 +506,21 @@ var CBIWifiFrequencyValue = form.Value.extend({
+ 					'VHT20', '20 MHz', { available: htmodelist.VHT20 },
+ 					'VHT40', '40 MHz', { available: htmodelist.VHT40 },
+ 					'VHT80', '80 MHz', { available: htmodelist.VHT80 },
++					'VHT80_80', '80+80 MHz', { available: htmodelist.VHT80_80 },
+ 					'VHT160', '160 MHz', { available: htmodelist.VHT160 }
+ 				],
+ 				'ax': [
+ 					'HE20', '20 MHz', { available: htmodelist.HE20 },
+ 					'HE40', '40 MHz', { available: htmodelist.HE40 },
+ 					'HE80', '80 MHz', { available: htmodelist.HE80 },
++					'HE80_80', '80+80 MHz', { available: htmodelist.HE80_80 },
+ 					'HE160', '160 MHz', { available: htmodelist.HE160 }
+ 				],
+ 				'be': [
+ 					'EHT20', '20 MHz', { available: htmodelist.EHT20 },
+ 					'EHT40', '40 MHz', { available: htmodelist.EHT40 },
+ 					'EHT80', '80 MHz', { available: htmodelist.EHT80 },
++					'EHT80_80', '80+80 MHz', { available: htmodelist.EHT80_80 },
+ 					'EHT160', '160 MHz', { available: htmodelist.EHT160 },
+ 					'EHT320', '320 MHz', { available: htmodelist.EHT320 }
+ 				]
+@@ -387,7 +539,8 @@ var CBIWifiFrequencyValue = form.Value.extend({
+ 					'5g', '5 GHz', { available: this.channels['5g'].length > 3 }
+ 				],
+ 				'ac': [
+-					'5g', '5 GHz', { available: true }
++					'2g', '2.4 GHz', { available: allow2gAc && this.channels['2g'].length > 3 },
++					'5g', '5 GHz', { available: this.channels['5g'].length > 3 }
+ 				],
+ 				'ax': [
+ 					'2g', '2.4 GHz', { available: this.channels['2g'].length > 3 },
+@@ -478,11 +631,11 @@ var CBIWifiFrequencyValue = form.Value.extend({
+ 		this.setValues(mode, this.modes);
+ 
+ 		// Determine mode based on htmode value
+-		if (/EHT20|EHT40|EHT80|EHT160|EHT320/.test(htval))
++		if (/EHT20|EHT40|EHT80|EHT80_80|EHT160|EHT320/.test(htval))
+ 			mode.value = 'be';		
+-		else if (/HE20|HE40|HE80|HE160/.test(htval))
++		else if (/HE20|HE40|HE80|HE80_80|HE160/.test(htval))
+ 			mode.value = 'ax';
+-		else if (/VHT20|VHT40|VHT80|VHT160/.test(htval))
++		else if (/VHT20|VHT40|VHT80|VHT80_80|VHT160/.test(htval))
+ 			mode.value = 'ac';
+ 		else if (/HT20|HT40/.test(htval))
+ 			mode.value = 'n';
+@@ -667,8 +820,8 @@ return view.extend({
+ 
+ 		rows.forEach(row => {
+ 			const section_id = row.getAttribute('data-sid');
+-			const radioDev = data[1].filter(function(d) { return d.getName() == section_id; })[0];
+-			const radioNet = data[2].filter(function(n) { return n.getName() == section_id; })[0];
++			const radioDev = data[2].filter(function(d) { return d.getName() == section_id; })[0];
++			const radioNet = data[3].filter(function(n) { return n.getName() == section_id; })[0];
+ 			const badge = row.querySelector('[data-name="_badge"] > div');
+ 			const stat = row.querySelector('[data-name="_stat"]');
+ 			const btns = row.querySelectorAll('.cbi-section-actions button');
+@@ -676,7 +829,7 @@ return view.extend({
+ 
+ 			if (radioDev) {
+ 				dom.content(badge, render_radio_badge(radioDev));
+-				dom.content(stat, render_radio_status(radioDev, data[2].filter(function(n) { return n.getWifiDeviceName() == radioDev.getName(); })));
++				dom.content(stat, render_radio_status(radioDev, data[3].filter(function(n) { return n.getWifiDeviceName() == radioDev.getName(); })));
+ 			}
+ 			else {
+ 				dom.content(badge, render_network_badge(radioNet));
+@@ -684,7 +837,7 @@ return view.extend({
+ 			}
+ 
+ 			if (stat.hasAttribute('restart'))
+-				dom.content(stat, E('em', _('Device is restarting…')));
++				dom.content(stat, E('em', _('Device is restarting...')));
+ 
+ 			btns[0].disabled = isReadonlyView || busy;
+ 			btns[1].disabled = (isReadonlyView && radioDev) || busy;
+@@ -693,15 +846,17 @@ return view.extend({
+ 
+ 		const table = document.querySelector('#wifi_assoclist_table');
+ 		const hosts = data[0];
++		const stationhints = data[1];
+ 		let trows = [];
+-		const radios = data[3];
+-		const zones = data[4];
++		const stations = data[4];
++		const zones = data[5];
+ 
+-		radios.forEach(zone => {
++		stations.forEach(zone => {
+ 			const bss = zone;
+-			const name = hosts.getHostnameByMACAddr(bss.mac);
+-			const ipv4 = hosts.getIPAddrByMACAddr(bss.mac);
+-			const ipv6 = hosts.getIP6AddrByMACAddr(bss.mac);
++			const host = getStationHint(hosts, stationhints, bss.mac);
++			const name = host.name;
++			const ipv4 = host.ipv4;
++			const ipv6 = host.ipv6;
+ 
+ 			let hint;
+ 
+@@ -710,7 +865,7 @@ return view.extend({
+ 			else if (name && (ipv4 ?? ipv6))
+ 				hint = `${'%h'.format(name)} <span class="hide-xs">(${ipv4 || ipv6})</span>`;
+ 			else
+-				hint = name || ipv4 || ipv6 || '?';
++				hint = (name == '?' ? null : name) || ipv4 || ipv6 || ((bss.mac && bss.mac != '?') ? bss.mac : '-');
+ 
+ 			let row = [
+ 				E('span', {
+@@ -2221,7 +2376,7 @@ return view.extend({
+ 					});
+ 				});
+ 			}).then(L.bind(function() {
+-				ui.showModal(null, E('p', { 'class': 'spinning' }, [ _('Loading data…') ]));
++				ui.showModal(null, E('p', { 'class': 'spinning' }, [ _('Loading data...') ]));
+ 
+ 				return this.renderMoreOptionsModal(section_id);
+ 			}, this));
+@@ -2352,7 +2507,7 @@ return view.extend({
+ 
+ 		return m.render().then(L.bind(function(m, nodes) {
+ 			poll.add(L.bind(function() {
+-				const tasks = [ network.getHostHints(), network.getWifiDevices() ];
++				const tasks = [ network.getHostHints(), L.resolveDefault(callWifiStationHints(), {}), network.getWifiDevices() ];
+ 
+ 				m?.children[0]?.cfgsections?.().forEach(s => {
+ 					const row = nodes.querySelector('.cbi-section-table-row[data-sid="%s"]'.format(s));
+@@ -2373,37 +2528,37 @@ return view.extend({
+ 				});
+ 
+ 				return Promise.all(tasks)
+-					.then(L.bind(function(hosts_radios) {
++					.then(L.bind(function(hosts_stationhints_radios) {
+ 						const tasks = [];
+ 
+-						hosts_radios[1].forEach(r => tasks.push(r.getWifiNetworks()) );
++						hosts_stationhints_radios[2].forEach(r => tasks.push(r.getWifiNetworks()) );
+ 
+ 						return Promise.all(tasks).then(function(data) {
+-							hosts_radios[2] = [];
++							hosts_stationhints_radios[3] = [];
+ 
+ 							for (let d of data)
+-								hosts_radios[2].push.apply(hosts_radios[2], d);
++								hosts_stationhints_radios[3].push.apply(hosts_stationhints_radios[3], d);
+ 
+-							return hosts_radios;
++							return hosts_stationhints_radios;
+ 						});
+ 					}, network))
+-					.then(L.bind(function(hosts_radios_wifis) {
++					.then(L.bind(function(hosts_stationhints_radios_wifis) {
+ 						const tasks = [];
+ 
+-						hosts_radios_wifis[2].forEach(hrw => tasks.push(hrw.getAssocList()) );
++						hosts_stationhints_radios_wifis[3].forEach(hrw => tasks.push(hrw.getAssocList()) );
+ 
+ 						return Promise.all(tasks).then(function(data) {
+-							hosts_radios_wifis[3] = [];
++							hosts_stationhints_radios_wifis[4] = [];
+ 
+ 							for (let i = 0; i < data.length; i++) {
+-								const wifiNetwork = hosts_radios_wifis[2][i];
+-								const radioDev = hosts_radios_wifis[1].filter(function(d) { return d.getName() == wifiNetwork.getWifiDeviceName(); })[0];
++								const wifiNetwork = hosts_stationhints_radios_wifis[3][i];
++								const radioDev = hosts_stationhints_radios_wifis[2].filter(function(d) { return d.getName() == wifiNetwork.getWifiDeviceName(); })[0];
+ 
+ 								for (let dy of data[i])
+-									hosts_radios_wifis[3].push(Object.assign({ radio: radioDev, network: wifiNetwork }, dy));
++									hosts_stationhints_radios_wifis[4].push(Object.assign({ radio: radioDev, network: wifiNetwork }, dy));
+ 							}
+ 
+-							return hosts_radios_wifis;
++							return hosts_stationhints_radios_wifis;
+ 						});
+ 					}, network))
+ 					.then(L.bind(function(zones, data) {
