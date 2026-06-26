@@ -44,6 +44,23 @@ get_mt_wifi7_band_label() {
 	_mt_iface="$1"
 	_mt_freq=""
 
+	# MTK vendor WiFi7 interface names are more reliable than iwinfo on
+	# some 6 GHz builds, where iwinfo may still report a 5.x GHz channel.
+	case "$_mt_iface" in
+	rai*)
+		echo "5G"
+		return
+		;;
+	rax*)
+		echo "6G"
+		return
+		;;
+	ra[0-9]*)
+		echo "2.4G"
+		return
+		;;
+	esac
+
 	if command -v iwinfo >/dev/null 2>&1; then
 		_mt_freq="$(iwinfo "$_mt_iface" info 2>/dev/null | sed -n 's/.*Channel:[[:space:]]*[0-9]\+[[:space:]]*(\([0-9.]\+\)[[:space:]]GHz).*/\1/p' | sed -n '1p')"
 
@@ -63,20 +80,7 @@ get_mt_wifi7_band_label() {
 		esac
 	fi
 
-	case "$_mt_iface" in
-	rai*)
-		echo "5G"
-		;;
-	rax*)
-		echo "6G"
-		;;
-	ra[0-9]*)
-		echo "2.4G"
-		;;
-	*)
-		echo "$_mt_iface"
-		;;
-	esac
+	echo "$_mt_iface"
 }
 
 get_mt_wifi7_temp() {
