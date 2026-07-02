@@ -229,13 +229,20 @@ index 20d2f90..aad62f8 100644
  			mode.value = 'ac';
  		else if (/HT20|HT40/.test(htval))
  			mode.value = 'n';
-@@ -722,12 +825,17 @@ return view.extend({
+@@ -722,12 +825,21 @@ return view.extend({
  			var hint = '-';
  			if (bss.network.getMode() == 'ap')
  			{
-+				if (name == '?')
-+					name = null;
++				/* Some host-hint implementations return '?' as a placeholder
++				 * for unresolved entries instead of null.  Normalise them so
++				 * the '?' literal never leaks into the hint via || short-circuit. */
++				if (name == '?') name = null;
++				if (ipv4 == '?') ipv4 = null;
++				if (ipv6 == '?') ipv6 = null;
 +
++				/* For Wi-Fi 7 MLO stations the assoclist MAC (MLD address) may
++				 * differ from the per-link MAC used for DHCP, so host lookups
++				 * can fail.  Fall back to showing the MAC rather than '?'. */
 +				var station_mac = (bss.mac && bss.mac != '?') ? bss.mac : '-';
 +
  				if (name && ipv4 && ipv6)
@@ -244,7 +251,7 @@ index 20d2f90..aad62f8 100644
  					hint = '%s <span class="hide-xs">(%s)</span>'.format(name, ipv4 || ipv6);
  				else
 -					hint = name || ipv4 || ipv6 || '?';
-+					hint = ipv4 || ipv6 || station_mac;
++					hint = name || ipv4 || ipv6 || station_mac;
  			}
  
  			var timestr = '-';
