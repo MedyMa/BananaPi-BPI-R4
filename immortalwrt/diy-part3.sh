@@ -37,11 +37,11 @@ apply_workspace_patch() {
 
     [ -f "$patch_file" ] || return 0
 
-    if git apply --ignore-space-change --ignore-whitespace --reverse --check "$patch_file" >/dev/null 2>&1; then
+    if git apply --recount --ignore-space-change --ignore-whitespace --reverse --check "$patch_file" >/dev/null 2>&1; then
         return 0
     fi
 
-    git apply --ignore-space-change --ignore-whitespace "$patch_file"
+    git apply --recount --ignore-space-change --ignore-whitespace "$patch_file"
 }
 
 install_kernel_patch() {
@@ -68,6 +68,8 @@ install_sfp_warm_reboot_patches() {
     [ -d "$patch_root" ] || return 0
 
     for patch_name in \
+        997-sfp-rtl8672-accept-zero-phys-id-24.10.patch \
+        998-sfp-rtl8672-reduce-false-positive-warning.patch \
         999-2753-net-phy-sfp-support-additional-RollBall-modules.patch \
         999-2754-net-phy-sfp-support-shared-mod-def0-gpio.patch \
         999-2764-net-phy-sfp-add-some-FS-copper-SFP-fixes.patch \
@@ -290,7 +292,11 @@ patch_makefile_dep \
 	# or GPON SFP modules during EEPROM/PHY probe.
 	bpi_dtsi="target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4.dtsi"
 	if [ -f "$bpi_dtsi" ] && grep -q 'mediatek,pnswap-rx' "$bpi_dtsi"; then
-		perl -0pi -e 's/\n&usxgmiisys0[ \t\r]*\{[ \t\r\n]*mediatek,pnswap-rx;[ \t\r\n]*\};[ \t\r]*\n[ \t\r]*\n?&usxgmiisys1[ \t\r]*\{[ \t\r\n]*mediatek,pnswap-rx;[ \t\r\n]*\};[ \t\r]*\n/\n/g' "$bpi_dtsi"
+		# Match each &usxgmiisys{0,1} pnswap-rx block independently so the
+		# removal succeeds even when comments or blank lines separate the two
+		# blocks (the original regex required them to be adjacent and would
+		# silently fail to match if they weren't, leaving pnswap-rx in place).
+		perl -0pi -e 's/\n[ \t]*&usxgmiisys[01][ \t]*\{[ \t]*\n[ \t]*mediatek,pnswap-rx;[ \t]*\n[ \t]*\};[ \t]*(?:\r?\n)?//g' "$bpi_dtsi"
 	fi
 }
 
@@ -308,14 +314,16 @@ _purge_libcrypt_compat
 # Downgrade the usign SHA-512 padding warning from ERROR_MESSAGE (red/scary) 
 sed -i 's/ERROR_MESSAGE,WARNING: Applying padding in/MESSAGE,WARNING: Applying padding in/' package/Makefile
 
+# LuCI and mtwifi patches for padavanonly/immortalwrt-mt798x-6.6 only.
+# Do not reuse the openwrt-24.10 or master patch filenames in this chain.
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1000-luci-status-overview-wifi7-mlo.patch"
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1000-mtwifi-6.6-luci-status-overview-wifi7-mlo.patch"
 
 [ -f feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1001-luci-network-wireless-station-hints.patch"
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1001-mtwifi-6.6-luci-network-wireless-station-hints.patch"
 
 [ -f feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/999-luci-wireless-mtk-mode-matrix.patch"
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/999-mtwifi-6.6-luci-wireless-mtk-mode-matrix.patch"
 
 [ -d package/system/rpcd ] && {
     mkdir -p package/system/rpcd/patches
@@ -325,10 +333,10 @@ sed -i 's/ERROR_MESSAGE,WARNING: Applying padding in/MESSAGE,WARNING: Applying p
 }
 
 [ -f package/network/utils/iwinfo/src/iwinfo_mtk.c ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/998-iwinfo-mtk-fix-6ghz-reporting.patch"
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/998-mtwifi-6.6-iwinfo-mtk-fix-6ghz-reporting.patch"
 
 [ -f package/mtk/applications/luci-app-mtwifi-cfg/root/usr/share/luci-app-mtwifi-cfg/wireless-mtk.js ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1005-luci-wireless-mtk-station-and-rate-fixes.patch"
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1005-mtwifi-6.6-luci-wireless-mtk-station-and-rate-fixes.patch"
 
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1002-luci-status-overview-rate-mhz-hi.patch"
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1002-mtwifi-6.6-luci-status-overview-rate-mhz-hi.patch"
