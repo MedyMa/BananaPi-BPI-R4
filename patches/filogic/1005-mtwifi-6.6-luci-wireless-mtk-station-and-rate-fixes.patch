@@ -302,28 +302,3 @@ index e239ef3..9d725a7 100644
 +		*buf = (bitrate / 1000);
  		return 0;
  	}
- 
-@@ -980,7 +1008,9 @@ static int mtk_get_hwmodelist(const char *dev, int *buf)
- 	if (band) {
- 		if (!strcmp(band,"2g"))
- 			*buf = (IWINFO_80211_N | IWINFO_80211_AX | IWINFO_80211_BE);
- 		else if (!strcmp(band,"5g"))
- 			*buf = (IWINFO_80211_AC | IWINFO_80211_AX | IWINFO_80211_BE);
-+		else if (!strcmp(band,"6g"))
-+			*buf = (IWINFO_80211_AX | IWINFO_80211_BE);
- 		return 0;
- 	}
-@@ -1038,9 +1068,13 @@ static int mtk_get_htmodelist(const char *dev, int *buf)
- 	if (band) {
- 		if (!strcmp(band,"2g"))
- 			*buf = (IWINFO_HTMODE_HT20 | IWINFO_HTMODE_HT40 | IWINFO_HTMODE_HE20 | IWINFO_HTMODE_HE40 | IWINFO_HTMODE_EHT20 | IWINFO_HTMODE_EHT40);
- 		else if (!strcmp(band,"5g"))
- 			*buf = (IWINFO_HTMODE_VHT20 | IWINFO_HTMODE_VHT40 | IWINFO_HTMODE_VHT80 | IWINFO_HTMODE_VHT160
- 			| IWINFO_HTMODE_HE20 | IWINFO_HTMODE_HE40 | IWINFO_HTMODE_HE80 | IWINFO_HTMODE_HE160
- 			| IWINFO_HTMODE_EHT20 | IWINFO_HTMODE_EHT40 | IWINFO_HTMODE_EHT80 | IWINFO_HTMODE_EHT160);
-+		else if (!strcmp(band,"6g"))
-+			*buf = (IWINFO_HTMODE_HE20 | IWINFO_HTMODE_HE40 | IWINFO_HTMODE_HE80 | IWINFO_HTMODE_HE160
-+			| IWINFO_HTMODE_EHT20 | IWINFO_HTMODE_EHT40 | IWINFO_HTMODE_EHT80 | IWINFO_HTMODE_EHT160
-+			| IWINFO_HTMODE_EHT320);
- 		return 0;
- 	}
