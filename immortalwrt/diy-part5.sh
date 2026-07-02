@@ -35,11 +35,11 @@ apply_workspace_patch() {
 
     [ -f "$patch_file" ] || return 0
 
-    if git apply --ignore-space-change --ignore-whitespace --reverse --check "$patch_file" >/dev/null 2>&1; then
+    if git apply --recount --ignore-space-change --ignore-whitespace --reverse --check "$patch_file" >/dev/null 2>&1; then
         return 0
     fi
 
-    git apply --ignore-space-change --ignore-whitespace "$patch_file"
+    git apply --recount --ignore-space-change --ignore-whitespace "$patch_file"
 }
 
 # Remove upstream feeds replaced by community clones below
@@ -80,6 +80,10 @@ mkdir -p package/OpenClash
 pushd package/OpenClash
 git clone --depth=1 https://github.com/vernesong/OpenClash
 popd
+
+# Register mtk-openwrt-feeds so kmod-npu and sub-packages are available.
+# immortalwrt openwrt-25.12 does not include this feed in feeds.conf.default.
+echo 'src-git-full mtk_openwrt_feeds https://github.com/mediatek/mtk-openwrt-feeds.git;main' >> feeds.conf.default
 
 # Re-run feeds update after manual feed modifications
 ./scripts/feeds update -a
@@ -128,6 +132,16 @@ fi
 
 # Feed deps needed by community clones (pcre2 is in main tree since 25.12)
 ./scripts/feeds install c-ares udns
+
+# MTK NPU hardware offload packages (MT7988 / BPI-R4).
+# mtk-openwrt-feeds is registered above; feeds install -a already ran,
+# so explicitly install the npu packages to ensure they are indexed.
+# ref: https://github.com/mediatek/mtk-openwrt-feeds/commit/822c2f0603614e47ec8496571043431494fd2841
+./scripts/feeds install \
+    kmod-npu npu-rebb-fw \
+    kmod-npu-flow kmod-npu-flow-autoload \
+    kmod-npu-nf_hnat kmod-npu-nf_hnat-autoload \
+    kmod-npu-mcast kmod-npu-mcast-autoload
 
 # Remove kiddin9 APK repo (triggers broken video/ sub-repo)
 for f in \
@@ -178,7 +192,7 @@ patch_makefile_dep \
     'CONFIG_BOOTDELAY=30' \
     'CONFIG_BOOTDELAY=10'
 
-# Apply LuCI patches (master-branch for ES6+ syntax on 25.12)
+# Apply LuCI patches for master/25.12 only.
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1000-luci-status-overview-wifi7-mlo-master.patch"
 
