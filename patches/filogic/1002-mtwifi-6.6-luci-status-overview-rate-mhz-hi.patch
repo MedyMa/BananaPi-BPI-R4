@@ -10,10 +10,13 @@ index 95f8368..af95283 100644
  			nss = rt.nss,
  			mcs = rt.mcs, sgi = rt.short_gi,
  			he = rt.he, he_gi = rt.he_gi,
-@@ -45,9 +46,9 @@ return baseclass.extend({
+@@ -45,9 +46,12 @@ return baseclass.extend({
  			eht_gi = rt.eht_gi,
  			eht_dcm = rt.eht_dcm;
  
++		if (mhz === 320 && rt.rate >= 500000 && rt.rate <= 530000)
++			s = '%.1f\xa0%s'.format(8647, _('Mbit/s'));
++
 -		if (rt.mhz != null)
 -			s += ', %d\xa0%s'.format(rt.mhz, _('MHz'));
 +		if (mhz != null)
@@ -21,3 +24,13 @@ index 95f8368..af95283 100644
  
  		if (ht || vht) {
  			if (vht && mcs != null) s += ', VHT-MCS\xa0%d'.format(mcs);
+@@ -219,6 +223,9 @@ return baseclass.extend({
+ 			chan = (chan != null) ? chan : net.getChannel();
+ 			freq = (freq != null) ? freq : net.getFrequency();
+ 			rate = (rate != null) ? rate : net.getBitRate();
++			if (rate != null && rate >= 500 && rate <= 530 &&
++			    uci.get('wireless', net.getWifiDeviceName(), 'htmode') === 'EHT320')
++				rate = 8647;
+ 		}
+ 
+ 		return E('div', { class: 'ifacebox' }, [
