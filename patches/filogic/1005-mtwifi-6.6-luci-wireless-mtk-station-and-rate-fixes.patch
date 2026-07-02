@@ -156,7 +156,7 @@ index 20d2f90..aad62f8 100644
  var CBIWifiFrequencyValue = form.Value.extend({
  	callFrequencyList: rpc.declare({
  		object: 'iwinfo',
-@@ -380,6 +469,20 @@ var CBIWifiFrequencyValue = form.Value.extend({
+@@ -380,6 +469,24 @@ var CBIWifiFrequencyValue = form.Value.extend({
  			var hwmodelist = L.toArray(data[0] ? data[0].getHWModes() : null)
  				.reduce(function(o, v) { o[v] = true; return o }, {});
  
@@ -167,7 +167,11 @@ index 20d2f90..aad62f8 100644
 +				(this.channels['6g'].length > 3 ? '6g' :
 +					this.channels['5g'].length > 3 ? '5g' :
 +					this.channels['2g'].length > 3 ? '2g' :
-+					this.channels['60g'].length > 0 ? '60g' : null);
++					this.channels['60g'].length > 0 ? '60g' : null) ||
++				/* EHT320 is exclusive to 6 GHz; derive band from htmode when
++				 * UCI band option is absent and the channel list is empty
++				 * (radio disabled / iwinfo not probed yet). */
++				(uci.get('wireless', section_id, 'htmode') === 'EHT320' ? '6g' : null);
 +
 +			if (uci.get('wireless', section_id, 'type') == 'mtwifi' && deviceBand) {
 +				Object.assign(hwmodelist, getMtkFallbackWifiHwModes(deviceBand));
@@ -299,3 +303,27 @@ index e239ef3..9d725a7 100644
  		return 0;
  	}
  
+@@ -980,7 +1008,9 @@ static int mtk_get_hwmodelist(const char *dev, int *buf)
+ 	if (band) {
+ 		if (!strcmp(band,"2g"))
+ 			*buf = (IWINFO_80211_N | IWINFO_80211_AX | IWINFO_80211_BE);
+ 		else if (!strcmp(band,"5g"))
+ 			*buf = (IWINFO_80211_AC | IWINFO_80211_AX | IWINFO_80211_BE);
++		else if (!strcmp(band,"6g"))
++			*buf = (IWINFO_80211_AX | IWINFO_80211_BE);
+ 		return 0;
+ 	}
+@@ -1038,9 +1068,13 @@ static int mtk_get_htmodelist(const char *dev, int *buf)
+ 	if (band) {
+ 		if (!strcmp(band,"2g"))
+ 			*buf = (IWINFO_HTMODE_HT20 | IWINFO_HTMODE_HT40 | IWINFO_HTMODE_HE20 | IWINFO_HTMODE_HE40 | IWINFO_HTMODE_EHT20 | IWINFO_HTMODE_EHT40);
+ 		else if (!strcmp(band,"5g"))
+ 			*buf = (IWINFO_HTMODE_VHT20 | IWINFO_HTMODE_VHT40 | IWINFO_HTMODE_VHT80 | IWINFO_HTMODE_VHT160
+ 			| IWINFO_HTMODE_HE20 | IWINFO_HTMODE_HE40 | IWINFO_HTMODE_HE80 | IWINFO_HTMODE_HE160
+ 			| IWINFO_HTMODE_EHT20 | IWINFO_HTMODE_EHT40 | IWINFO_HTMODE_EHT80 | IWINFO_HTMODE_EHT160);
++		else if (!strcmp(band,"6g"))
++			*buf = (IWINFO_HTMODE_HE20 | IWINFO_HTMODE_HE40 | IWINFO_HTMODE_HE80 | IWINFO_HTMODE_HE160
++			| IWINFO_HTMODE_EHT20 | IWINFO_HTMODE_EHT40 | IWINFO_HTMODE_EHT80 | IWINFO_HTMODE_EHT160
++			| IWINFO_HTMODE_EHT320);
+ 		return 0;
+ 	}
