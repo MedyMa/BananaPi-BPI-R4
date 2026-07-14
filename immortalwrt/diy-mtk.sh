@@ -67,26 +67,37 @@ if [ -d "$files_src" ]; then
         cp -af "$tmp_dst"/. "$files_dst/"
         log "  overlaid to: ${files_dst}"
 
-        # autobuild.sh prepare copies logan_common patches-6.12/ into
-        # the tree, including the original 999-eth-91.  That version has
-        # PPE guard hunks that fail on linux-6.12.94 -> quilt rejects the
-        # whole patch -> HNAT Kconfig/Makefile lost -> module never compiles.
-        # Replace with trimmed version (Kconfig+Makefile only, no PPE guards).
+        # 999-eth-91-a/b replace the original (PPE-failing) 999-eth-91:
+        #   a) Kconfig: complete file overlay into files-6.12 (no patch — avoids
+        #      plaintext patch parser issues with tab-indented context lines)
+        #   b) Makefile: single-file quilt patch (works in plaintext mode)
         script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-        trimmed="${script_dir}/../patches/filogic/mtk/999-eth-91-hnat-kconfig-makefile.patch"
-        owrt_patches="${OPENWRT_ROOT}/target/linux/mediatek/patches-6.12"
+        mtk="${script_dir}/../patches/filogic/mtk"
+        owrt="${OPENWRT_ROOT}/target/linux/mediatek/patches-6.12"
 
-        if [ -d "$owrt_patches" ]; then
-            find "$owrt_patches" -name '999-eth-91*driver-support*' -delete 2>/dev/null || true
-            find "$owrt_patches" -name '999-eth-91*mtkhnat*' -delete 2>/dev/null || true
+        # Kconfig: copy complete modified file into files-6.12 overlay
+        kconfig_src="${mtk}/kconfig-modified.txt"
+        kconfig_dst="${files_dst}/drivers/net/ethernet/mediatek/Kconfig"
+        if [ -f "$kconfig_src" ]; then
+            mkdir -p "$(dirname "$kconfig_dst")"
+            cp -f "$kconfig_src" "$kconfig_dst"
+            log "  Kconfig: complete file overlaid"
+        else
+            warn "Kconfig source not found: ${kconfig_src}"
         fi
 
-        if [ -f "$trimmed" ]; then
-            mkdir -p "$owrt_patches"
-            cp -f "$trimmed" "$owrt_patches/"
-            log "  replaced 999-eth-91 with trimmed (Kconfig+Makefile)"
+        # Makefile: staged as quilt patch
+        if [ -d "$owrt" ]; then
+            find "$owrt" -name '999-eth-91*driver-support*' -delete 2>/dev/null || true
+            find "$owrt" -name '999-eth-91*mtkhnat*' -delete 2>/dev/null || true
+        fi
+        mkdir -p "$owrt"
+        mf_patch="${mtk}/999-eth-91-b-hnat-makefile.patch"
+        if [ -f "$mf_patch" ]; then
+            cp -f "$mf_patch" "$owrt/"
+            log "  Makefile: staged quilt patch"
         else
-            warn "trimmed 999-eth-91 not found: ${trimmed}"
+            warn "Makefile patch not found: ${mf_patch}"
         fi
 
     else
