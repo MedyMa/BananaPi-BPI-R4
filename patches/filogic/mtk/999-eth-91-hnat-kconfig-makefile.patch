@@ -1,4 +1,4 @@
-﻿From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: diy-mtk.sh <build@localhost>
 Date: Mon, 14 Jul 2026 00:00:00 +0000
 Subject: [PATCH] net: ethernet: mtk_eth_soc: add mtkhnat Kconfig and Makefile
@@ -9,6 +9,7 @@ Subject: [PATCH] net: ethernet: mtk_eth_soc: add mtkhnat Kconfig and Makefile
  drivers/net/ethernet/mediatek/Makefile |  1 +
  2 files changed, 25 insertions(+)
 
+diff --git a/drivers/net/ethernet/mediatek/Kconfig b/drivers/net/ethernet/mediatek/Kconfig
 --- a/drivers/net/ethernet/mediatek/Kconfig
 +++ b/drivers/net/ethernet/mediatek/Kconfig
 @@ -40,4 +40,28 @@ config NET_MEDIATEK_STAR_EMAC
@@ -36,6 +37,7 @@ Subject: [PATCH] net: ethernet: mtk_eth_soc: add mtkhnat Kconfig and Makefile
 +	  in the MediaTek MT7988/MT7986/MT7981 chipset family.
 +
  endif #NET_VENDOR_MEDIATEK
+diff --git a/drivers/net/ethernet/mediatek/Makefile b/drivers/net/ethernet/mediatek/Makefile
 --- a/drivers/net/ethernet/mediatek/Makefile
 +++ b/drivers/net/ethernet/mediatek/Makefile
 @@ -11,4 +11,5 @@ mtk_eth-$(CONFIG_NET_MEDIATEK_SOC_WED) += mtk_wed_debugfs.o
