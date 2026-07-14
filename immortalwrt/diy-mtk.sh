@@ -67,29 +67,28 @@ if [ -d "$files_src" ]; then
         cp -af "$tmp_dst"/. "$files_dst/"
         log "  overlaid to: ${files_dst}"
 
-        # autobuild.sh skips logan_common patches-6.12.
-        # Stage trimmed 999-eth-91 in two parts (PPE guard hunks excluded —
-        # they fail on linux-6.12.94).
+        # autobuild.sh prepare copies logan_common patches-6.12/ into
+        # the tree, including the original 999-eth-91.  That version has
+        # PPE guard hunks that fail on linux-6.12.94 -> quilt rejects the
+        # whole patch -> HNAT Kconfig/Makefile lost -> module never compiles.
+        # Replace with trimmed version (Kconfig+Makefile only, no PPE guards).
         script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-        mtk_patches="${script_dir}/../patches/filogic/mtk"
+        trimmed="${script_dir}/../patches/filogic/mtk/999-eth-91-hnat-kconfig-makefile.patch"
         owrt_patches="${OPENWRT_ROOT}/target/linux/mediatek/patches-6.12"
-        mkdir -p "$owrt_patches"
 
-        local_patch="${mtk_patches}/mtk-999-eth-91-hnat-kconfig-makefile.patch"
-        if [ -f "$local_patch" ]; then
-            cp -f "$local_patch" "$owrt_patches/"
-            log "  staged Kconfig+Makefile"
-        else
-            warn "not found: ${local_patch}"
+        if [ -d "$owrt_patches" ]; then
+            find "$owrt_patches" -name '999-eth-91*driver-support*' -delete 2>/dev/null || true
+            find "$owrt_patches" -name '999-eth-91*mtkhnat*' -delete 2>/dev/null || true
         fi
 
-        soc_patch="${mtk_patches}/mtk-999-eth-91-hnat-soc-hooks.patch"
-        if [ -f "$soc_patch" ]; then
-            cp -f "$soc_patch" "$owrt_patches/"
-            log "  staged soc hooks (include+rx)"
+        if [ -f "$trimmed" ]; then
+            mkdir -p "$owrt_patches"
+            cp -f "$trimmed" "$owrt_patches/"
+            log "  replaced 999-eth-91 with trimmed (Kconfig+Makefile)"
         else
-            warn "not found: ${soc_patch}"
+            warn "trimmed 999-eth-91 not found: ${trimmed}"
         fi
+
     else
         warn "Copy from logan_common failed"
         rm -rf "$tmp_dst"
