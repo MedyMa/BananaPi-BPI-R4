@@ -76,7 +76,7 @@ if [ -d "$files_src" ]; then
         owrt="${OPENWRT_ROOT}/target/linux/mediatek/patches-6.12"
 
         # Kconfig: copy complete modified file into files-6.12 overlay
-        kconfig_src="${mtk}/kconfig-modified.txt"
+        kconfig_src="${mtk}/Kconfig"
         kconfig_dst="${files_dst}/drivers/net/ethernet/mediatek/Kconfig"
         if [ -f "$kconfig_src" ]; then
             mkdir -p "$(dirname "$kconfig_dst")"
