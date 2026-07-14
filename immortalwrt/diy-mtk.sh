@@ -16,6 +16,7 @@ if [ -f "$cfg" ]; then
     for symbol in MEDIATEK_2P5GE_PHY NET_MEDIATEK_HNAT MEDIATEK_NETSYS_V3; do
         case "$symbol" in
             MEDIATEK_2P5GE_PHY) val="# CONFIG_${symbol} is not set" ;;
+            NET_MEDIATEK_HNAT) val="CONFIG_${symbol}=m" ;;
             *) val="CONFIG_${symbol}=y" ;;
         esac
         sed -i "/^CONFIG_${symbol}=/d; /^# CONFIG_${symbol} is not set$/d" "$cfg"
