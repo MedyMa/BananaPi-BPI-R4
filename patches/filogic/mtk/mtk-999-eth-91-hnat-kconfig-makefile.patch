@@ -1,16 +1,14 @@
-From 096f1f857cdbc8412a4a00b834ab07d50d08dd2e Mon Sep 17 00:00:00 2001
-From: "chak-kei.lam" <chak-kei.lam@mediatek.com>
-Date: Thu, 5 Feb 2026 10:23:31 +0800
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: diy-mtk.sh <build@localhost>
+Date: Mon, 14 Jul 2026 00:00:00 +0000
 Subject: [PATCH] net: ethernet: mtk_eth_soc: add mtkhnat Kconfig and Makefile
- (trimmed: Kconfig+Makefile only, no PPE guards)
+ (trimmed: Kconfig+Makefile only, no PPE guards, no soc hooks)
 
 ---
  drivers/net/ethernet/mediatek/Kconfig  | 24 ++++++++++++++++++++++++
  drivers/net/ethernet/mediatek/Makefile |  1 +
  2 files changed, 25 insertions(+)
 
-diff --git a/drivers/net/ethernet/mediatek/Kconfig b/drivers/net/ethernet/mediatek/Kconfig
-index d974316..1589b36 100644
 --- a/drivers/net/ethernet/mediatek/Kconfig
 +++ b/drivers/net/ethernet/mediatek/Kconfig
 @@ -40,4 +40,28 @@ config NET_MEDIATEK_STAR_EMAC
@@ -30,20 +28,14 @@ index d974316..1589b36 100644
 +	  This options enable MTK Ethernet NETSYS V3 support for
 +	  XGMAC and USXGMII.
 +
-+	  If you have a network system belong to this class, say Y.
-+	  If unsure, say N.
-+
 +config NET_MEDIATEK_HNAT
 +	tristate "MediaTek HW NAT support"
 +	depends on NET_MEDIATEK_SOC && NF_CONNTRACK && IP_NF_NAT
 +	help
-+	  This driver supports the hardward Network Address Translation
-+	  in the MediaTek MT7988/MT7986/MT2701/MT7622/MT7629/MT7621 chipset
-+	  family.
++	  This driver supports the Hardware Network Address Translation
++	  in the MediaTek MT7988/MT7986/MT7981 chipset family.
 +
  endif #NET_VENDOR_MEDIATEK
-diff --git a/drivers/net/ethernet/mediatek/Makefile b/drivers/net/ethernet/mediatek/Makefile
-index 52848b7..96d0f74 100644
 --- a/drivers/net/ethernet/mediatek/Makefile
 +++ b/drivers/net/ethernet/mediatek/Makefile
 @@ -11,4 +11,5 @@ mtk_eth-$(CONFIG_NET_MEDIATEK_SOC_WED) += mtk_wed_debugfs.o
