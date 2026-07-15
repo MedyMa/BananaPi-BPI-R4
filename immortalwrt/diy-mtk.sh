@@ -104,6 +104,21 @@ if [ -d "$CHASEY_PATCHES" ]; then
     done
     # Fix CRLF: chasey-dev patches sometimes have Windows line endings
     find "$PATCH_DIR" -maxdepth 1 -name '999-*.patch' -exec sed -i 's/\r$//' {} + 2>/dev/null || true
+
+    # Override patches that need context fix for 6.12.94
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    LOCAL_PATCHES="${SCRIPT_DIR}/../patches/filogic/mtk"
+    for fix in "$LOCAL_PATCHES"/999-*-fix-*.patch; do
+        [ -f "$fix" ] || continue
+        base=$(basename "$fix" | sed 's/-fix-/-/')
+        orig=$(find "$PATCH_DIR" -maxdepth 1 -name "${base}" -print -quit 2>/dev/null || true)
+        if [ -n "$orig" ]; then
+            rm -f "$orig"
+            cp -f "$fix" "$PATCH_DIR/${base}"
+            log "  patched: ${base} (local context fix)"
+        fi
+    done
+
     log "  staged ${COUNT} chasey-dev patches (from ${CHASEY_BRANCH})"
 else
     die "chasey-dev patches not found after clone"
