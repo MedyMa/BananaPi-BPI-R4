@@ -116,6 +116,13 @@ if [ -d "$files_src" ]; then
         else
             warn "Makefile patch not found: ${mf_patch}"
         fi
+        ndo_patch="${mtk}/999-eth-91-c-netdevice-ndo-flow-offload.patch"
+        if [ -f "$ndo_patch" ]; then
+            cp -f "$ndo_patch" "$owrt/"
+            log "  ndo_flow_offload_check: staged quilt patch"
+        else
+            warn "ndo patch not found: ${ndo_patch}"
+        fi
 
     else
         warn "Copy from logan_common failed"
