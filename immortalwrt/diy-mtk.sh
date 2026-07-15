@@ -1,230 +1,177 @@
 #!/bin/bash
+# diy-mtk.sh — Post-autobuild fixups for BPI-R4 vendor WiFi + HNAT + NPU
+# Run AFTER: autobuild.sh prepare
+# Run BEFORE: autobuild.sh filogic-mac80211-mt798x_rfb-wifi7_nic build
 set -euo pipefail
 
 log()  { echo "[MTK-FIX] $*"; }
 warn() { echo "[MTK-FIX WARN] $*"; }
+die()  { echo "[MTK-FIX ERROR] $*"; exit 1; }
 
+# ─── Bootstrap ───
 OPENWRT_ROOT="${OPENWRT_ROOT:-$(pwd)}"
 MTK_SDK_DIR="${MTK_SDK_DIR:-${OPENWRT_ROOT}/../mtk-openwrt-feeds}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PATCH_SRC="${SCRIPT_DIR}/../patches/filogic/mtk"
 
 log "OPENWRT_ROOT=${OPENWRT_ROOT}"
 log "MTK_SDK_DIR=${MTK_SDK_DIR}"
 
-log "Pinning kernel Kconfig symbols..."
-cfg="${OPENWRT_ROOT}/target/linux/mediatek/filogic/config-6.12"
-if [ -f "$cfg" ]; then
-    for symbol in MEDIATEK_2P5GE_PHY NET_MEDIATEK_HNAT MEDIATEK_NETSYS_V3 NETFILTER; do
-        case "$symbol" in
-            MEDIATEK_2P5GE_PHY) val="# CONFIG_${symbol} is not set" ;;
-            NET_MEDIATEK_HNAT) val="CONFIG_${symbol}=m" ;;
-            *) val="CONFIG_${symbol}=y" ;;
-        esac
-        sed -i "/^CONFIG_${symbol}=/d; /^# CONFIG_${symbol} is not set$/d" "$cfg"
-        echo "$val" >> "$cfg"
-        log "  ${symbol}: pinned"
-    done
-else
-    warn "config-6.12 not found: ${cfg}"
-fi
+# ═══════════════════════════════════════════
+# Step 1: Pin kernel Kconfig symbols
+# ═══════════════════════════════════════════
+log "=== Step 1: Kconfig ==="
+CFG="${OPENWRT_ROOT}/target/linux/mediatek/filogic/config-6.12"
+[ -f "$CFG" ] || die "config-6.12 not found: ${CFG}"
 
-log "Enabling CMake policy compatibility..."
+declare -A PINS=(
+    [MEDIATEK_2P5GE_PHY]="# CONFIG_MEDIATEK_2P5GE_PHY is not set"
+    [NET_MEDIATEK_HNAT]="CONFIG_NET_MEDIATEK_HNAT=m"
+    [MEDIATEK_NETSYS_V3]="CONFIG_MEDIATEK_NETSYS_V3=y"
+    [NETFILTER]="CONFIG_NETFILTER=y"
+)
+for sym in "${!PINS[@]}"; do
+    sed -i "/^CONFIG_${sym}=/d; /^# CONFIG_${sym} is not set\$/d" "$CFG"
+    echo "${PINS[$sym]}" >> "$CFG"
+    log "  ${sym}: pinned"
+done
+
+# ═══════════════════════════════════════════
+# Step 2: CMake policy
+# ═══════════════════════════════════════════
+log "=== Step 2: CMake ==="
 export CMAKE_POLICY_VERSION_MINIMUM=3.5
 echo "CMAKE_POLICY_VERSION_MINIMUM=3.5" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
-log "  CMAKE_POLICY_VERSION_MINIMUM=3.5"
+log "  OK"
 
-log "Overlaying HNAT kernel files..."
-files_src="${MTK_SDK_DIR}/autobuild/unified/global/logan_common/25.12/files/target/linux/mediatek/files-6.12"
-files_dst="${OPENWRT_ROOT}/target/linux/mediatek/files-6.12"
-log "  source: ${files_src}"
-if [ -d "$files_src" ]; then
-    mkdir -p "$files_dst"
-    tmp_dst=$(mktemp -d)
-    log "  staging: ${tmp_dst}"
-    trap "rm -rf '$tmp_dst'" EXIT
-    if cp -af "$files_src"/. "$tmp_dst/" 2>/dev/null; then
-        before=$(find "$tmp_dst" -type f 2>/dev/null | wc -l)
-        log "  copied ${before} files to staging"
-        find "$tmp_dst" -type f \( -name 'Makefile' -o -name 'Kbuild' -o -name 'Kconfig' \) -print0 2>/dev/null | \
-            while IFS= read -r -d '' mf; do
-                case "$mf" in
-                    */drivers/net/ethernet/mediatek/mtk_hnat/Makefile)
-                        log "    keep: $(echo "$mf" | sed "s|${tmp_dst}/||")"
-                        ;;
-                    *)
-                        log "    drop: $(echo "$mf" | sed "s|${tmp_dst}/||")"
-                        rm -f "$mf"
-                        ;;
-                esac
-            done
-        for dir in "$tmp_dst"/*/; do
-            [ -d "$dir" ] || continue
-            case "$(basename "${dir%/}")" in
-                drivers|include|arch) ;;
-                *) rm -rf "$dir" ;;
-            esac
-        done
-        after=$(find "$tmp_dst" -type f 2>/dev/null | wc -l)
-        log "  after cleanup: ${after} files"
-        cp -af "$tmp_dst"/. "$files_dst/"
-        log "  overlaid to: ${files_dst}"
+# ═══════════════════════════════════════════
+# Step 3: HNAT files + patches + header
+# ═══════════════════════════════════════════
+log "=== Step 3: HNAT integration ==="
 
-        # 999-eth-91-a/b replace the original (PPE-failing) 999-eth-91:
-        #   a) Kconfig: complete file overlay into files-6.12 (no patch — avoids
-        #      plaintext patch parser issues with tab-indented context lines)
-        #   b) Makefile: single-file quilt patch (works in plaintext mode)
-        script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-        mtk="${script_dir}/../patches/filogic/mtk"
-        owrt="${OPENWRT_ROOT}/target/linux/mediatek/patches-6.12"
+SDK_FILES="${MTK_SDK_DIR}/autobuild/unified/global/logan_common/25.12/files/target/linux/mediatek/files-6.12"
+DST_FILES="${OPENWRT_ROOT}/target/linux/mediatek/files-6.12"
+PATCH_DIR="${OPENWRT_ROOT}/target/linux/mediatek/patches-6.12"
 
-        # Kconfig: copy complete modified file into files-6.12 overlay
-        kconfig_src="${mtk}/Kconfig"
-        kconfig_dst="${files_dst}/drivers/net/ethernet/mediatek/Kconfig"
-        if [ -f "$kconfig_src" ]; then
-            mkdir -p "$(dirname "$kconfig_dst")"
-            cp -f "$kconfig_src" "$kconfig_dst"
-            log "  Kconfig: complete file overlaid"
-        else
-            warn "Kconfig source not found: ${kconfig_src}"
-        fi
+[ -d "$SDK_FILES" ] || die "SDK files-6.12 missing: ${SDK_FILES}"
+mkdir -p "$DST_FILES" "$PATCH_DIR"
 
-        # Compat header: defines macros from MTK patches that quilt skips
-        compat="${mtk}/hnat_compat.h"
-        if [ -f "$compat" ]; then
-            cp -f "$compat" "${files_dst}/drivers/net/ethernet/mediatek/mtk_hnat/"
-            # Force-include via HNAT Makefile
-            # SDK Makefile uses ccflags-y=-Werror (plain =, not +=), which would
-            # clear any earlier += append. Inject on the same line to survive.
-            hnat_mf="${files_dst}/drivers/net/ethernet/mediatek/mtk_hnat/Makefile"
-            if [ -f "$hnat_mf" ] && ! grep -q 'hnat_compat' "$hnat_mf"; then
-                sed -i 's|^ccflags-y=-Werror$|ccflags-y=-Werror -include $(src)/hnat_compat.h|' "$hnat_mf"
-                log "  compat header injected"
-            fi
-        fi
+# -- 3a: Overlay HNAT source from SDK --
+TMP=$(mktemp -d)
+trap "rm -rf '$TMP'" EXIT
+cp -af "$SDK_FILES"/. "$TMP/" || die "copy SDK files failed"
+BEFORE=$(find "$TMP" -type f | wc -l)
 
-        # Makefile: staged as quilt patch
-        if [ -d "$owrt" ]; then
-            find "$owrt" -name '999-eth-91*driver-support*' -delete 2>/dev/null || true
-            find "$owrt" -name '999-eth-91*mtkhnat*' -delete 2>/dev/null || true
-            # Strip diff --git lines: GNU patch plaintext mode rejects them
-            find "$owrt" -name '*.patch' -exec sed -i '/^diff --git /d' {} + 2>/dev/null || true
-        fi
-        mkdir -p "$owrt"
-        mf_patch="${mtk}/999-eth-91-b-hnat-makefile.patch"
-        if [ -f "$mf_patch" ]; then
-            cp -f "$mf_patch" "$owrt/"
-            log "  Makefile: staged quilt patch"
-        else
-            warn "Makefile patch not found: ${mf_patch}"
-        fi
-        ndo_patch="${mtk}/999-eth-91-c-netdevice-ndo-flow-offload.patch"
-        if [ -f "$ndo_patch" ]; then
-            cp -f "$ndo_patch" "$owrt/"
-            log "  ndo_flow_offload_check: staged quilt patch"
-        else
-            warn "ndo patch not found: ${ndo_patch}"
-        fi
+# Keep HNAT Makefile, drop all other Makefile/Kbuild/Kconfig
+find "$TMP" -type f \( -name Makefile -o -name Kbuild -o -name Kconfig \) -print0 | \
+while IFS= read -r -d '' f; do
+    case "$f" in */drivers/net/ethernet/mediatek/mtk_hnat/Makefile) ;; *) rm -f "$f" ;; esac
+done
+# Keep only drivers/ include/ arch/
+for d in "$TMP"/*/; do
+    [ -d "$d" ] || continue
+    case "$(basename "${d%/}")" in drivers|include|arch) ;; *) rm -rf "$d" ;; esac
+done
+AFTER=$(find "$TMP" -type f | wc -l)
+cp -af "$TMP"/. "$DST_FILES/"
+rm -rf "$TMP"
+trap - EXIT
+log "  files: ${BEFORE} -> ${AFTER} overlaid"
 
-    else
-        warn "Copy from logan_common failed"
-        rm -rf "$tmp_dst"
-        trap - EXIT
-        exit 1
-    fi
-    rm -rf "$tmp_dst"
-    trap - EXIT
+# -- 3b: Patch management --
+# Purge SDK patches that conflict with chasey-dev rebased versions
+for prefix in 999-eth-91 999-hnat- 999-net-03 999-net-04 999-tnl- 999-zzz-51 999-zzz-53; do
+    find "$PATCH_DIR" -maxdepth 1 -name "${prefix}*" -delete 2>/dev/null || true
+done
+# Strip diff --git from remaining non-HNAT SDK patches
+find "$PATCH_DIR" -maxdepth 1 -name '*.patch' -exec sed -i '/^diff --git /d' {} + 2>/dev/null || true
+log "  old SDK patches cleaned"
+
+# Stage chasey-dev rebased patches (git format-patch, keep diff --git)
+COUNT=0
+for p in "$PATCH_SRC"/999-*.patch; do
+    [ -f "$p" ] || continue
+    cp -f "$p" "$PATCH_DIR/"
+    COUNT=$((COUNT + 1))
+done
+log "  staged ${COUNT} chasey-dev patches"
+
+# -- 3c: mtk_eth_reset.h (NPU needs it, not in files-6.12) --
+HDR="${DST_FILES}/drivers/net/ethernet/mediatek/mtk_eth_reset.h"
+SDK_P93="${MTK_SDK_DIR}/autobuild/unified/global/logan_common/25.12/files/target/linux/mediatek/patches-6.12/999-eth-93-mtk_eth_soc-add-internal-SER-notify-event.patch"
+CD_P93=$(find "$PATCH_DIR" -maxdepth 1 -name '999-eth-93*' -print -quit 2>/dev/null || true)
+
+extract_hdr() {
+    awk '/^diff.*mtk_eth_reset\.h$/{s=1;next} /^diff --git /{s=0} s&&/^@@/{h=1;next} s&&h&&/^\+/{print substr($0,2)}' "$1" > "$2"
+    [ -s "$2" ] && grep -q 'MTK_FE_START_RESET' "$2"
+}
+
+mkdir -p "$(dirname "$HDR")"
+if [ -f "$SDK_P93" ] && extract_hdr "$SDK_P93" "$HDR"; then
+    log "  mtk_eth_reset.h: SDK ($(wc -l < "$HDR") lines)"
+elif [ -n "$CD_P93" ] && [ -f "$CD_P93" ] && extract_hdr "$CD_P93" "$HDR"; then
+    log "  mtk_eth_reset.h: chasey-dev ($(wc -l < "$HDR") lines)"
 else
-    warn "logan_common files-6.12 not found: ${files_src}"
-    exit 1
+    warn "mtk_eth_reset.h extraction failed"
 fi
 
-log "Injecting KERNEL_EXTRA_SYMBOLS for HNAT→NPU symvers..."
-# 0014 patch defines KernelPackage/mediatek_hnat but without symvers export.
-# NPU modules depend on HNAT symbols; without KERNEL_EXTRA_SYMBOLS:=1,
-# Module.symvers is not propagated → modpost undefined symbols.
-netdev_mk="${OPENWRT_ROOT}/package/kernel/linux/modules/netdevices.mk"
-if [ -f "$netdev_mk" ] && grep -q 'KernelPackage/mediatek_hnat' "$netdev_mk"; then
-    if ! grep -q 'KERNEL_EXTRA_SYMBOLS.*:=.*1' "$netdev_mk"; then
+# ═══════════════════════════════════════════
+# Step 4: KERNEL_EXTRA_SYMBOLS for HNAT→NPU
+# ═══════════════════════════════════════════
+log "=== Step 4: KERNEL_EXTRA_SYMBOLS ==="
+NETDEV="${OPENWRT_ROOT}/package/kernel/linux/modules/netdevices.mk"
+
+if [ -f "$NETDEV" ] && grep -q 'KernelPackage/mediatek_hnat' "$NETDEV"; then
+    if ! grep -q 'KERNEL_EXTRA_SYMBOLS.*:=.*1' "$NETDEV"; then
         sed -i '/^define KernelPackage\/mediatek_hnat$/,/^endef$/{/DEPENDS:=/a\  KERNEL_EXTRA_SYMBOLS:=1
-}' "$netdev_mk"
-        log "  injected KERNEL_EXTRA_SYMBOLS:=1"
+}' "$NETDEV"
+        log "  KERNEL_EXTRA_SYMBOLS injected"
     else
         log "  already present"
     fi
-    # KCONFIG lacks NETFILTER — without it NF_CONNTRACK invisible → HNAT stripped.
-    if ! grep -q 'CONFIG_NETFILTER=y' "$netdev_mk"; then
+    if ! grep -q 'CONFIG_NETFILTER=y' "$NETDEV"; then
         sed -i '/^define KernelPackage\/mediatek_hnat$/,/^endef$/{/KCONFIG:=/a\	CONFIG_NETFILTER=y
-}' "$netdev_mk"
+}' "$NETDEV"
         sed -i '/^define KernelPackage\/mediatek_hnat$/,/^endef$/{/KCONFIG:=/a\	CONFIG_NF_CONNTRACK=m
-}' "$netdev_mk"
+}' "$NETDEV"
         sed -i '/^define KernelPackage\/mediatek_hnat$/,/^endef$/{/KCONFIG:=/a\	CONFIG_IP_NF_NAT=m
-}' "$netdev_mk"
-        log "  injected NETFILTER deps into KCONFIG"
+}' "$NETDEV"
+        log "  NETFILTER deps injected"
     fi
 else
-    warn "netdevices.mk not found or mediatek_hnat not defined"
+    warn "netdevices.mk: no mediatek_hnat"
 fi
 
-log "Patching NPU Makefile for CONFIG_MEDIATEK_NETSYS_V3..."
-# NPU package Makefile passes EXTRA_CFLAGS on cmdline → overrides Kbuild ccflags-y.
-# Must inject -DCONFIG_MEDIATEK_NETSYS_V3 into EXTRA_CFLAGS here, not in Kbuild.
-npu_makefile="${MTK_SDK_DIR}/feed/kernel/mtk_npu/Makefile"
-if [ -f "$npu_makefile" ]; then
-    if grep -q 'CONFIG_MEDIATEK_NETSYS_V3' "$npu_makefile"; then
-        log "  already patched"
+# ═══════════════════════════════════════════
+# Step 5: NPU compile flags + include path
+# ═══════════════════════════════════════════
+log "=== Step 5: NPU patches ==="
+
+# 5a: NETSYS_V3 into EXTRA_CFLAGS
+NPU_MK="${MTK_SDK_DIR}/feed/kernel/mtk_npu/Makefile"
+if [ -f "$NPU_MK" ]; then
+    if grep -q 'CONFIG_MEDIATEK_NETSYS_V3' "$NPU_MK"; then
+        log "  NETSYS_V3: already patched"
     else
-        sed -i '/EXTRA_KCONFIG))))$/a\EXTRA_CFLAGS+= -DCONFIG_MEDIATEK_NETSYS_V3' "$npu_makefile"
-        log "  added NETSYS_V3 to EXTRA_CFLAGS"
+        sed -i '/EXTRA_KCONFIG))))$/a\EXTRA_CFLAGS+= -DCONFIG_MEDIATEK_NETSYS_V3' "$NPU_MK"
+        log "  NETSYS_V3: added"
     fi
 else
-    warn "NPU Makefile not found: ${npu_makefile}"
+    warn "NPU Makefile missing: ${NPU_MK}"
 fi
 
-log "Patching NPU Kbuild for include path..."
-npu_kbuild="${MTK_SDK_DIR}/feed/kernel/mtk_npu/src/Makefile"
-if [ -f "$npu_kbuild" ]; then
-    if grep -q 'srctree.*mediatek' "$npu_kbuild"; then
-        log "  already patched"
+# 5b: HNAT include path for NPU Kbuild
+NPU_KB="${MTK_SDK_DIR}/feed/kernel/mtk_npu/src/Makefile"
+if [ -f "$NPU_KB" ]; then
+    if grep -q 'srctree.*mediatek' "$NPU_KB"; then
+        log "  include: already patched"
     else
-        sed -i '/^ccflags-y += -I\$(src)\/protocol\/inc$/a\ccflags-y += -I$(srctree)/drivers/net/ethernet/mediatek' "$npu_kbuild"
-        log "  added include path"
+        sed -i '/^ccflags-y += -I\$(src)\/protocol\/inc$/a\ccflags-y += -I$(srctree)/drivers/net/ethernet/mediatek' "$NPU_KB"
+        log "  include: added"
     fi
 else
-    warn "NPU Kbuild not found: ${npu_kbuild}"
+    warn "NPU Kbuild missing: ${NPU_KB}"
 fi
 
-log "Extracting mtk_eth_reset.h..."
-hdr="${files_dst}/drivers/net/ethernet/mediatek/mtk_eth_reset.h"
-log "  target: ${hdr}"
-
-patch_sdk="${MTK_SDK_DIR}/autobuild/unified/global/logan_common/25.12/files/target/linux/mediatek/patches-6.12"
-patch="${patch_sdk}/999-eth-93-mtk_eth_soc-add-internal-SER-notify-event.patch"
-shopt -s nullglob
-patch_owrt_candidates=("${OPENWRT_ROOT}"/target/linux/mediatek/patches-6.12/999-eth-93*)
-shopt -u nullglob
-
-found=""
-if [ -f "$patch" ]; then
-    found="$patch"
-    log "  strategy1: found in SDK (${patch})"
-elif [ "${#patch_owrt_candidates[@]}" -gt 0 ]; then
-    found="${patch_owrt_candidates[0]}"
-    log "  strategy2: found in OpenWrt tree (${found})"
-else
-    log "  strategy1: not found (${patch})"
-    log "  strategy2: no candidates in OpenWrt tree"
-fi
-
-if [ -n "$found" ]; then
-    mkdir -p "$(dirname "$hdr")"
-    sed -n '/^diff.*mtk_eth_reset\.h$/{n; :a; /^diff --git /b; /^+++/!s/^+//; p; n; ba}' "$found" | \
-        sed '1,/^@@/d' > "$hdr"
-    if [ -s "$hdr" ] && grep -q 'MTK_FE_START_RESET' "$hdr"; then
-        log "  Extracted ($(wc -l < "$hdr") lines)"
-    else
-        warn "Extraction produced empty or invalid file, header may be missing"
-    fi
-else
-    warn "999-eth-93 patch not found in SDK or OpenWrt tree - NPU build may fail"
-fi
-
-log "All fixups complete."
+# ═══════════════════════════════════════════
+log "=== All fixups complete ==="
