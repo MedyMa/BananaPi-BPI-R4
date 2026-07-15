@@ -96,7 +96,7 @@ if [ -d "$files_src" ]; then
             # clear any earlier += append. Inject on the same line to survive.
             hnat_mf="${files_dst}/drivers/net/ethernet/mediatek/mtk_hnat/Makefile"
             if [ -f "$hnat_mf" ] && ! grep -q 'hnat_compat' "$hnat_mf"; then
-                sed -i 's|^ccflags-y=-Werror$|ccflags-y=-Werror -include hnat_compat.h|' "$hnat_mf"
+                sed -i 's|^ccflags-y=-Werror$|ccflags-y=-Werror -include $(src)/hnat_compat.h|' "$hnat_mf"
                 log "  compat header injected"
             fi
         fi
