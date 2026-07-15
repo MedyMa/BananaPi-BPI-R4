@@ -1,4 +1,4 @@
-/* HNAT compat — symbols from MTK patches not applied by plaintext quilt.
+/* HNAT compat -- symbols from MTK patches not applied by plaintext quilt.
  * This header is force-included via -include BEFORE any kernel #includes,
  * so we must use raw C types and forward declarations only. */
 #ifndef __HNAT_COMPAT_H
@@ -16,12 +16,12 @@
 #endif
 
 /* From 999-hnat-11: skb headroom copy function pointer.
- * Tentative definition — linker merges across translation units. */
+ * Tentative definition -- linker merges across translation units. */
 struct sk_buff;
 int (*mtk_skb_headroom_copy)(struct sk_buff *new, struct sk_buff *old);
 
 /* From 999-hnat-03/07/09: HW offload path descriptor.
- * Quilt skips hnat-*/net-* patches — provide the complete final struct.
+ * Quilt skips hnat-*/net-* patches -- provide the complete final struct.
  * Raw C types used because linux/types.h and linux/if_ether.h are not
  * yet included at the point this header is force-injected. */
 struct net_device;
