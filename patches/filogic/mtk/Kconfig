@@ -56,7 +56,10 @@ config MEDIATEK_NETSYS_V3
 
 config NET_MEDIATEK_HNAT
 	tristate "MediaTek HW NAT support"
-	depends on NET_MEDIATEK_SOC && NF_CONNTRACK && IP_NF_NAT
+	depends on NET_MEDIATEK_SOC
+	select NETFILTER
+	select NF_CONNTRACK
+	select IP_NF_NAT
 	help
 	  This driver supports the Hardware Network Address Translation
 	  in the MediaTek MT7988/MT7986/MT7981 chipset family.
