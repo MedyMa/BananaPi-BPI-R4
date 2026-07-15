@@ -102,6 +102,8 @@ if [ -d "$CHASEY_PATCHES" ]; then
             COUNT=$((COUNT + 1))
         done
     done
+    # Fix CRLF: chasey-dev patches sometimes have Windows line endings
+    find "$PATCH_DIR" -maxdepth 1 -name '999-*.patch' -exec sed -i 's/\r$//' {} + 2>/dev/null || true
     log "  staged ${COUNT} chasey-dev patches (from ${CHASEY_BRANCH})"
 else
     die "chasey-dev patches not found after clone"
