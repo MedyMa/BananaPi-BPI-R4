@@ -91,6 +91,8 @@ if [ -d "$files_src" ]; then
         if [ -d "$owrt" ]; then
             find "$owrt" -name '999-eth-91*driver-support*' -delete 2>/dev/null || true
             find "$owrt" -name '999-eth-91*mtkhnat*' -delete 2>/dev/null || true
+            # Strip diff --git lines: GNU patch plaintext mode rejects them
+            find "$owrt" -name '*.patch' -exec sed -i '/^diff --git /d' {} + 2>/dev/null || true
         fi
         mkdir -p "$owrt"
         mf_patch="${mtk}/999-eth-91-b-hnat-makefile.patch"
