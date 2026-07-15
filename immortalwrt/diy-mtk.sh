@@ -129,10 +129,12 @@ if [ -f "$netdev_mk" ] && grep -q 'KernelPackage/mediatek_hnat' "$netdev_mk"; th
     fi
     # KCONFIG lacks NETFILTER — without it NF_CONNTRACK invisible → HNAT stripped.
     if ! grep -q 'CONFIG_NETFILTER=y' "$netdev_mk"; then
-        sed -i '/^define KernelPackage\/mediatek_hnat$/,/^endef$/{/KCONFIG:=/a\	CONFIG_NETFILTER=y \
-	CONFIG_NF_CONNTRACK=m \
-	CONFIG_IP_NF_NAT=m \
-' "$netdev_mk"
+        sed -i '/^define KernelPackage\/mediatek_hnat$/,/^endef$/{/KCONFIG:=/a\	CONFIG_NETFILTER=y
+}' "$netdev_mk"
+        sed -i '/^define KernelPackage\/mediatek_hnat$/,/^endef$/{/KCONFIG:=/a\	CONFIG_NF_CONNTRACK=m
+}' "$netdev_mk"
+        sed -i '/^define KernelPackage\/mediatek_hnat$/,/^endef$/{/KCONFIG:=/a\	CONFIG_IP_NF_NAT=m
+}' "$netdev_mk"
         log "  injected NETFILTER deps into KCONFIG"
     fi
 else
