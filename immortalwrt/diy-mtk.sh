@@ -109,25 +109,6 @@ fi
 rm -rf "$CHASEY_TMP"
 trap - EXIT
 
-# -- 3c: mtk_eth_reset.h (NPU needs it, not in files-6.12) --
-HDR="${DST_FILES}/drivers/net/ethernet/mediatek/mtk_eth_reset.h"
-SDK_P93="${MTK_SDK_DIR}/autobuild/unified/global/logan_common/25.12/files/target/linux/mediatek/patches-6.12/999-eth-93-mtk_eth_soc-add-internal-SER-notify-event.patch"
-CD_P93=$(find "$PATCH_DIR" -maxdepth 1 -name '999-eth-93*' -print -quit 2>/dev/null || true)
-
-extract_hdr() {
-    awk '/^diff.*mtk_eth_reset\.h$/{s=1;next} /^diff --git /{s=0} s&&/^@@/{h=1;next} s&&h&&/^\+/{print substr($0,2)}' "$1" > "$2"
-    [ -s "$2" ] && grep -q 'MTK_FE_START_RESET' "$2"
-}
-
-mkdir -p "$(dirname "$HDR")"
-if [ -f "$SDK_P93" ] && extract_hdr "$SDK_P93" "$HDR"; then
-    log "  mtk_eth_reset.h: SDK ($(wc -l < "$HDR") lines)"
-elif [ -n "$CD_P93" ] && [ -f "$CD_P93" ] && extract_hdr "$CD_P93" "$HDR"; then
-    log "  mtk_eth_reset.h: chasey-dev ($(wc -l < "$HDR") lines)"
-else
-    warn "mtk_eth_reset.h extraction failed"
-fi
-
 # ═══════════════════════════════════════════
 # Step 4: KERNEL_EXTRA_SYMBOLS for HNAT→NPU
 # ═══════════════════════════════════════════
