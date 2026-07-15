@@ -13,7 +13,7 @@ log "MTK_SDK_DIR=${MTK_SDK_DIR}"
 log "Pinning kernel Kconfig symbols..."
 cfg="${OPENWRT_ROOT}/target/linux/mediatek/filogic/config-6.12"
 if [ -f "$cfg" ]; then
-    for symbol in MEDIATEK_2P5GE_PHY NET_MEDIATEK_HNAT MEDIATEK_NETSYS_V3; do
+    for symbol in MEDIATEK_2P5GE_PHY NET_MEDIATEK_HNAT MEDIATEK_NETSYS_V3 NETFILTER; do
         case "$symbol" in
             MEDIATEK_2P5GE_PHY) val="# CONFIG_${symbol} is not set" ;;
             NET_MEDIATEK_HNAT) val="CONFIG_${symbol}=m" ;;
