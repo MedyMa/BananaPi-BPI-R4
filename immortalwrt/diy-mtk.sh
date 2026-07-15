@@ -87,6 +87,18 @@ if [ -d "$files_src" ]; then
             warn "Kconfig source not found: ${kconfig_src}"
         fi
 
+        # Compat header: defines macros from MTK patches that quilt skips
+        compat="${mtk}/hnat_compat.h"
+        if [ -f "$compat" ]; then
+            cp -f "$compat" "${files_dst}/drivers/net/ethernet/mediatek/mtk_hnat/"
+            # Force-include via HNAT Makefile
+            hnat_mf="${files_dst}/drivers/net/ethernet/mediatek/mtk_hnat/Makefile"
+            if [ -f "$hnat_mf" ] && ! grep -q 'hnat_compat' "$hnat_mf"; then
+                sed -i '1i\ccflags-y += -include hnat_compat.h' "$hnat_mf"
+                log "  compat header injected"
+            fi
+        fi
+
         # Makefile: staged as quilt patch
         if [ -d "$owrt" ]; then
             find "$owrt" -name '999-eth-91*driver-support*' -delete 2>/dev/null || true
