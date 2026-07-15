@@ -11,8 +11,8 @@ die()  { echo "[MTK-FIX ERROR] $*"; exit 1; }
 # ─── Bootstrap ───
 OPENWRT_ROOT="${OPENWRT_ROOT:-$(pwd)}"
 MTK_SDK_DIR="${MTK_SDK_DIR:-${OPENWRT_ROOT}/../mtk-openwrt-feeds}"
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PATCH_SRC="${SCRIPT_DIR}/../patches/filogic/mtk"
+CHASEY_REPO="https://github.com/chasey-dev/immortalwrt-mt798x-rebase.git"
+CHASEY_BRANCH="25.12"
 
 log "OPENWRT_ROOT=${OPENWRT_ROOT}"
 log "MTK_SDK_DIR=${MTK_SDK_DIR}"
@@ -78,23 +78,36 @@ rm -rf "$TMP"
 trap - EXIT
 log "  files: ${BEFORE} -> ${AFTER} overlaid"
 
-# -- 3b: Patch management --
-# Purge SDK patches that conflict with chasey-dev rebased versions
-for prefix in 999-eth-91 999-hnat- 999-net-03 999-net-04 999-tnl- 999-zzz-51 999-zzz-53; do
-    find "$PATCH_DIR" -maxdepth 1 -name "${prefix}*" -delete 2>/dev/null || true
-done
-# Strip diff --git from remaining non-HNAT SDK patches
-find "$PATCH_DIR" -maxdepth 1 -name '*.patch' -exec sed -i '/^diff --git /d' {} + 2>/dev/null || true
-log "  old SDK patches cleaned"
+# -- 3b: Fetch chasey-dev rebased patches --
+# Shallow-clone chasey-dev, copy HNAT patches, discard clone
+CHASEY_TMP=$(mktemp -d)
+trap "rm -rf '$CHASEY_TMP'" EXIT
+git clone --depth 1 --branch "$CHASEY_BRANCH" "$CHASEY_REPO" "$CHASEY_TMP" 2>&1 | tail -1
+CHASEY_PATCHES="${CHASEY_TMP}/target/linux/mediatek/patches-6.12"
+if [ -d "$CHASEY_PATCHES" ]; then
+    # Purge SDK patches that conflict with chasey-dev rebased versions
+    for prefix in 999-eth-91 999-hnat- 999-net-03 999-net-04 999-tnl- 999-zzz-51 999-zzz-53; do
+        find "$PATCH_DIR" -maxdepth 1 -name "${prefix}*" -delete 2>/dev/null || true
+    done
+    # Strip diff --git from remaining non-HNAT SDK patches
+    find "$PATCH_DIR" -maxdepth 1 -name '*.patch' -exec sed -i '/^diff --git /d' {} + 2>/dev/null || true
+    log "  old SDK patches cleaned"
 
-# Stage chasey-dev rebased patches (git format-patch, keep diff --git)
-COUNT=0
-for p in "$PATCH_SRC"/999-*.patch; do
-    [ -f "$p" ] || continue
-    cp -f "$p" "$PATCH_DIR/"
-    COUNT=$((COUNT + 1))
-done
-log "  staged ${COUNT} chasey-dev patches"
+    # Copy chasey-dev patches (git format-patch, keep diff --git intact)
+    COUNT=0
+    for prefix in 999-eth-91 999-eth-93 999-hnat- 999-net-03 999-net-04 999-tnl- 999-zzz-51 999-zzz-53; do
+        for p in "$CHASEY_PATCHES"/${prefix}*.patch; do
+            [ -f "$p" ] || continue
+            cp -f "$p" "$PATCH_DIR/"
+            COUNT=$((COUNT + 1))
+        done
+    done
+    log "  staged ${COUNT} chasey-dev patches (from ${CHASEY_BRANCH})"
+else
+    die "chasey-dev patches not found after clone"
+fi
+rm -rf "$CHASEY_TMP"
+trap - EXIT
 
 # -- 3c: mtk_eth_reset.h (NPU needs it, not in files-6.12) --
 HDR="${DST_FILES}/drivers/net/ethernet/mediatek/mtk_eth_reset.h"
