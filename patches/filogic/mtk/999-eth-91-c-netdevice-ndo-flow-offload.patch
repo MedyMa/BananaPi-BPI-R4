@@ -1,12 +1,25 @@
 From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
 From: diy-mtk.sh <build@localhost>
 Date: Mon, 14 Jul 2026 00:00:00 +0000
-Subject: [PATCH] net: netdevice: add ndo_flow_offload_check member
+Subject: [PATCH] net: netdevice: add flow_offload_hw_path forward decl +
+ ndo_flow_offload_check
  (minimal standalone — avoids depending on full 999-hnat-03 chain)
 
 ---
- include/linux/netdevice.h | 1 +
- 1 file changed, 1 insertion(+)
+ include/linux/netdevice.h | 2 ++
+ 1 file changed, 2 insertions(+)
+
+--- a/include/linux/netdevice.h
++++ b/include/linux/netdevice.h
+@@ -1008,6 +1008,8 @@ struct netdev_net_notifier {
+ 	struct notifier_block *nb;
+ };
+ 
++struct flow_offload_hw_path;
++
+ /*
+  * This structure defines the management hooks for network devices.
+  * The following hooks can be defined; unless noted otherwise, they are
 
 --- a/include/linux/netdevice.h
 +++ b/include/linux/netdevice.h
@@ -18,3 +31,4 @@ Subject: [PATCH] net: netdevice: add ndo_flow_offload_check member
  	int			(*ndo_change_carrier)(struct net_device *dev,
  						      bool new_carrier);
  	int			(*ndo_get_phys_port_id)(struct net_device *dev,
+
