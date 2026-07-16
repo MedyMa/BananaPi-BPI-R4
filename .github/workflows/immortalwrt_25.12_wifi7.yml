@@ -14,7 +14,6 @@ env:
   REPO_BRANCH: 25.12-dev-wifi7
   CONFIG_FILE: immortalwrt/MTK/defconfig-vendor-wifi
   DIY_P1_SH: immortalwrt/diy-mtk.sh
-  DIY_P2_SH: immortalwrt/diy-part6.sh
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
@@ -100,8 +99,6 @@ jobs:
     - name: Load config
       run: |
         [ -e "$CONFIG_FILE" ] && cat "$CONFIG_FILE" > openwrt/.config
-        chmod +x $OPENWRT_NAME/*.sh && cd openwrt
-        $GITHUB_WORKSPACE/$DIY_P2_SH
 
     - name: Download the installation package
       id: package
