@@ -1,188 +1,183 @@
 #!/bin/bash
-# diy-mtk.sh — Post-autobuild fixups for BPI-R4 vendor WiFi + HNAT + NPU
-# Run AFTER: autobuild.sh prepare
-# Run BEFORE: autobuild.sh filogic-mac80211-mt798x_rfb-wifi7_nic build
-set -euo pipefail
+#
+# diy-mtk.sh -- Community packages & config for chasey-dev build
+#
 
-log()  { echo "[MTK-FIX] $*"; }
-warn() { echo "[MTK-FIX WARN] $*"; }
-die()  { echo "[MTK-FIX ERROR] $*"; exit 1; }
+merge_package(){
+    repo=`echo $1 | rev | cut -d'/' -f 1 | rev`
+    pkg=`echo $2 | rev | cut -d'/' -f 1 | rev`
+    git clone --depth=1 --single-branch $1
+    [ -d package/openwrt-packages ] || mkdir -p package/openwrt-packages
+    mv $2 package/openwrt-packages/
+    rm -rf $repo
+}
 
-# ─── Bootstrap ───
-OPENWRT_ROOT="${OPENWRT_ROOT:-$(pwd)}"
-MTK_SDK_DIR="${MTK_SDK_DIR:-${OPENWRT_ROOT}/../mtk-openwrt-feeds}"
-CHASEY_REPO="https://github.com/chasey-dev/immortalwrt-mt798x-rebase.git"
-CHASEY_BRANCH="25.12"
+patch_makefile_dep() {
+    local file_path="$1"
+    local old_text="$2"
+    local new_text="$3"
+    local perl_status
 
-log "OPENWRT_ROOT=${OPENWRT_ROOT}"
-log "MTK_SDK_DIR=${MTK_SDK_DIR}"
+    [ -f "$file_path" ] || return 0
+    grep -qF "$old_text" "$file_path" || return 0
 
-# ═══════════════════════════════════════════
-# Step 1: Pin kernel Kconfig symbols
-# ═══════════════════════════════════════════
-log "=== Step 1: Kconfig ==="
-CFG="${OPENWRT_ROOT}/target/linux/mediatek/filogic/config-6.12"
-[ -f "$CFG" ] || die "config-6.12 not found: ${CFG}"
+    PATCH_OLD_TEXT="$old_text" PATCH_NEW_TEXT="$new_text" \
+        perl -0pi -e 'BEGIN { $old = $ENV{"PATCH_OLD_TEXT"}; $new = $ENV{"PATCH_NEW_TEXT"}; }
+            $count = s/\Q$old\E/$new/g;
+            END { exit($count > 0 ? 0 : 2); }' "$file_path"
+    perl_status=$?
 
-declare -A PINS=(
-    [MEDIATEK_2P5GE_PHY]="# CONFIG_MEDIATEK_2P5GE_PHY is not set"
-    [NET_MEDIATEK_HNAT]="CONFIG_NET_MEDIATEK_HNAT=m"
-    [MEDIATEK_NETSYS_V3]="CONFIG_MEDIATEK_NETSYS_V3=y"
-    [NETFILTER]="CONFIG_NETFILTER=y"
-)
-for sym in "${!PINS[@]}"; do
-    sed -i "/^CONFIG_${sym}=/d; /^# CONFIG_${sym} is not set\$/d" "$CFG"
-    echo "${PINS[$sym]}" >> "$CFG"
-    log "  ${sym}: pinned"
+    [ "$perl_status" -eq 0 ] || {
+        echo "Failed to apply literal patch to $file_path" >&2
+        return "$perl_status"
+    }
+}
+
+apply_workspace_patch() {
+    local patch_file="$1"
+
+    [ -f "$patch_file" ] || return 0
+
+    if git apply --recount --ignore-space-change --ignore-whitespace --reverse --check "$patch_file" >/dev/null 2>&1; then
+        return 0
+    fi
+
+    git apply --recount --ignore-space-change --ignore-whitespace "$patch_file"
+}
+
+# Remove upstream feeds replaced by community clones below
+rm -rf feeds/luci/themes/luci-theme-argon
+rm -rf feeds/luci/applications/luci-app-argon-config
+rm -rf feeds/luci/applications/luci-app-passwall
+rm -rf feeds/luci/applications/luci-app-modemband
+rm -rf package/mtk/applications/luci-app-turboacc-mtk
+rm -rf feeds/packages/net/adguardhome
+rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2socks,hysteria,ipt2socks,microsocks,naiveproxy,shadowsocks-libev,shadowsocks-rust,shadowsocksr-libev,simple-obfs,tcping,trojan-plus,tuic-client,v2ray-plugin,xray-plugin,geoview,shadow-tls}
+
+# Clone community packages
+mkdir -p package/community
+pushd package/community
+git clone --depth=1 -b dev https://github.com/fw876/helloworld
+git clone --depth=1 -b main https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git
+[ -f openwrt-passwall-packages/haproxy/Makefile ] && sed -i '/^[[:space:]]*ADDON+=USE_QUIC=1$/d' openwrt-passwall-packages/haproxy/Makefile
+git clone --depth=1 -b main https://github.com/Openwrt-Passwall/openwrt-passwall.git
+git clone --depth=1 https://github.com/nikkinikki-org/OpenWrt-nikki
+git clone --depth=1 https://github.com/1522042029/luci-app-socat
+git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
+git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
+merge_package https://github.com/kenzok8/jell jell/adguardhome
+merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-fan
+merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-sfp-status
+merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-adguardhome
+merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-modemband
+merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-turboacc-mtk
+merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnsto-openwrt-package/ddnsto
+merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnsto-openwrt-package/luci-app-ddnsto
+popd
+
+# luci-app-mosdns
+rm -rf feeds/packages/lang/golang
+git clone --depth=1 https://github.com/sbwml/packages_lang_golang -b 26.x feeds/packages/lang/golang
+rm -rf feeds/packages/net/mosdns
+git clone --depth=1 https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
+
+# luci-app-OpenClash
+mkdir -p package/OpenClash
+pushd package/OpenClash
+git clone --depth=1 https://github.com/vernesong/OpenClash
+popd
+
+# Fix non-deterministic PKG_MIRROR_HASH in helloworld/shadowsocks-libev
+patch_makefile_dep \
+    package/community/helloworld/shadowsocks-libev/Makefile \
+    'PKG_MIRROR_HASH:=b3898ad0a557bc8b0bbb2f3888101d461944239b0b7d4d4c6f164d73694a4595' \
+    'PKG_MIRROR_HASH:=skip'
+
+# shadowsocksr-libev: replace brittle LTO with no-lto
+[ -f package/community/openwrt-passwall-packages/shadowsocksr-libev/Makefile ] && {
+    sed -i '/^[[:space:]]*TARGET_CFLAGS += -flto$/c\PKG_BUILD_FLAGS+=no-lto' \
+        package/community/openwrt-passwall-packages/shadowsocksr-libev/Makefile
+    patch_makefile_dep \
+        package/community/openwrt-passwall-packages/shadowsocksr-libev/Makefile \
+        '146fa4511a52da2aaa1e11ea0294cfb450e62643156c5da3b10e037ef43961f6' \
+        'skip'
+}
+
+# GCC 14 + musl fortify workaround for mbedtls
+if ! grep -q '_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile; then
+    if grep -q '\$(if \$(findstring cortex-a53,\$(CONFIG_CPU_TYPE)),-march=armv8-a)' package/libs/mbedtls/Makefile; then
+        sed -i '/$(if $(findstring cortex-a53,$(CONFIG_CPU_TYPE)),-march=armv8-a)/a TARGET_CFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile
+  else
+    echo 'TARGET_CFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0' >> package/libs/mbedtls/Makefile
+  fi
+fi
+
+# Drop onionshare-cli (unresolved metadata, not in our config)
+rm -rf feeds/packages/net/onionshare-cli
+
+[ -f feeds/luci/applications/luci-app-package-manager/root/usr/libexec/package-manager-call ] && \
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1004-luci-package-manager-apk-upload-untrusted-master.patch"
+
+# vpnc: add -p to mkdir for idempotency
+if grep -q 'mkdir $(PKG_BUILD_DIR)/bin' feeds/packages/net/vpnc/Makefile 2>/dev/null; then
+    sed -i '/mkdir $(PKG_BUILD_DIR)\/bin/s/mkdir /mkdir -p /' feeds/packages/net/vpnc/Makefile
+fi
+
+# Feed deps needed by community clones (pcre2 is in main tree since 25.12)
+./scripts/feeds update -a
+./scripts/feeds install -a
+./scripts/feeds install c-ares udns
+
+
+
+# Remove kiddin9 APK repo (triggers broken video/ sub-repo)
+for f in \
+    package/base-files/files/etc/apk/repositories \
+    package/base-files/files/etc/apk/repositories.d/* \
+    package/utils/alpine-repositories/files/repositories; do
+    [ -f "$f" ] && grep -q 'kiddin9' "$f" 2>/dev/null && sed -i '/kiddin9/d' "$f" 2>/dev/null || true
 done
 
-# ═══════════════════════════════════════════
-# Step 2: CMake policy
-# ═══════════════════════════════════════════
-log "=== Step 2: CMake ==="
-export CMAKE_POLICY_VERSION_MINIMUM=3.5
-echo "CMAKE_POLICY_VERSION_MINIMUM=3.5" >> "${GITHUB_ENV:-/dev/null}" 2>/dev/null || true
-log "  OK"
+# APK runtime fixes: allow local unsigned APK uploads and disable broken feed entries
+rm -f package/base-files/files/etc/uci-defaults/99-apk-untrusted
+[ -d package/base-files/files/etc/uci-defaults ] && \
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1005-base-files-apk-manager-fixes-master.patch"
 
-# ═══════════════════════════════════════════
-# Step 3: HNAT files + patches + header
-# ═══════════════════════════════════════════
-log "=== Step 3: HNAT integration ==="
-
-SDK_FILES="${MTK_SDK_DIR}/autobuild/unified/global/logan_common/25.12/files/target/linux/mediatek/files-6.12"
-DST_FILES="${OPENWRT_ROOT}/target/linux/mediatek/files-6.12"
-PATCH_DIR="${OPENWRT_ROOT}/target/linux/mediatek/patches-6.12"
-
-[ -d "$SDK_FILES" ] || die "SDK files-6.12 missing: ${SDK_FILES}"
-mkdir -p "$DST_FILES" "$PATCH_DIR"
-
-# -- 3a: Overlay HNAT source from SDK --
-TMP=$(mktemp -d)
-trap "rm -rf '$TMP'" EXIT
-cp -af "$SDK_FILES"/. "$TMP/" || die "copy SDK files failed"
-BEFORE=$(find "$TMP" -type f | wc -l)
-
-# Keep HNAT Makefile, drop all other Makefile/Kbuild/Kconfig
-find "$TMP" -type f \( -name Makefile -o -name Kbuild -o -name Kconfig \) -print0 | \
-while IFS= read -r -d '' f; do
-    case "$f" in */drivers/net/ethernet/mediatek/mtk_hnat/Makefile) ;; *) rm -f "$f" ;; esac
-done
-# Keep only drivers/ include/ arch/
-for d in "$TMP"/*/; do
-    [ -d "$d" ] || continue
-    case "$(basename "${d%/}")" in drivers|include|arch) ;; *) rm -rf "$d" ;; esac
-done
-AFTER=$(find "$TMP" -type f | wc -l)
-cp -af "$TMP"/. "$DST_FILES/"
-rm -rf "$TMP"
-trap - EXIT
-log "  files: ${BEFORE} -> ${AFTER} overlaid"
-
-# -- 3b: Fetch chasey-dev rebased patches --
-# Shallow-clone chasey-dev, copy HNAT patches, discard clone
-CHASEY_TMP=$(mktemp -d)
-trap "rm -rf '$CHASEY_TMP'" EXIT
-git clone --depth 1 --branch "$CHASEY_BRANCH" "$CHASEY_REPO" "$CHASEY_TMP" 2>&1 | tail -1
-CHASEY_PATCHES="${CHASEY_TMP}/target/linux/mediatek/patches-6.12"
-if [ -d "$CHASEY_PATCHES" ]; then
-    # Purge SDK patches that conflict with chasey-dev rebased versions
-    for prefix in 999-eth-91 999-hnat- 999-net-03 999-net-04 999-tnl- 999-zzz-51 999-zzz-53; do
-        find "$PATCH_DIR" -maxdepth 1 -name "${prefix}*" -delete 2>/dev/null || true
-    done
-    # Strip diff --git from remaining non-HNAT SDK patches
-    find "$PATCH_DIR" -maxdepth 1 -name '*.patch' -exec sed -i '/^diff --git /d' {} + 2>/dev/null || true
-    log "  old SDK patches cleaned"
-
-    # Copy chasey-dev patches (git format-patch, keep diff --git intact)
-    COUNT=0
-    for prefix in 999-eth-91 999-eth-93 999-hnat- 999-net-03 999-net-04 999-tnl- 999-zzz-51 999-zzz-53; do
-        for p in "$CHASEY_PATCHES"/${prefix}*.patch; do
-            [ -f "$p" ] || continue
-            cp -f "$p" "$PATCH_DIR/"
-            COUNT=$((COUNT + 1))
-        done
-    done
-    # Fix CRLF: chasey-dev patches sometimes have Windows line endings
-    find "$PATCH_DIR" -maxdepth 1 -name '999-*.patch' -exec sed -i 's/\r$//' {} + 2>/dev/null || true
-
-    # Override patches that need context fix for 6.12.94
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    LOCAL_PATCHES="${SCRIPT_DIR}/../patches/filogic/mtk"
-    for fix in "$LOCAL_PATCHES"/999-*-fix-*.patch; do
-        [ -f "$fix" ] || continue
-        base=$(basename "$fix" | sed 's/-fix-/-/')
-        orig=$(find "$PATCH_DIR" -maxdepth 1 -name "${base}" -print -quit 2>/dev/null || true)
-        if [ -n "$orig" ]; then
-            rm -f "$orig"
-            cp -f "$fix" "$PATCH_DIR/${base}"
-            log "  patched: ${base} (local context fix)"
-        fi
-    done
-
-    log "  staged ${COUNT} chasey-dev patches (from ${CHASEY_BRANCH})"
-else
-    die "chasey-dev patches not found after clone"
-fi
-rm -rf "$CHASEY_TMP"
-trap - EXIT
-
-# ═══════════════════════════════════════════
-# Step 4: KERNEL_EXTRA_SYMBOLS for HNAT→NPU
-# ═══════════════════════════════════════════
-log "=== Step 4: KERNEL_EXTRA_SYMBOLS ==="
-NETDEV="${OPENWRT_ROOT}/package/kernel/linux/modules/netdevices.mk"
-
-if [ -f "$NETDEV" ] && grep -q 'KernelPackage/mediatek_hnat' "$NETDEV"; then
-    if ! grep -q 'KERNEL_EXTRA_SYMBOLS.*:=.*1' "$NETDEV"; then
-        sed -i '/^define KernelPackage\/mediatek_hnat$/,/^endef$/{/DEPENDS:=/a\  KERNEL_EXTRA_SYMBOLS:=1
-}' "$NETDEV"
-        log "  KERNEL_EXTRA_SYMBOLS injected"
-    else
-        log "  already present"
-    fi
-    if ! grep -q 'CONFIG_NETFILTER=y' "$NETDEV"; then
-        sed -i '/^define KernelPackage\/mediatek_hnat$/,/^endef$/{/KCONFIG:=/a\	CONFIG_NETFILTER=y
-}' "$NETDEV"
-        sed -i '/^define KernelPackage\/mediatek_hnat$/,/^endef$/{/KCONFIG:=/a\	CONFIG_NF_CONNTRACK=m
-}' "$NETDEV"
-        sed -i '/^define KernelPackage\/mediatek_hnat$/,/^endef$/{/KCONFIG:=/a\	CONFIG_IP_NF_NAT=m
-}' "$NETDEV"
-        log "  NETFILTER deps injected"
-    fi
-else
-    warn "netdevices.mk: no mediatek_hnat"
+# Verify libmbedtls presence (required by shadowsocks-libev)
+if [ ! -f package/libs/mbedtls/Makefile ]; then
+  echo "WARNING: package/libs/mbedtls/Makefile not found" >&2
+elif ! grep -q 'define Package/libmbedtls' package/libs/mbedtls/Makefile; then
+  echo "WARNING: package/libs/mbedtls/Makefile does not define libmbedtls" >&2
 fi
 
-# ═══════════════════════════════════════════
-# Step 5: NPU compile flags + include path
-# ═══════════════════════════════════════════
-log "=== Step 5: NPU patches ==="
+# GO proxy for sing-box
+export GOEXPERIMENT=
+export GOPROXY=https://proxy.golang.org,direct
 
-# 5a: NETSYS_V3 into EXTRA_CFLAGS
-NPU_MK="${MTK_SDK_DIR}/feed/kernel/mtk_npu/Makefile"
-if [ -f "$NPU_MK" ]; then
-    if grep -q 'CONFIG_MEDIATEK_NETSYS_V3' "$NPU_MK"; then
-        log "  NETSYS_V3: already patched"
-    else
-        sed -i '/EXTRA_KCONFIG))))$/a\EXTRA_CFLAGS+= -DCONFIG_MEDIATEK_NETSYS_V3' "$NPU_MK"
-        log "  NETSYS_V3: added"
-    fi
-else
-    warn "NPU Makefile missing: ${NPU_MK}"
-fi
+# Compatibility fixes for floating feeds metadata
+patch_makefile_dep \
+    feeds/packages/lang/python/python-ubus/Makefile \
+    'PKG_BUILD_DEPENDS:=python-setuptools/host' \
+    'PKG_BUILD_DEPENDS:=python3/host'
+patch_makefile_dep \
+    package/feeds/packages/python-ubus/Makefile \
+    'PKG_BUILD_DEPENDS:=python-setuptools/host' \
+    'PKG_BUILD_DEPENDS:=python3/host'
 
-# 5b: HNAT include path for NPU Kbuild
-NPU_KB="${MTK_SDK_DIR}/feed/kernel/mtk_npu/src/Makefile"
-if [ -f "$NPU_KB" ]; then
-    if grep -q 'srctree.*mediatek' "$NPU_KB"; then
-        log "  include: already patched"
-    else
-        sed -i '/^ccflags-y += -I\$(src)\/protocol\/inc$/a\ccflags-y += -I$(srctree)/drivers/net/ethernet/mediatek' "$NPU_KB"
-        log "  include: added"
-    fi
-else
-    warn "NPU Kbuild missing: ${NPU_KB}"
-fi
+patch_makefile_dep \
+    feeds/packages/admin/zabbix/Makefile \
+    'libnetsnmp-ssl' \
+    'libnetsnmp'
+patch_makefile_dep \
+    package/feeds/packages/zabbix/Makefile \
+    'libnetsnmp-ssl' \
+    'libnetsnmp'
 
-# ═══════════════════════════════════════════
-log "=== All fixups complete ==="
+# Reduce BPI-R4 U-Boot bootdelay
+patch_makefile_dep \
+    package/boot/uboot-mediatek/patches/450-add-bpi-r4.patch \
+    'CONFIG_BOOTDELAY=30' \
+    'CONFIG_BOOTDELAY=10'
+
+# Modify default IP
+sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generate
