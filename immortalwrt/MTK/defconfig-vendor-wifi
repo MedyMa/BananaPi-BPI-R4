@@ -1,8 +1,4 @@
-# chasey-dev 25.12-dev-wifi7 defconfig for BananaPi BPI-R4
-# Source: chasey-dev/immortalwrt-mt798x-rebase
-# WiFi: mt_wifi7 + mt_hwifi + warp (padavanonly-style vendor drivers)
-# HNAT: kmod-mediatek_hnat (CONFIG_NET_MEDIATEK_HNAT)
-# NPU: kernel-level only (dts/netdevice/PPE patches), no standalone kmod
+# chasey-dev 25.12-dev-wifi7 / BPI-R4
 
 CONFIG_TARGET_mediatek=y
 CONFIG_TARGET_mediatek_filogic=y
@@ -23,7 +19,7 @@ CONFIG_DRIVER_11BE_SUPPORT=y
 # CONFIG_PACKAGE_kmod-mt7996-firmware is not set
 # CONFIG_PACKAGE_kmod-mt7996-233-firmware is not set
 
-# Keep the nftables firewall / IPv6 userspace explicit.
+# nftables firewall
 CONFIG_PACKAGE_firewall4=y
 CONFIG_PACKAGE_odhcp6c=y
 CONFIG_PACKAGE_odhcpd-ipv6only=y
@@ -32,7 +28,7 @@ CONFIG_PACKAGE_ip6tables-nft=y
 CONFIG_PACKAGE_ppp=y
 CONFIG_PACKAGE_ppp-mod-pppoe=y
 
-# --- MTK vendor WiFi7 (mt_wifi7 + mt_hwifi + warp stack) ---
+# --- WiFi7 ---
 CONFIG_PACKAGE_kmod-cfg80211=y
 # CONFIG_PACKAGE_kmod-mac80211 is not set
 CONFIG_PACKAGE_mt_wifi7=y
@@ -49,12 +45,10 @@ CONFIG_KERNEL_MEDIATEK_NETSYS_V3=y
 # CONFIG_KERNEL_MEDIATEK_NETSYS_V2 is not set
 
 # --- NPU ---
-# NPU kernel modules (kmod-npu, kmod-npu-flow, etc.) are NOT in chasey-dev.
-# They only exist in padavanonly's mt798x-mt799x-6.6-mtwifi tree.
-# chasey-dev has NPU support at kernel patch level (dts/netdevice/PPE) only.
+# not available as kmod; integrated via kernel patches
 # CONFIG_PACKAGE_kmod-npu is not set
 
-# --- MTK platform / debug tools ---
+# --- Platform tools ---
 CONFIG_PACKAGE_mii_mgr=y
 CONFIG_PACKAGE_regs=y
 CONFIG_PACKAGE_switch=y
@@ -65,7 +59,7 @@ CONFIG_PACKAGE_ethswbox=y
 CONFIG_PACKAGE_flowtable=y
 CONFIG_PACKAGE_tops-tool=y
 
-# 5G / WWAN / SFP bring-up and diagnostics.
+# 5G / WWAN / SFP
 CONFIG_MODEMMANAGER_WITH_MBIM=y
 CONFIG_MODEMMANAGER_WITH_QMI=y
 CONFIG_MODEMMANAGER_WITH_QRTR=y
@@ -118,7 +112,7 @@ CONFIG_PACKAGE_parted=y
 CONFIG_PACKAGE_smartmontools=y
 CONFIG_PACKAGE_kmod-nvme=y
 
-# Core service set trimmed to packages that are present in current feeds.
+# Core packages
 CONFIG_PACKAGE_adguardhome=y
 CONFIG_PACKAGE_alsa-utils=y
 CONFIG_PACKAGE_aria2=y
@@ -225,7 +219,7 @@ CONFIG_PACKAGE_xray-plugin=y
 CONFIG_PACKAGE_yq=y
 CONFIG_PACKAGE_zlib=y
 
-# LuCI core + stable apps.
+# LuCI core
 CONFIG_LUCI_LANG_zh_Hans=y
 CONFIG_PACKAGE_luci-compat=y
 CONFIG_PACKAGE_luci-lib-chartjs=y
@@ -255,7 +249,7 @@ CONFIG_PACKAGE_luci-proto-vpnc=y
 CONFIG_PACKAGE_luci-proto-vxlan=y
 CONFIG_PACKAGE_luci-proto-wireguard=y
 
-# Community LuCI apps supplied by diy-part5.sh.
+# Community LuCI apps
 CONFIG_PACKAGE_luci-theme-argon=y
 CONFIG_PACKAGE_luci-app-argon-config=y
 CONFIG_PACKAGE_luci-app-adguardhome=y
@@ -326,12 +320,12 @@ CONFIG_PACKAGE_luci-app-vlmcsd=y
 CONFIG_PACKAGE_luci-app-wechatpush=y
 CONFIG_PACKAGE_luci-app-wrtbwmon=y
 
-# Keep the SSR Libev client pieces, but leave the server off on aarch64 defaults.
+# SSR Libev
 CONFIG_PACKAGE_shadowsocksr-libev-ssr-local=y
 CONFIG_PACKAGE_shadowsocksr-libev-ssr-redir=y
 CONFIG_PACKAGE_shadowsocksr-libev-ssr-server=n
 
-# Samba4 / discovery options kept explicit for the LuCI app.
+# Samba4
 CONFIG_PACKAGE_samba4-libs=y
 CONFIG_PACKAGE_samba4-server=y
 CONFIG_SAMBA4_SERVER_AVAHI=y
