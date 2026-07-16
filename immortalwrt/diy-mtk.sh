@@ -93,6 +93,12 @@ patch_makefile_dep \
     'PKG_MIRROR_HASH:=b3898ad0a557bc8b0bbb2f3888101d461944239b0b7d4d4c6f164d73694a4595' \
     'PKG_MIRROR_HASH:=skip'
 
+# simple-obfs: skip tarball hash (git archive + submodule produces non-deterministic hash)
+patch_makefile_dep \
+    package/community/helloworld/simple-obfs/Makefile \
+    'PKG_MIRROR_HASH:=7a0154d2de18373e52783d1b64cf5204471049c2d2c64f0b3323d7f430aa4275' \
+    'PKG_MIRROR_HASH:=skip'
+
 # shadowsocksr-libev: replace brittle LTO with no-lto
 [ -f package/community/openwrt-passwall-packages/shadowsocksr-libev/Makefile ] && {
     sed -i '/^[[:space:]]*TARGET_CFLAGS += -flto$/c\PKG_BUILD_FLAGS+=no-lto' \
