@@ -11,17 +11,6 @@ CONFIG_DEFAULT_TARGET_OPTIMIZATION="-Os -pipe -march=armv8-a+crypto+crc -mtune=c
 CONFIG_CPU_TYPE="generic+cortex-a73"
 CONFIG_TARGET_OPTIMIZATION="-Os -pipe -march=armv8-a+crypto+crc -mtune=cortex-a73"
 CONFIG_PACKAGE_kmod-mediatek_hnat=y
-
-# --- NPU ---
-CONFIG_PACKAGE_kmod-npu=y
-CONFIG_PACKAGE_npu-rebb-fw=y
-CONFIG_PACKAGE_kmod-npu-flow=y
-CONFIG_PACKAGE_kmod-npu-flow-autoload=y
-CONFIG_PACKAGE_kmod-npu-nf_hnat=y
-CONFIG_PACKAGE_kmod-npu-nf_hnat-autoload=y
-CONFIG_PACKAGE_kmod-npu-mcast=y
-CONFIG_PACKAGE_kmod-npu-mcast-autoload=y
-
 CONFIG_DEVEL=y
 CONFIG_CCACHE=y
 CONFIG_TOOLCHAINOPTS=y
