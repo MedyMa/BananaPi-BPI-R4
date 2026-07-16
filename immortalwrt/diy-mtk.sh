@@ -99,6 +99,12 @@ patch_makefile_dep \
     'PKG_MIRROR_HASH:=7a0154d2de18373e52783d1b64cf5204471049c2d2c64f0b3323d7f430aa4275' \
     'PKG_MIRROR_HASH:=skip'
 
+# adguardhome: skip frontend hash (GitHub release asset hash is volatile)
+patch_makefile_dep \
+    package/community/package/openwrt-packages/adguardhome/Makefile \
+    'FRONTEND_HASH:=084bf3e00ca3e49487fc5a87270b4e1eb26617710ca6116b9e42ce90cb1ad358' \
+    'FRONTEND_HASH:=skip'
+
 # shadowsocksr-libev: replace brittle LTO with no-lto
 [ -f package/community/openwrt-passwall-packages/shadowsocksr-libev/Makefile ] && {
     sed -i '/^[[:space:]]*TARGET_CFLAGS += -flto$/c\PKG_BUILD_FLAGS+=no-lto' \
