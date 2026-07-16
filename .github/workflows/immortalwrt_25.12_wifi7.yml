@@ -54,6 +54,11 @@ jobs:
         cd openwrt
         git log --oneline -1
 
+    - name: Update base feed indexes
+      working-directory: ./openwrt
+      run: |
+        ./scripts/feeds update -a
+        
     - name: Apply custom packages & config
       run: |
         chmod +x immortalwrt/*.sh
