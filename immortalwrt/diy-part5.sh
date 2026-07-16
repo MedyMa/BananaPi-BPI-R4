@@ -4,15 +4,6 @@
 #   (runs AFTER diy-mtk-sdk.sh which sets up MTK SDK patches + feed)
 #
 
-# ── MTK SDK feed guard ────────────────────────────────────────────────
-# Ensure MTK feed is registered (idempotent — diy-mtk-sdk.sh may
-# have already added it; if not, add it now from the cloned SDK dir).
-MTK_SDK_DIR="${MTK_SDK_DIR:-${GITHUB_WORKSPACE}/mtk-openwrt-feeds}"
-if [ -d "$MTK_SDK_DIR/feed/kernel" ] && ! grep -q "mtk_openwrt_feed" feeds.conf.default 2>/dev/null; then
-    echo "src-link mtk_openwrt_feed ${MTK_SDK_DIR}/feed" >> feeds.conf.default
-    echo "[MTK-SDK] Added MTK feed to feeds.conf.default"
-fi
-
 merge_package(){
     repo=`echo $1 | rev | cut -d'/' -f 1 | rev`
     pkg=`echo $2 | rev | cut -d'/' -f 1 | rev`
@@ -55,26 +46,6 @@ apply_workspace_patch() {
     git apply --recount --ignore-space-change --ignore-whitespace "$patch_file"
 }
 
-fix_mtk_flowtable_dependency() {
-    # MTK flowtable feed may depend on kmod-nf-flow-netlink, which is not
-    # present in ImmortalWrt 25.12. Drop the stale dependency in the SDK
-    # source, generated feed metadata (both per-feed indices and per-package
-    # info files), and the installed package copy.
-    for flowtable_mk in \
-        "${MTK_SDK_DIR}/feed/flowtable/Makefile" \
-        "${MTK_SDK_DIR}/feed/kernel/flowtable/Makefile" \
-        feeds/mtk_openwrt_feed/flowtable/Makefile \
-        feeds/mtk_openwrt_feed/kernel/flowtable/Makefile \
-        package/feeds/mtk_openwrt_feed/flowtable/Makefile; do
-        [ -f "$flowtable_mk" ] && sed -i -E 's/[[:space:]]*\+?kmod-nf-flow-netlink//g' "$flowtable_mk"
-    done
-
-    for dep_file in \
-        $(find "${MTK_SDK_DIR}/feed" feeds/mtk_openwrt_feed package/feeds/mtk_openwrt_feed tmp/info \
-            -type f 2>/dev/null | xargs grep -l 'kmod-nf-flow-netlink' 2>/dev/null || true); do
-        sed -i -E 's/[[:space:]]*\+?kmod-nf-flow-netlink//g' "$dep_file"
-    done
-}
 
 # Remove upstream feeds replaced by community clones below
 rm -rf feeds/luci/themes/luci-theme-argon
@@ -150,36 +121,6 @@ rm -rf feeds/packages/net/onionshare-cli
 if grep -q 'mkdir $(PKG_BUILD_DIR)/bin' feeds/packages/net/vpnc/Makefile 2>/dev/null; then
     sed -i '/mkdir $(PKG_BUILD_DIR)\/bin/s/mkdir /mkdir -p /' feeds/packages/net/vpnc/Makefile
 fi
-
-fix_mtk_flowtable_dependency
-./scripts/feeds update mtk_openwrt_feed >/dev/null 2>&1 || true
-fix_mtk_flowtable_dependency
-./scripts/feeds install -a
-
-# ── MTK SDK patches-feeds ─────────────────────────────────────────────
-# patches-feeds 必须在 feeds install 之后应用，因为它修改的是 feed 包
-# （cryptsetup, libaio, lvm2, dm, strongswan）的 Makefile 和配置。
-apply_mtk_patches_feeds() {
-    local mtk_dir="${MTK_SDK_DIR:-${GITHUB_WORKSPACE}/mtk-openwrt-feeds}"
-    local pf_dir="$mtk_dir/25.12/patches-feeds"
-
-    [ -d "$pf_dir" ] || return 0
-    echo "[MTK-SDK] Applying patches-feeds (feed package patches)..."
-    local ok=0 fail=0
-    for pf in $(find "$pf_dir" -name "*.patch" -type f | sort); do
-        local pname; pname=$(basename "$pf")
-        if patch -p1 --force --no-backup-if-mismatch < "$pf" 2>/dev/null; then
-            ok=$((ok + 1))
-        else
-            echo "[MTK-SDK]   WARN: patches-feeds/$pname did not apply cleanly"
-            fail=$((fail + 1))
-        fi
-    done
-    echo "[MTK-SDK] patches-feeds: $ok applied, $fail skipped"
-}
-apply_mtk_patches_feeds
-
-fix_mtk_flowtable_dependency
 
 # Feed deps needed by community clones (pcre2 is in main tree since 25.12)
 ./scripts/feeds install c-ares udns
