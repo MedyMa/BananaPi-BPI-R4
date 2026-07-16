@@ -1,7 +1,8 @@
-# ImmortalWrt mt798x-mt799x-6.6-mtwifi defconfig draft for BananaPi BPI-R4.
-# This keeps the branch's MT7990/Eagle WiFi 7 layout for BPI-R4, then nudges
-# the vendor stack toward NIC-BE14 by selecting the BE14000 custom hwifi blob.
-# The mt_wifi7 profile in this tree still maps Eagle to the BE19000 SKU string.
+# chasey-dev 25.12-dev-wifi7 defconfig for BananaPi BPI-R4
+# Source: chasey-dev/immortalwrt-mt798x-rebase
+# WiFi: mt_wifi7 + mt_hwifi + warp (padavanonly-style vendor drivers)
+# HNAT: kmod-mediatek_hnat (CONFIG_NET_MEDIATEK_HNAT)
+# NPU: kernel-level only (dts/netdevice/PPE patches), no standalone kmod
 
 CONFIG_TARGET_mediatek=y
 CONFIG_TARGET_mediatek_filogic=y
@@ -31,12 +32,13 @@ CONFIG_PACKAGE_ip6tables-nft=y
 CONFIG_PACKAGE_ppp=y
 CONFIG_PACKAGE_ppp-mod-pppoe=y
 
-# --- MTK vendor WiFi7 (mt76-vendor stack) ---
+# --- MTK vendor WiFi7 (mt_wifi7 + mt_hwifi + warp stack) ---
 CONFIG_PACKAGE_kmod-cfg80211=y
 # CONFIG_PACKAGE_kmod-mac80211 is not set
-CONFIG_PACKAGE_mt76-vendor=y
-CONFIG_PACKAGE_kmod-mtk_wed=y
-CONFIG_PACKAGE_mt7988-wo-firmware=y
+CONFIG_PACKAGE_mt_wifi7=y
+CONFIG_PACKAGE_mt_hwifi=y
+CONFIG_PACKAGE_warp=y
+CONFIG_PACKAGE_wifi-profile=y
 # CONFIG_PACKAGE_kmod-mt7996-firmware is not set
 # CONFIG_PACKAGE_kmod-mt7992-firmware is not set
 
@@ -47,14 +49,10 @@ CONFIG_KERNEL_MEDIATEK_NETSYS_V3=y
 # CONFIG_KERNEL_MEDIATEK_NETSYS_V2 is not set
 
 # --- NPU ---
-CONFIG_PACKAGE_kmod-npu=y
-CONFIG_PACKAGE_npu-rebb-fw=y
-CONFIG_PACKAGE_kmod-npu-flow=y
-CONFIG_PACKAGE_kmod-npu-flow-autoload=y
-CONFIG_PACKAGE_kmod-npu-nf_hnat=y
-CONFIG_PACKAGE_kmod-npu-nf_hnat-autoload=y
-CONFIG_PACKAGE_kmod-npu-mcast=y
-CONFIG_PACKAGE_kmod-npu-mcast-autoload=y
+# NPU kernel modules (kmod-npu, kmod-npu-flow, etc.) are NOT in chasey-dev.
+# They only exist in padavanonly's mt798x-mt799x-6.6-mtwifi tree.
+# chasey-dev has NPU support at kernel patch level (dts/netdevice/PPE) only.
+# CONFIG_PACKAGE_kmod-npu is not set
 
 # --- MTK platform / debug tools ---
 CONFIG_PACKAGE_mii_mgr=y
