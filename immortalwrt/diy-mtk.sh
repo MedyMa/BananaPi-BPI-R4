@@ -181,3 +181,18 @@ patch_makefile_dep \
 
 # Modify default IP
 sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generate
+
+# Pin kernel Kconfig symbols to avoid interactive prompts (NEW symbols)
+CFG="target/linux/mediatek/filogic/config-6.12"
+if [ -f "$CFG" ]; then
+    for sym in MEDIATEK_2P5GE_PHY NET_MEDIATEK_HNAT MEDIATEK_NETSYS_V3 NETFILTER; do
+        case "$sym" in
+            MEDIATEK_2P5GE_PHY) val="# CONFIG_${sym} is not set" ;;
+            NET_MEDIATEK_HNAT)   val="CONFIG_${sym}=m" ;;
+            *)                   val="CONFIG_${sym}=y" ;;
+        esac
+        sed -i "/^CONFIG_${sym}=/d; /^# CONFIG_${sym} is not set$/d" "$CFG"
+        echo "$val" >> "$CFG"
+    done
+    echo "[DIY] Kernel Kconfig symbols pinned"
+fi
