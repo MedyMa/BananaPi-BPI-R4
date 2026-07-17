@@ -142,6 +142,13 @@ if [ -f "$HOSTAPD_MLD_PATCH" ] && [ -d "package/network/services/hostapd/patches
     echo "[DIY] hostapd MLD fields patch installed"
 fi
 
+# datconf: disable parallel build (5 sub-packages share one CMake tree, race with -j>1)
+if [ -f "package/mtk/applications/datconf/Makefile" ] && \
+   ! grep -q 'PKG_BUILD_PARALLEL' "package/mtk/applications/datconf/Makefile"; then
+    sed -i '/^PKG_RELEASE:=/a PKG_BUILD_PARALLEL:=0' "package/mtk/applications/datconf/Makefile"
+    echo "[DIY] datconf parallel build disabled"
+fi
+
 # Feed deps needed by community clones (pcre2 is in main tree since 25.12)
 ./scripts/feeds update -a
 ./scripts/feeds install -a
