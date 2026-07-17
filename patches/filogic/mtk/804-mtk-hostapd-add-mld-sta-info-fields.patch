@@ -1,0 +1,49 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: CI Fix <ci@build.local>
+Date: Thu, 17 Jul 2026 00:00:00 +0800
+Subject: [PATCH] hostapd: add missing MLD fields to sta_info.h for 802.11be
+ build
+
+Upstream hostapd commit ca266cc2 ("2025-08-26 snapshot") has
+ieee802_11.c already referencing mld_assoc_link_id and
+mld_info.common_info / mld_info.links[] in sae_accept_sta(),
+but sta_info.h has not yet been updated with those struct members.
+
+Add the minimal required fields inside the existing
+#ifdef CONFIG_IEEE80211BE block so that vendor WiFi7 builds
+(defconfig-vendor-wifi with CONFIG_DRIVER_11BE_SUPPORT=y) can
+compile wpad-full-openssl successfully.
+
+This patch supplements 803-hostapd-fix-80211be-build.patch which
+only fixes ap_sta_is_mld() / ap_sta_set_mld() but does not add
+the struct fields that ieee802_11.c expects.
+
+--- a/src/ap/sta_info.h
++++ b/src/ap/sta_info.h
+@@ -253,6 +253,21 @@ struct mld_info {
+ 	bool mld_sta;
+ 	u8 assoc_link_id;
+ 	u8 *resp_sta_profile;
++
++	/*
++	 * The following sub-structures are referenced by
++	 * ieee802_11.c (sae_accept_sta) and are needed for
++	 * CONFIG_IEEE80211BE=y builds.
++	 */
++	struct {
++		u8 mld_addr[ETH_ALEN];
++	} common_info;
++	struct mld_link_info {
++		u8 peer_addr[ETH_ALEN];
++		u8 *resp_sta_profile;
++	} links[1];
+ };
+ 
+ /**
+@@ -318,6 +333,7 @@ struct sta_info {
+ #ifdef CONFIG_IEEE80211BE
+ 	struct mld_info mld_info;
+ 	u16 mld_tsc_tx[TSC_LEN_NUM];
++	int mld_assoc_link_id;
+ 	u16 mld_tsc_rx[TSC_LEN_NUM];
+ #endif /* CONFIG_IEEE80211BE */
