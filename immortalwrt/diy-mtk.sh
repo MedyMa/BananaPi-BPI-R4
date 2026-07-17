@@ -136,23 +136,10 @@ if grep -q 'mkdir $(PKG_BUILD_DIR)/bin' feeds/packages/net/vpnc/Makefile 2>/dev/
 fi
 
 # hostapd: add missing MLD struct fields for CONFIG_IEEE80211BE=y builds
-HOSTAPD_PATCHES_DIR="package/network/services/hostapd/patches"
-HOSTAPD_OVERLAY_DIR="package/network/services/hostapd/src/src/ap"
 HOSTAPD_MLD_PATCH="$GITHUB_WORKSPACE/patches/filogic/mtk/804-mtk-hostapd-add-mld-sta-info-fields.patch"
-HOSTAPD_FALLBACK_URL="https://raw.githubusercontent.com/MedyMa/BananaPi-BPI-R4/main/files/hostapd/sta_info.h"
-
-if [ -f "$HOSTAPD_MLD_PATCH" ] && [ -d "$HOSTAPD_PATCHES_DIR" ]; then
-    cp "$HOSTAPD_MLD_PATCH" "$HOSTAPD_PATCHES_DIR/"
+if [ -f "$HOSTAPD_MLD_PATCH" ] && [ -d "package/network/services/hostapd/patches" ]; then
+    cp "$HOSTAPD_MLD_PATCH" "package/network/services/hostapd/patches/"
     echo "[DIY] hostapd MLD fields patch installed"
-else
-    echo "[DIY] hostapd MLD patch unavailable, downloading overlay fallback..."
-    mkdir -p "$HOSTAPD_OVERLAY_DIR"
-    if curl -fsSL --retry 3 --connect-timeout 15 "$HOSTAPD_FALLBACK_URL" \
-        -o "$HOSTAPD_OVERLAY_DIR/sta_info.h" 2>/dev/null; then
-        echo "[DIY] hostapd sta_info.h overlay downloaded"
-    else
-        echo "[DIY] WARNING: hostapd MLD fix unavailable - build may fail" >&2
-    fi
 fi
 
 # Feed deps needed by community clones (pcre2 is in main tree since 25.12)
