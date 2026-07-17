@@ -136,10 +136,19 @@ if grep -q 'mkdir $(PKG_BUILD_DIR)/bin' feeds/packages/net/vpnc/Makefile 2>/dev/
 fi
 
 # hostapd: add missing MLD struct fields for CONFIG_IEEE80211BE=y builds
-HOSTAPD_MLD_PATCH="$GITHUB_WORKSPACE/patches/filogic/mtk/804-mtk-hostapd-add-mld-sta-info-fields.patch"
-if [ -f "$HOSTAPD_MLD_PATCH" ] && [ -d "package/network/services/hostapd/patches" ]; then
-    cp "$HOSTAPD_MLD_PATCH" "package/network/services/hostapd/patches/"
-    echo "[DIY] hostapd MLD fields patch installed"
+# Patch approach fails on hunk offset mismatch; use sed injection via Build/Prepare hook
+if [ -f "package/network/services/hostapd/Makefile" ] && \
+   ! grep -q 'mld_assoc_link_id' "package/network/services/hostapd/Makefile"; then
+    cat >> "package/network/services/hostapd/Makefile" << 'HOSTAPD_MLD_FIX'
+
+# +++ DIY: inject missing MLD struct fields after patching
+define Build/Prepare
+	$(call Build/Prepare/Default)
+	$(SED) '/^	bool mld_sta;/a\	struct { u8 mld_addr[ETH_ALEN]; } common_info;\n	struct mld_link_info { u8 peer_addr[ETH_ALEN]; u8 *resp_sta_profile; } links[1];' $(PKG_BUILD_DIR)/src/ap/sta_info.h
+	$(SED) '/^	struct mld_info mld_info;/i\	int mld_assoc_link_id;' $(PKG_BUILD_DIR)/src/ap/sta_info.h
+endef
+HOSTAPD_MLD_FIX
+    echo "[DIY] hostapd MLD sed fix injected into Makefile"
 fi
 
 # datconf: disable parallel build (5 sub-packages share one CMake tree, race with -j>1)
