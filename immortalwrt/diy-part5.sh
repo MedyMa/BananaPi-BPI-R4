@@ -1,7 +1,6 @@
 #!/bin/bash
 #
 # diy-part5.sh — ImmortalWrt 25.12 feeds & community packages
-#   (runs AFTER diy-mtk-sdk.sh which sets up MTK SDK patches + feed)
 #
 
 merge_package(){
@@ -45,7 +44,6 @@ apply_workspace_patch() {
 
     git apply --recount --ignore-space-change --ignore-whitespace "$patch_file"
 }
-
 
 # Remove upstream feeds replaced by community clones below
 rm -rf feeds/luci/themes/luci-theme-argon
@@ -121,6 +119,8 @@ rm -rf feeds/packages/net/onionshare-cli
 if grep -q 'mkdir $(PKG_BUILD_DIR)/bin' feeds/packages/net/vpnc/Makefile 2>/dev/null; then
     sed -i '/mkdir $(PKG_BUILD_DIR)\/bin/s/mkdir /mkdir -p /' feeds/packages/net/vpnc/Makefile
 fi
+
+./scripts/feeds install -a
 
 # Feed deps needed by community clones (pcre2 is in main tree since 25.12)
 ./scripts/feeds install c-ares udns
