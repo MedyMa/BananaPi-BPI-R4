@@ -135,6 +135,26 @@ if grep -q 'mkdir $(PKG_BUILD_DIR)/bin' feeds/packages/net/vpnc/Makefile 2>/dev/
     sed -i '/mkdir $(PKG_BUILD_DIR)\/bin/s/mkdir /mkdir -p /' feeds/packages/net/vpnc/Makefile
 fi
 
+# hostapd: add missing MLD struct fields for CONFIG_IEEE80211BE=y builds
+HOSTAPD_PATCHES_DIR="package/network/services/hostapd/patches"
+HOSTAPD_OVERLAY_DIR="package/network/services/hostapd/src/src/ap"
+HOSTAPD_MLD_PATCH="$GITHUB_WORKSPACE/patches/filogic/mtk/804-mtk-hostapd-add-mld-sta-info-fields.patch"
+HOSTAPD_FALLBACK_URL="https://raw.githubusercontent.com/MedyMa/BananaPi-BPI-R4/main/files/hostapd/sta_info.h"
+
+if [ -f "$HOSTAPD_MLD_PATCH" ] && [ -d "$HOSTAPD_PATCHES_DIR" ]; then
+    cp "$HOSTAPD_MLD_PATCH" "$HOSTAPD_PATCHES_DIR/"
+    echo "[DIY] hostapd MLD fields patch installed"
+else
+    echo "[DIY] hostapd MLD patch unavailable, downloading overlay fallback..."
+    mkdir -p "$HOSTAPD_OVERLAY_DIR"
+    if curl -fsSL --retry 3 --connect-timeout 15 "$HOSTAPD_FALLBACK_URL" \
+        -o "$HOSTAPD_OVERLAY_DIR/sta_info.h" 2>/dev/null; then
+        echo "[DIY] hostapd sta_info.h overlay downloaded"
+    else
+        echo "[DIY] WARNING: hostapd MLD fix unavailable - build may fail" >&2
+    fi
+fi
+
 # Feed deps needed by community clones (pcre2 is in main tree since 25.12)
 ./scripts/feeds update -a
 ./scripts/feeds install -a
@@ -191,6 +211,9 @@ patch_makefile_dep \
     'CONFIG_BOOTDELAY=30' \
     'CONFIG_BOOTDELAY=10'
 
+# Modify default IP
+sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generate
+
 # Pin kernel Kconfig symbols to avoid interactive prompts (NEW symbols)
 CFG="target/linux/mediatek/filogic/config-6.12"
 if [ -f "$CFG" ]; then
@@ -205,6 +228,3 @@ if [ -f "$CFG" ]; then
     done
     echo "[DIY] Kernel Kconfig symbols pinned"
 fi
-
-# Modify default IP
-sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generate
