@@ -150,8 +150,8 @@ define Build/Prepare
 	$(call Build/Prepare/Default)
 	@echo "[DIY Build/Prepare] injecting MLD struct fields into sta_info.h"
 	@if grep -q 'mld_sta' $(PKG_BUILD_DIR)/src/ap/sta_info.h; then \
-		$(SED) '/mld_sta;/a\	int mld_assoc_link_id;\n	struct {\n		struct { u8 mld_addr[ETH_ALEN]; } common_info;\n		struct { u8 peer_addr[ETH_ALEN]; u8 *resp_sta_profile; } links[16];\n	} mld_info;' $(PKG_BUILD_DIR)/src/ap/sta_info.h; \
-		echo "  [DIY] mld_assoc_link_id + mld_info appended after mld_sta"; \
+		$(SED) '/mld_sta;/a\	int mld_assoc_link_id;\n	struct { u8 mld_addr[ETH_ALEN]; } common_info;\n	struct { u8 peer_addr[ETH_ALEN]; u8 *resp_sta_profile; } links[16];' $(PKG_BUILD_DIR)/src/ap/sta_info.h; \
+		echo "  [DIY] mld_assoc_link_id + mld_info members appended after mld_sta"; \
 	else \
 		echo "  [DIY] WARNING: mld_sta not found in sta_info.h"; \
 	fi
