@@ -178,6 +178,9 @@ git clone --depth=1 -b mt798x-mt799x-6.6-mtwifi \
 mv /tmp/padavanonly-wifi-profile/package/mtk/drivers/wifi-profile \
     package/mtk/drivers/wifi-profile
 rm -rf /tmp/padavanonly-wifi-profile
+# Remove legacy wifi_jedi → /sbin/wifi install (conflicts with ImmortalWrt 25.12 wifi-scripts)
+sed -i 's|$(INSTALL_BIN) ./files/common/wifi_jedi $(1)/sbin/wifi|# DIY: removed – conflicts with wifi-scripts|' \
+    package/mtk/drivers/wifi-profile/Makefile
 echo "[DIY] wifi-profile replaced with padavanonly mt7990-only version"
 
 # MTK mt_wifi7: expand Kconfig card names in make, not in the shell
