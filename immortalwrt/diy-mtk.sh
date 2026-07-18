@@ -139,7 +139,9 @@ fi
 patch_makefile_dep \
     package/network/services/hostapd/patches/975-mtk-mlo-pass-pmksa-link-address.patch \
     '@@ -1158,6 +1158,18 @@ static int sae_assign_vlan(struct hostap' \
-    '@@ -1158,6 +1158,21 @@ static int sae_assign_vlan(struct hostap'
+    '@@ -1158,6 +1158,21 @@ static int sae_assign_vlan(struct hostap' \
+    && echo "[DIY] hostapd 975 hunk header: 18 -> 21" \
+    || echo "[DIY] hostapd 975 hunk header: SKIP (already patched or not found)"
 patch_makefile_dep \
     package/network/services/hostapd/patches/975-mtk-mlo-pass-pmksa-link-address.patch \
     '+	bool is_ml = ap_sta_has_ml_rsn(hapd, sta);
@@ -162,7 +164,22 @@ patch_makefile_dep \
 +		pmksa_addr = sta->mld_info.common_info.mld_addr;
 +		pmksa_link_addr = sta->mld_info.links[link_id].peer_addr;
 +	}
-+#endif /* CONFIG_IEEE80211BE */'
++#endif /* CONFIG_IEEE80211BE */' \
+    && echo "[DIY] hostapd 975 guard: #ifdef CONFIG_IEEE80211BE injected" \
+    || echo "[DIY] hostapd 975 guard: SKIP (already patched or not found)"
+
+# MTK Wi-Fi profiles: expand Kconfig card names in make, not in the shell
+for mtk_wifi_mk in \
+    package/mtk/drivers/wifi-profile/Makefile \
+    package/mtk/drivers/mt_wifi7/Makefile; do
+  if [ -f "$mtk_wifi_mk" ] && grep -q 'CONFIG_first_card_name' "$mtk_wifi_mk"; then
+    # $$(CONFIG_*_card_name) reaches the shell as command substitution.
+    # Use make expansion so only the configured chip profile blocks run.
+    sed -i 's/$$(CONFIG_first_card_name)/$(CONFIG_first_card_name)/g; s/$$(CONFIG_second_card_name)/$(CONFIG_second_card_name)/g; s/$$(CONFIG_third_card_name)/$(CONFIG_third_card_name)/g' \
+        "$mtk_wifi_mk"
+    echo "[DIY] $mtk_wifi_mk: CONFIG_*_card_name fixed for make expansion"
+  fi
+done
 
 # datconf: disable parallel build (5 sub-packages share one CMake tree, race with -j>1)
 if [ -f "package/mtk/applications/datconf/Makefile" ] && \
