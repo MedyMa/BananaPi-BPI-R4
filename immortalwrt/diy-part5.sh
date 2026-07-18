@@ -84,6 +84,12 @@ pushd package/OpenClash
 git clone --depth=1 https://github.com/vernesong/OpenClash
 popd
 
+# simple-obfs: skip tarball hash (git archive + submodule produces non-deterministic hash)
+patch_makefile_dep \
+    package/community/helloworld/simple-obfs/Makefile \
+    'PKG_MIRROR_HASH:=7a0154d2de18373e52783d1b64cf5204471049c2d2c64f0b3323d7f430aa4275' \
+    'PKG_MIRROR_HASH:=skip'
+    
 # Fix non-deterministic PKG_MIRROR_HASH in helloworld/shadowsocks-libev
 patch_makefile_dep \
     package/community/helloworld/shadowsocks-libev/Makefile \
