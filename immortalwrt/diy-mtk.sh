@@ -168,18 +168,25 @@ patch_makefile_dep \
     && echo "[DIY] hostapd 975 guard: #ifdef CONFIG_IEEE80211BE injected" \
     || echo "[DIY] hostapd 975 guard: SKIP (already patched or not found)"
 
-# MTK Wi-Fi profiles: expand Kconfig card names in make, not in the shell
-for mtk_wifi_mk in \
-    package/mtk/drivers/wifi-profile/Makefile \
-    package/mtk/drivers/mt_wifi7/Makefile; do
-  if [ -f "$mtk_wifi_mk" ] && grep -q 'CONFIG_first_card_name' "$mtk_wifi_mk"; then
-    # $$(CONFIG_*_card_name) reaches the shell as command substitution.
-    # Use make expansion so only the configured chip profile blocks run.
+# MTK Wi-Fi profiles: replace chasey-dev version with padavanonly's mt7990-only build
+# (chasey-dev version references nonexistent mt7622/mt7615 files and uses broken
+#  shell command-substitution for Kconfig values)
+rm -rf package/mtk/drivers/wifi-profile
+git clone --depth=1 -b mt798x-mt799x-6.6-mtwifi \
+    https://github.com/padavanonly/immortalwrt-mt798x-6.6.git \
+    /tmp/padavanonly-wifi-profile >/dev/null 2>&1
+mv /tmp/padavanonly-wifi-profile/package/mtk/drivers/wifi-profile \
+    package/mtk/drivers/wifi-profile
+rm -rf /tmp/padavanonly-wifi-profile
+echo "[DIY] wifi-profile replaced with padavanonly mt7990-only version"
+
+# MTK mt_wifi7: expand Kconfig card names in make, not in the shell
+if [ -f "package/mtk/drivers/mt_wifi7/Makefile" ] && \
+   grep -q 'CONFIG_first_card_name' "package/mtk/drivers/mt_wifi7/Makefile"; then
     sed -i 's/$$(CONFIG_first_card_name)/$(CONFIG_first_card_name)/g; s/$$(CONFIG_second_card_name)/$(CONFIG_second_card_name)/g; s/$$(CONFIG_third_card_name)/$(CONFIG_third_card_name)/g' \
-        "$mtk_wifi_mk"
-    echo "[DIY] $mtk_wifi_mk: CONFIG_*_card_name fixed for make expansion"
-  fi
-done
+        "package/mtk/drivers/mt_wifi7/Makefile"
+    echo "[DIY] mt_wifi7/Makefile: CONFIG_*_card_name fixed for make expansion"
+fi
 
 # datconf: disable parallel build (5 sub-packages share one CMake tree, race with -j>1)
 if [ -f "package/mtk/applications/datconf/Makefile" ] && \
