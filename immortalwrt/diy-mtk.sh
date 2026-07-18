@@ -137,6 +137,10 @@ fi
 
 # hostapd: add missing MLD struct fields for CONFIG_IEEE80211BE=y builds
 # Patch approach fails on hunk offset mismatch; use sed injection via Build/Prepare hook
+if [ -f "package/network/services/hostapd/Makefile" ]; then
+    sed -i '/^# +++ DIY: inject missing MLD struct fields after patching$/,/^HOSTAPD_MLD_FIX$/d' \
+        "package/network/services/hostapd/Makefile"
+fi
 if [ -f "package/network/services/hostapd/Makefile" ] && \
    ! grep -q 'mld_assoc_link_id' "package/network/services/hostapd/Makefile"; then
     cat >> "package/network/services/hostapd/Makefile" << 'HOSTAPD_MLD_FIX'
@@ -144,8 +148,13 @@ if [ -f "package/network/services/hostapd/Makefile" ] && \
 # +++ DIY: inject missing MLD struct fields after patching
 define Build/Prepare
 	$(call Build/Prepare/Default)
-	$(SED) '/^	bool mld_sta;/a\	struct { u8 mld_addr[ETH_ALEN]; } common_info;\n	struct mld_link_info { u8 peer_addr[ETH_ALEN]; u8 *resp_sta_profile; } links[1];' $(PKG_BUILD_DIR)/src/ap/sta_info.h
-	$(SED) '/^	struct mld_info mld_info;/i\	int mld_assoc_link_id;' $(PKG_BUILD_DIR)/src/ap/sta_info.h
+	@echo "[DIY Build/Prepare] injecting MLD struct fields into sta_info.h"
+	@if grep -q 'mld_sta' $(PKG_BUILD_DIR)/src/ap/sta_info.h; then \
+		$(SED) '/mld_sta;/a\	int mld_assoc_link_id;\n	struct {\n		struct { u8 mld_addr[ETH_ALEN]; } common_info;\n		struct { u8 peer_addr[ETH_ALEN]; u8 *resp_sta_profile; } links[16];\n	} mld_info;' $(PKG_BUILD_DIR)/src/ap/sta_info.h; \
+		echo "  [DIY] mld_assoc_link_id + mld_info appended after mld_sta"; \
+	else \
+		echo "  [DIY] WARNING: mld_sta not found in sta_info.h"; \
+	fi
 endef
 HOSTAPD_MLD_FIX
     echo "[DIY] hostapd MLD sed fix injected into Makefile"
