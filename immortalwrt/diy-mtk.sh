@@ -135,30 +135,34 @@ if grep -q 'mkdir $(PKG_BUILD_DIR)/bin' feeds/packages/net/vpnc/Makefile 2>/dev/
     sed -i '/mkdir $(PKG_BUILD_DIR)\/bin/s/mkdir /mkdir -p /' feeds/packages/net/vpnc/Makefile
 fi
 
-# hostapd: add missing MLD struct fields for CONFIG_IEEE80211BE=y builds
-# Patch approach fails on hunk offset mismatch; use sed injection via Build/Prepare hook
-if [ -f "package/network/services/hostapd/Makefile" ]; then
-    sed -i '/^# +++ DIY: inject missing MLD struct fields after patching$/,/^HOSTAPD_MLD_FIX$/d' \
-        "package/network/services/hostapd/Makefile"
-fi
-if [ -f "package/network/services/hostapd/Makefile" ] && \
-   ! grep -q 'mld_assoc_link_id' "package/network/services/hostapd/Makefile"; then
-    cat >> "package/network/services/hostapd/Makefile" << 'HOSTAPD_MLD_FIX'
+# hostapd: keep MTK private MLO PMKSA patch out of non-BE builds
+patch_makefile_dep \
+    package/network/services/hostapd/patches/975-mtk-mlo-pass-pmksa-link-address.patch \
+    '@@ -1158,6 +1158,18 @@ static int sae_assign_vlan(struct hostap' \
+    '@@ -1158,6 +1158,21 @@ static int sae_assign_vlan(struct hostap'
+patch_makefile_dep \
+    package/network/services/hostapd/patches/975-mtk-mlo-pass-pmksa-link-address.patch \
+    '+	bool is_ml = ap_sta_has_ml_rsn(hapd, sta);
 
-# +++ DIY: inject missing MLD struct fields after patching
-define Build/Prepare
-	$(call Build/Prepare/Default)
-	@echo "[DIY Build/Prepare] injecting MLD struct fields into sta_info.h"
-	@if grep -q 'mld_sta' $(PKG_BUILD_DIR)/src/ap/sta_info.h; then \
-		$(SED) '/mld_sta;/a\	int mld_assoc_link_id;\n	struct { u8 mld_addr[ETH_ALEN]; } common_info;\n	struct { u8 peer_addr[ETH_ALEN]; u8 *resp_sta_profile; } links[16];' $(PKG_BUILD_DIR)/src/ap/sta_info.h; \
-		echo "  [DIY] mld_assoc_link_id + mld_info members appended after mld_sta"; \
-	else \
-		echo "  [DIY] WARNING: mld_sta not found in sta_info.h"; \
-	fi
-endef
-HOSTAPD_MLD_FIX
-    echo "[DIY] hostapd MLD sed fix injected into Makefile"
-fi
+	if (is_ml) {
+		u8 link_id = sta->mld_assoc_link_id;
+
+		/* PMKSA is keyed by MLD address; driver sync also needs link addr. */
+		pmksa_addr = sta->mld_info.common_info.mld_addr;
+		pmksa_link_addr = sta->mld_info.links[link_id].peer_addr;
+	}' \
+    '+	bool is_ml = false;
+
++#ifdef CONFIG_IEEE80211BE
+	is_ml = ap_sta_has_ml_rsn(hapd, sta);
+	if (is_ml) {
+		u8 link_id = sta->mld_assoc_link_id;
+
+		/* PMKSA is keyed by MLD address; driver sync also needs link addr. */
+		pmksa_addr = sta->mld_info.common_info.mld_addr;
+		pmksa_link_addr = sta->mld_info.links[link_id].peer_addr;
+	}
++#endif /* CONFIG_IEEE80211BE */'
 
 # datconf: disable parallel build (5 sub-packages share one CMake tree, race with -j>1)
 if [ -f "package/mtk/applications/datconf/Makefile" ] && \
