@@ -19,7 +19,7 @@ patch_makefile_dep() {
     local perl_status
 
     [ -f "$file_path" ] || return 0
-    grep -qF "$old_text" "$file_path" || return 0
+    grep -qzF "$old_text" "$file_path" || return 0
 
     PATCH_OLD_TEXT="$old_text" PATCH_NEW_TEXT="$new_text" \
         perl -0pi -e 'BEGIN { $old = $ENV{"PATCH_OLD_TEXT"}; $new = $ENV{"PATCH_NEW_TEXT"}; }
@@ -143,25 +143,25 @@ patch_makefile_dep \
 patch_makefile_dep \
     package/network/services/hostapd/patches/975-mtk-mlo-pass-pmksa-link-address.patch \
     '+	bool is_ml = ap_sta_has_ml_rsn(hapd, sta);
-
-	if (is_ml) {
-		u8 link_id = sta->mld_assoc_link_id;
-
-		/* PMKSA is keyed by MLD address; driver sync also needs link addr. */
-		pmksa_addr = sta->mld_info.common_info.mld_addr;
-		pmksa_link_addr = sta->mld_info.links[link_id].peer_addr;
-	}' \
++
++	if (is_ml) {
++		u8 link_id = sta->mld_assoc_link_id;
++
++		/* PMKSA is keyed by MLD address; driver sync also needs link addr. */
++		pmksa_addr = sta->mld_info.common_info.mld_addr;
++		pmksa_link_addr = sta->mld_info.links[link_id].peer_addr;
++	}' \
     '+	bool is_ml = false;
-
++
 +#ifdef CONFIG_IEEE80211BE
-	is_ml = ap_sta_has_ml_rsn(hapd, sta);
-	if (is_ml) {
-		u8 link_id = sta->mld_assoc_link_id;
-
-		/* PMKSA is keyed by MLD address; driver sync also needs link addr. */
-		pmksa_addr = sta->mld_info.common_info.mld_addr;
-		pmksa_link_addr = sta->mld_info.links[link_id].peer_addr;
-	}
++	is_ml = ap_sta_has_ml_rsn(hapd, sta);
++	if (is_ml) {
++		u8 link_id = sta->mld_assoc_link_id;
++
++		/* PMKSA is keyed by MLD address; driver sync also needs link addr. */
++		pmksa_addr = sta->mld_info.common_info.mld_addr;
++		pmksa_link_addr = sta->mld_info.links[link_id].peer_addr;
++	}
 +#endif /* CONFIG_IEEE80211BE */'
 
 # datconf: disable parallel build (5 sub-packages share one CMake tree, race with -j>1)
