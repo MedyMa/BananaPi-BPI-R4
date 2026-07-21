@@ -66,6 +66,27 @@ git clone --depth=1 https://github.com/1522042029/luci-app-socat
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
 merge_package https://github.com/kenzok8/jell jell/adguardhome
+# Fix broken default_username.patch: upstream zh-cn.json was reorganized since
+# the patch was created (hunk context moved from ~L571 to ~L755, indentation
+# changed from 4-space to 2-space). Replace with corrected hunk so the build
+# does not fail at AdGuardHome prepare stage.
+_adguardhome_patch="package/openwrt-packages/adguardhome/patches/default_username.patch"
+if [ -f "$_adguardhome_patch" ]; then
+	cat > "$_adguardhome_patch" << 'AGPATCH'
+--- a/client/src/__locales/zh-cn.json
++++ b/client/src/__locales/zh-cn.json
+@@ -752,7 +752,7 @@
+   "use_private_ptr_resolvers_title": "使用私人反向 DNS 解析器",
+   "use_saved_key": "使用之前保存的密钥",
+   "username_label": "用户名",
+-  "username_placeholder": "输入用户名",
++  "username_placeholder": "默认用户名密码都是root",
+   "validated_with_dnssec": "通过 DNSSEC 验证",
+   "version": "版本",
+   "version_request_error": "检查更新失败。请检查互联网连接。",
+AGPATCH
+	echo "[DIY] adguardhome default_username.patch regenerated for v0.107.78"
+fi
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-fan
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-sfp-status
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-adguardhome
