@@ -391,5 +391,8 @@ sed -i 's/ERROR_MESSAGE,WARNING: Applying padding in/MESSAGE,WARNING: Applying p
 [ -f package/mtk/applications/luci-app-mtwifi-cfg/root/usr/share/luci-app-mtwifi-cfg/wireless-mtk.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/mtwifi-6.6/1005-mtwifi-6.6-luci-wireless-mtk-station-and-rate-fixes.patch"
 
+[ -f package/mtk/applications/luci-app-mtwifi-cfg/root/usr/share/luci-app-mtwifi-cfg/wireless-mtk.js ] && \
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/mtwifi-6.6/1005-signal-fix.patch"
+
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/mtwifi-6.6/1002-mtwifi-6.6-luci-status-overview-rate-mhz-hi.patch"
