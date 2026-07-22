@@ -1,0 +1,55 @@
+From: MedyMa <aneylovemzy@gmail.com>
+Date: Tue, 22 Jul 2026 00:00:00 +0800
+Subject: [PATCH] mtk_hnat: fix CPU-to-WiFi TCP retransmissions caused by GSO
+
+The MTK HNAT do_hnat_cpu_to_ge() pushes CPU-generated GSO frames directly
+to WiFi via WED/PPE, but the WiFi MAC cannot handle oversized frames,
+causing TCP retransmissions.
+
+Fix by calling skb_gso_segment() before the WED enqueue, then recursively
+enqueuing each wire-sized segment through the same function.
+
+Signed-off-by: MedyMa <aneylovemzy@gmail.com>
+---
+ drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c | 24 ++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+
+--- a/drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c
++++ b/drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c
+@@ -23,6 +23,7 @@
+ #include <net/ip.h>
+ #include <net/tcp.h>
+ #include <net/udp.h>
++#include <net/gso.h>
+ #include <net/netfilter/nf_conntrack.h>
+ #include <net/netfilter/nf_conntrack_acct.h>
+
+ @@ -955,7 +958,30 @@ static unsigned int is_ppe_support_type(struct sk_buff *skb)
+ static unsigned int do_hnat_cpu_to_ge(struct sk_buff *skb)
+ {
+ 	if (unlikely(skb_shinfo(skb)->frag_list))
+                 return -1;
++	if (skb_is_gso(skb)) {
++		netdev_features_t features;
++	struct sk_buff *segs, *nskb, *seg;
++
++		if (unlikely(!hnat_priv->g_ppdev) ||
++	    unlikely(!(hnat_priv->g_ppdev->flags & IFF_UP))) {
++		dev_kfree_skb_any(skb);
++		return 0;
++	}
++		features = hnat_priv->g_ppdev->features & ~NETIF_F_GSO_MASK;
++		segs = skb_gso_segment(skb, features);
++		if (IS_ERR(segs))
++			return -1;
++		consume_skb(skb);
++	skb_list_walk_safe(segs, seg, nskb) {
++		skb_mark_not_on_list(seg);
++		if (do_hnat_cpu_to_ge(seg))
++			dev_kfree_skb_any(seg);
++		}
++		return 0;
++	}
+         if (unlikely(skb_headroom(skb) < (FOE_INFO_LEN + ETH_HLEN))) {
+                 if(unlikely(skb_cow(skb, FOE_INFO_LEN + ETH_HLEN)))
+                 return -1;
