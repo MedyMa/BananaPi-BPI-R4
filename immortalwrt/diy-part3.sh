@@ -172,7 +172,7 @@ git clone --depth=1 -b main https://github.com/Openwrt-Passwall/openwrt-passwall
 git clone --depth=1 https://github.com/nikkinikki-org/OpenWrt-nikki
 [ -f OpenWrt-nikki/nikki/Makefile ] && perl -0pi -e 's/define Build\/Compile\r?\n\r?\nendef/define Build\/Compile\n\nendef\n\ndefine Build\/InstallDev\n\nendef/' OpenWrt-nikki/nikki/Makefile
 git clone --depth=1 https://github.com/1522042029/luci-app-socat
-# git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
+git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
 merge_package https://github.com/kenzok8/jell jell/adguardhome
 merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnsto-openwrt-package/ddnsto
@@ -182,7 +182,7 @@ merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-adgu
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-modemband
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-sfp-status
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-turboacc-mtk
-merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-theme-argon
+# merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-theme-argon
 popd
 
 # add luci-app-mosdns
