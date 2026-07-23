@@ -1,0 +1,50 @@
+From: MedyMa <aneylovemzy@gmail.com>
+Date: Thu, 23 Jul 2026 00:00:00 +0800
+Subject: [PATCH 6.6] net: sfp: force module re-init on warm reboot via TX_DISABLE
+
+On warm reboot the kernel restarts but SFP modules stay powered.
+Their internal state machine may be stuck (especially I2C interface or
+PHY negotiation state), and the module never responds to the standard
+probe sequence.  The BPI-R4 I2C mux idle-disconnect handles the bus
+side, but the module itself needs a clean reset.
+
+Detect warm reboot by checking mod-def0 during sfp_probe(): if a module
+is already physically present at probe time (mod-def0 active), we are
+in a warm-boot scenario.  Briefly assert TX_DISABLE (100 ms) to force
+the module through a complete hardware reset, then wait 100 ms for the
+module to stabilise before proceeding with normal probing.
+
+Cold boot is unaffected because during a genuine power-cycle the module
+takes several hundred milliseconds to become ready, and mod-def0 will
+not yet be asserted by the time sfp_probe() runs.
+
+Signed-off-by: MedyMa <aneylovemzy@gmail.com>
+---
+ drivers/net/phy/sfp.c | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+--- a/drivers/net/phy/sfp.c
++++ b/drivers/net/phy/sfp.c
+@@ -3046,6 +3046,22 @@ static int sfp_probe(struct platform_device *pdev)
+ 		sfp->gpio_irq[i] = gpiod_to_irq(sfp->gpio[i]);
+ 	}
+ 
++	/* Warm boot: pulse TX_DISABLE to reset a module that stayed
++	 * powered across reboot, as its I2C state machine may be stuck.
++	 * GPIO0=mod-def0, GPIO3=tx-disable.
++	 */
++	if (sfp->gpio[0] && !IS_ERR(sfp->gpio[0]) &&
++	    gpiod_get_value_cansleep(sfp->gpio[0])) {
++		if (sfp->gpio[3] && !IS_ERR(sfp->gpio[3])) {
++			dev_dbg(&pdev->dev,
++				"warm boot: resetting module via TX_DISABLE\n");
++			gpiod_set_value_cansleep(sfp->gpio[3], 1);
++			msleep(100);
++			gpiod_set_value_cansleep(sfp->gpio[3], 0);
++			msleep(100);
++		}
++	}
++
+ 	/* There is no use for SFPs with no i2c bus */
+ 	if (!sfp->i2c)
+ 		return 0;
