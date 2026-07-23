@@ -36,7 +36,7 @@ Signed-off-by: Petr Wozniak <petr.wozniak@gmail.com>
 ---
  drivers/net/mdio/mdio-i2c.c | 48 ++++++++++++++++++++++++++++++++++++--------
  drivers/net/phy/sfp.c       |  1 +
- 2 files changed, 41 insertions(+), 8 deletions(-)
+ 2 files changed, 53 insertions(+), 7 deletions(-)
 
 --- a/drivers/net/mdio/mdio-i2c.c
 +++ b/drivers/net/mdio/mdio-i2c.c

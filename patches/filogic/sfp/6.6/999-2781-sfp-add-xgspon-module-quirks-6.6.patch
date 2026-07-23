@@ -21,7 +21,7 @@ Signed-off-by: Petr Wozniak <petr.wozniak@gmail.com>
 
 --- a/drivers/net/phy/sfp.c
 +++ b/drivers/net/phy/sfp.c
-@@ -524,2 +524,10 @@
+@@ -524,3 +524,11 @@
 +	/* Zaram ZXOS11NPI XGS-PON module (SFP+) */
 +	SFP_QUIRK_F("Zaram", "ZXOS11NPI", sfp_fixup_ignore_tx_fault),
 +	/* HSGQ NU-STICK1.0 XGS-PON module (SFP+) */

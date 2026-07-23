@@ -47,7 +47,7 @@ from "ret == -ENODEV" to "ret == -ENODEV || ret == -EINVAL").
 Signed-off-by: Petr Wozniak <petr.wozniak@gmail.com>
 ---
  drivers/net/phy/sfp.c | 67 +++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 72 insertions(+), 2 deletions(-)
+ 1 file changed, 69 insertions(+), 2 deletions(-)
 
 --- a/drivers/net/phy/sfp.c
 +++ b/drivers/net/phy/sfp.c
