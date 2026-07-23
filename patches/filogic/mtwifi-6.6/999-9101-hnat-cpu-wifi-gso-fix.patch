@@ -11,8 +11,8 @@ enqueuing each wire-sized segment through the same function.
 
 Signed-off-by: MedyMa <aneylovemzy@gmail.com>
 ---
- drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c | 24 ++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
 --- a/drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c
 +++ b/drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c
@@ -34,10 +34,8 @@ Signed-off-by: MedyMa <aneylovemzy@gmail.com>
 +	struct sk_buff *segs, *nskb, *seg;
 +
 +		if (unlikely(!hnat_priv->g_ppdev) ||
-+	    unlikely(!(hnat_priv->g_ppdev->flags & IFF_UP))) {
-+		dev_kfree_skb_any(skb);
-+		return 0;
-+	}
++		    unlikely(!(hnat_priv->g_ppdev->flags & IFF_UP)))
++			return -1;
 +		features = hnat_priv->g_ppdev->features & ~NETIF_F_GSO_MASK;
 +		segs = skb_gso_segment(skb, features);
 +		if (IS_ERR_OR_NULL(segs))
