@@ -40,7 +40,7 @@ Signed-off-by: MedyMa <aneylovemzy@gmail.com>
 +	}
 +		features = hnat_priv->g_ppdev->features & ~NETIF_F_GSO_MASK;
 +		segs = skb_gso_segment(skb, features);
-+		if (IS_ERR(segs))
++		if (IS_ERR_OR_NULL(segs))
 +			return -1;
 +		consume_skb(skb);
 +	skb_list_walk_safe(segs, seg, nskb) {
