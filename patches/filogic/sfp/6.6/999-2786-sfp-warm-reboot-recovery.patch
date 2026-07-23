@@ -25,8 +25,8 @@ Signed-off-by: MedyMa <aneylovemzy@gmail.com>
 
 --- a/drivers/net/phy/sfp.c
 +++ b/drivers/net/phy/sfp.c
-@@ -3046,6 +3046,22 @@ static int sfp_probe(struct platform_device *pdev)
- 		sfp->gpio_irq[i] = gpiod_to_irq(sfp->gpio[i]);
+@@ -3065,4 +3065,20 @@ static int sfp_probe(struct platform_device *pdev)
+ 		}
  	}
  
 +	/* Warm boot: pulse TX_DISABLE to reset a module that stayed
@@ -45,6 +45,4 @@ Signed-off-by: MedyMa <aneylovemzy@gmail.com>
 +		}
 +	}
 +
- 	/* There is no use for SFPs with no i2c bus */
- 	if (!sfp->i2c)
- 		return 0;
+ 	if (sfp->need_poll)
