@@ -31,8 +31,8 @@ GPIO-level state_ignore_mask + software-level tx_fault_ignore filter.
 
 Signed-off-by: MedyMa <aneylovemzy@gmail.com>
 ---
- drivers/net/phy/sfp.c | 93 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 93 insertions(+)
+ drivers/net/phy/sfp.c | 91 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 91 insertions(+), 8 deletions(-)
 
 --- a/drivers/net/phy/sfp.c
 +++ b/drivers/net/phy/sfp.c
@@ -44,7 +44,7 @@ Signed-off-by: MedyMa <aneylovemzy@gmail.com>
  	unsigned int state;
  
  	struct delayed_work poll;
-@@ -392,8 +392,36 @@ static void sfp_fixup_long_startup(struc
+@@ -392,10 +392,36 @@ static void sfp_fixup_long_startup(struc
  	sfp->module_t_start_up = T_START_UP_BAD_GPON;
  }
  
@@ -59,9 +59,9 @@ Signed-off-by: MedyMa <aneylovemzy@gmail.com>
 +
  static void sfp_fixup_ignore_tx_fault(struct sfp *sfp)
  {
-+	sfp->tx_fault_ignore = true;
+ 	sfp->tx_fault_ignore = true;
 +	sfp->state_ignore_mask |= SFP_F_TX_FAULT;
-+}
+ }
 +
 +static void sfp_fixup_ignore_tx_fault_and_los(struct sfp *sfp)
 +{
