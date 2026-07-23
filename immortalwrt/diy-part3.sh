@@ -87,6 +87,7 @@ install_sfp_warm_reboot_patches() {
         999-2782-sfp-rtl8261be-rollball-probe-fix-6.6.patch \
         999-2783-sfp-rtl8261be-1g-reprobe-watchdog-6.6.patch \
         999-2784-pcs-mtk-lynxi-hold-link-down-invalid-speed-6.6.patch \
+        999-2785-sfp-backport-upstream.patch \
         999-2786-sfp-warm-reboot-recovery.patch
     do
         install_kernel_patch "$patch_root/$patch_name" "$patch_name"
