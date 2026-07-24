@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 env:
-  REPO_URL: https://github.com/padavanonly/immortalwrt-mt798x-6.6
+  REPO_URL: https://github.com/MedyMa/immortalwrt-mt798x-6.6
   REPO_BRANCH: mt798x-mt799x-6.6-mtwifi
   CONFIG_FILE: immortalwrt/MT7988/defconfig
   DIY_P1_SH: immortalwrt/diy-part3.sh
