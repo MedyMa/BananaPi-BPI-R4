@@ -1,47 +1,19 @@
 From: MedyMa <aneylovemzy@gmail.com>
 Date: Thu, 24 Jul 2026 00:00:00 +0800
-Subject: [PATCH] mtk_hnat: fix CPU-to-WiFi TCP retransmissions (GSO + flow control)
+Subject: [PATCH] mtk_hnat: fix CPU-to-WiFi TCP retransmissions caused by GSO
 
-Two fixes for the CPU-to-WiFi HNAT path (do_hnat_cpu_to_ge), which
-redirects locally generated traffic destined for WiFi ("ra*")
-interfaces through eth0 → QDMA → PPE → WDMA → WED BM → WiFi FW.
+The MTK HNAT do_hnat_cpu_to_ge() pushes CPU-generated GSO frames directly
+to WiFi via WED/PPE, but the WiFi MAC cannot handle oversized frames,
+causing TCP retransmissions.
 
-Fix 1 — GSO segmentation (original 9101):
-  CPU-generated TCP segments may be GSO frames (up to 64KB).  The
-  WiFi MAC cannot handle oversized frames, causing silent drops and
-  TCP retransmissions.  Fix by calling skb_gso_segment() before the
-  WED enqueue, then recursively enqueuing each wire-sized segment.
+Fix by calling skb_gso_segment() before the WED enqueue, then recursively
+enqueuing each wire-sized segment through the same function.
 
-Fix 2 — In-flight flow control (original 9102):
-  The PPE/WED path bypasses the WiFi netdev's qdisc and mt_wifi flow
-  control (netif_stop_queue/wake_queue).  Without backpressure, the
-  WiFi firmware can be overwhelmed even with GSO fixed.  Add a
-  lightweight in-flight packet limiter (atomic counter, limit 64).
-  When exceeded, do_hnat_cpu_to_ge returns -1, falling back to the
-  normal bridge ndo_start_xmit path with proper flow control.  An
-  skb destructor decrements the counter on TX completion.
-
-Fixes: 20ec79e ("hnat: support cpu->wifi forwarded by ppe")
 Signed-off-by: MedyMa <aneylovemzy@gmail.com>
 ---
- .../mediatek/mtk_hnat/hnat.h
- .../mediatek/mtk_hnat/hnat_nf_hook.c | 41 +++++++++++++++++++++++++++
- 2 files changed, 41 insertions(+)
+ drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/drivers/net/ethernet/mediatek/mtk_hnat/hnat.h b/drivers/net/ethernet/mediatek/mtk_hnat/hnat.h
-index 2e8441dba1..a7b5fb1d82 100644
---- a/drivers/net/ethernet/mediatek/mtk_hnat/hnat.h
-+++ b/drivers/net/ethernet/mediatek/mtk_hnat/hnat.h
-@@ -961,6 +961,7 @@ struct mtk_hnat {
- 	u32 foe_etry_num;
- 	u32 etry_num_cfg;
- 	struct net_device *g_ppdev;
-+	atomic_t cpu_wifi_inflight;
- 	struct net_device *g_wandev;
- 	struct net_device *wifi_hook_if[MAX_IF_NUM];
- 	struct extdev_entry *ext_if[MAX_EXT_DEVS];
-diff --git a/drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c b/drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c
-index 70296d5a5b..0aa23f8203 100644
 --- a/drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c
 +++ b/drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c
 @@ -23,6 +23,7 @@
@@ -51,18 +23,8 @@ index 70296d5a5b..0aa23f8203 100644
 +#include <net/gso.h>
  #include <net/netfilter/nf_conntrack.h>
  #include <net/netfilter/nf_conntrack_acct.h>
- 
-@@ -952,10 +953,36 @@ static unsigned int is_ppe_support_type(struct sk_buff *skb)
- 	return 0;
- }
- 
-+#define HNAT_CPU_WIFI_MAX_INFLIGHT 16
-+
-+static void hnat_cpu_wifi_skb_destructor(struct sk_buff *skb)
-+{
-+	atomic_dec(&hnat_priv->cpu_wifi_inflight);
-+}
-+
+
+@@ -955,7 +956,28 @@ static unsigned int is_ppe_support_type(struct sk_buff *skb)
  static unsigned int do_hnat_cpu_to_ge(struct sk_buff *skb)
  {
  	if (unlikely(skb_shinfo(skb)->frag_list))
@@ -89,23 +51,3 @@ index 70296d5a5b..0aa23f8203 100644
          if (unlikely(skb_headroom(skb) < (FOE_INFO_LEN + ETH_HLEN))) {
                  if(unlikely(skb_cow(skb, FOE_INFO_LEN + ETH_HLEN)))
                  return -1;
-@@ -969,6 +996,19 @@ static unsigned int do_hnat_cpu_to_ge(struct sk_buff *skb)
-                 skb_hnat_alg(skb) = 1;
-                 return -1;
-         }
-+	/* Flow control: limit in-flight CPU-to-WiFi packets to prevent
-+	 * overwhelming the WiFi firmware.  When the limit is exceeded,
-+	 * return -1 so the caller falls back to the normal bridge
-+	 * ndo_start_xmit path with proper qdisc/netif_stop_queue
-+	 * backpressure.
-+	 */
-+	if (atomic_read(&hnat_priv->cpu_wifi_inflight) >= HNAT_CPU_WIFI_MAX_INFLIGHT)
-+		return -1;
-+
-+	atomic_inc(&hnat_priv->cpu_wifi_inflight);
-+	skb_orphan(skb);
-+	skb->destructor = hnat_cpu_wifi_skb_destructor;
-+
-         if (hnat_priv->g_ppdev && hnat_priv->g_ppdev->flags & IFF_UP) {
-                 u16 vlan_id = 0;
-                 skb_set_network_header(skb, 0);
