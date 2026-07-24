@@ -386,13 +386,6 @@ sed -i 's/ERROR_MESSAGE,WARNING: Applying padding in/MESSAGE,WARNING: Applying p
 [ -f feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/mtwifi-6.6/999-mtwifi-6.6-luci-wireless-mtk-mode-matrix.patch"
 
-[ -d package/system/rpcd ] && {
-    mkdir -p package/system/rpcd/patches
-    install -m 0644 \
-        "$GITHUB_WORKSPACE/patches/filogic/mtwifi-6.6/997-mtwifi-6.6-rpcd-iwinfo-export-mhz-hi.patch" \
-        package/system/rpcd/patches/997-iwinfo-export-eht-dcm.patch
-}
-
 [ -f package/network/utils/iwinfo/src/iwinfo_mtk.c ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/mtwifi-6.6/998-mtwifi-6.6-iwinfo-mtk-fix-6ghz-reporting.patch"
 
