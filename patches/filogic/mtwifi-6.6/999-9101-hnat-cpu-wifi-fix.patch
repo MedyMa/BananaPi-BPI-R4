@@ -56,7 +56,7 @@ index 70296d5a5b..0aa23f8203 100644
  	return 0;
  }
  
-+#define HNAT_CPU_WIFI_MAX_INFLIGHT 64
++#define HNAT_CPU_WIFI_MAX_INFLIGHT 16
 +
 +static void hnat_cpu_wifi_skb_destructor(struct sk_buff *skb)
 +{
