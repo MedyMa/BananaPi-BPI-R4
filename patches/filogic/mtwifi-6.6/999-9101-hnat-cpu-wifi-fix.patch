@@ -1,0 +1,14 @@
+--- a/drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c
++++ b/drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c
+@@ -955,7 +955,11 @@ static unsigned int is_ppe_support_type(struct sk_buff *skb)
+ static unsigned int do_hnat_cpu_to_ge(struct sk_buff *skb)
+ {
++	/* CPU-to-WiFi HNAT bypasses WiFi driver flow control,
++	 * causing silent drops and TCP retransmissions.
++	 * Route all CPU-local-to-WiFi traffic via the normal stack. */
++	return -1;
+ 	if (unlikely(skb_shinfo(skb)->frag_list))
+                 return -1;
+         if (unlikely(skb_headroom(skb) < (FOE_INFO_LEN + ETH_HLEN))) {
+                 if(unlikely(skb_cow(skb, FOE_INFO_LEN + ETH_HLEN)))
+                 return -1;
