@@ -42,14 +42,14 @@ Signed-off-by: BPI-R4 HNAT Fix
 --- a/drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c
 +++ b/drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c
 @@ -26,6 +26,7 @@
- #include <net/udp.h>
  #include <net/netfilter/nf_conntrack.h>
  #include <net/netfilter/nf_conntrack_acct.h>
+ #include <linux/stddef.h>
 +#include <net/gso.h>
  
  #include "nf_hnat_mtk.h"
  #include "hnat.h"
-@@ -952,42 +953,107 @@
+@@ -953,42 +954,107 @@
  	return 0;
  }
  
