@@ -1,39 +1,3 @@
-From: MedyMa <aneylovemzy@gmail.com>
-Date: Thu, 23 Jul 2026 00:00:00 +0800
-Subject: [PATCH 6.6] net: sfp: backport upstream quirks, fixup helpers,
- and state_ignore_mask (safe: retain tx_fault_ignore fallback)
-
-Backport selected upstream sfp.c improvements with defence in depth:
-GPIO-level state_ignore_mask + software-level tx_fault_ignore filter.
-
-- Add state_ignore_mask field alongside existing tx_fault_ignore.
-  sfp_fixup_ignore_tx_fault() sets BOTH mechanisms.
-
-- Add new fixup helpers: sfp_fixup_ignore_los(),
-  sfp_fixup_ignore_tx_fault_and_los(), sfp_fixup_ignore_hw(),
-  sfp_fixup_nokia(), sfp_fixup_potron().
-
-- Add upstream quirk entries for BIDB, FLYPRO, H-COM, YV, Turris,
-  Lantech 8330-265D, Hisense-Leox, Hisense ZNID-GPON, HSGQ XPON.
-  Update Huawei MA5671A (add LOS ignore), ALCATELLUCENT (nokia fixup),
-  Ubiquiti UF-Instant (add Autoneg/Pause).
-
-- Log broken RTL8672/RTL9601C emulated EEPROM detection.
-
-- Apply state_hw_mask &= ~state_ignore_mask after quirk fixup
-  (GPIO-level masking), exclude state_ignore_mask from soft polling.
-
-- Add MODULE_DESCRIPTION.
-
-- DELIBERATELY OMITTED: sfp_sm_main and sfp_check_state changes
-  that remove tx_fault_ignore software filtering.  The old
-  tx_fault_ignore guards remain as a safety net for GPON modules.
-
-Signed-off-by: MedyMa <aneylovemzy@gmail.com>
----
- drivers/net/phy/sfp.c | 92 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 92 insertions(+), 8 deletions(-)
-
 --- a/drivers/net/phy/sfp.c
 +++ b/drivers/net/phy/sfp.c
 @@ -270,6 +270,7 @@ struct sfp {
@@ -44,7 +8,7 @@ Signed-off-by: MedyMa <aneylovemzy@gmail.com>
  	unsigned int state;
  
  	struct delayed_work poll;
-@@ -392,9 +392,36 @@ static void sfp_fixup_long_startup(struc
+@@ -392,9 +392,35 @@ static void sfp_fixup_long_startup(struc
  	sfp->module_t_start_up = T_START_UP_BAD_GPON;
  }
  
@@ -59,7 +23,7 @@ Signed-off-by: MedyMa <aneylovemzy@gmail.com>
 +
  static void sfp_fixup_ignore_tx_fault(struct sfp *sfp)
  {
- 	sfp->tx_fault_ignore = true;
+-	sfp->tx_fault_ignore = true;
 +	sfp->state_ignore_mask |= SFP_F_TX_FAULT;
  }
 +
@@ -218,11 +182,11 @@ Signed-off-by: MedyMa <aneylovemzy@gmail.com>
  		sfp->i2c_block_size = 1;
  
  		ret = sfp_read(sfp, false, 0, &id.base, sizeof(id.base));
-@@ -2471,7 +2548,8 @@ static int sfp_sm_mod_probe(struct sfp *
+@@ -2471,7 +2548,7 @@ static int sfp_sm_mod_probe(struct sfp *
  	sfp->module_t_wait = T_WAIT;
  	sfp->phy_t_retry = T_PHY_RETRY;
  
- 	sfp->tx_fault_ignore = false;
+-	sfp->tx_fault_ignore = false;
 +	sfp->state_ignore_mask = 0;
  
  	if (sfp->id.base.extended_cc == SFF8024_ECC_10GBASE_T_SFI ||
