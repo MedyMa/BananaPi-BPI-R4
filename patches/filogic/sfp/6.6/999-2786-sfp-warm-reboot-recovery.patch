@@ -1,48 +1,60 @@
 From: MedyMa <aneylovemzy@gmail.com>
 Date: Thu, 23 Jul 2026 00:00:00 +0800
-Subject: [PATCH 6.6] net: sfp: force module re-init on warm reboot via TX_DISABLE
+Subject: [PATCH 6.6 v2] net: sfp: warm-reboot recovery via TX_DISABLE + I2C recovery
 
-On warm reboot the kernel restarts but SFP modules stay powered.
-Their internal state machine may be stuck (especially I2C interface or
-PHY negotiation state), and the module never responds to the standard
-probe sequence.  The BPI-R4 I2C mux idle-disconnect handles the bus
-side, but the module itself needs a clean reset.
+On warm reboot SFP modules stay powered while the kernel restarts,
+potentially leaving the I2C state machine stuck.  Detect this by
+checking mod-def0 at sfp_probe() time — if already asserted, the
+module survived a warm reboot.
 
-Detect warm reboot by checking mod-def0 during sfp_probe(): if a module
-is already physically present at probe time (mod-def0 active), we are
-in a warm-boot scenario.  Briefly assert TX_DISABLE (100 ms) to force
-the module through a complete hardware reset, then wait 100 ms for the
-module to stabilise before proceeding with normal probing.
+  - Pulse TX_DISABLE 300 ms + settle 500 ms, retry up to 3×.
+  - Recover I2C bus via i2c_recover_bus().
 
-Cold boot is unaffected because during a genuine power-cycle the module
-takes several hundred milliseconds to become ready, and mod-def0 will
-not yet be asserted by the time sfp_probe() runs.
+Cold boot is unaffected: mod-def0 is not yet asserted when
+sfp_probe() runs.
+
+v2: 300 ms pulse, 500 ms settle, 3 retries, I2C recovery.
 
 Signed-off-by: MedyMa <aneylovemzy@gmail.com>
 ---
- drivers/net/phy/sfp.c | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ drivers/net/phy/sfp.c | 31 ++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
 
 --- a/drivers/net/phy/sfp.c
 +++ b/drivers/net/phy/sfp.c
-@@ -3065,4 +3065,20 @@ static int sfp_probe(struct platform_device *pdev)
+@@ -3348,4 +3348,35 @@ static int sfp_probe(struct platform_device *pdev)
  		}
  	}
  
-+	/* Warm boot: pulse TX_DISABLE to reset a module that stayed
-+	 * powered across reboot, as its I2C state machine may be stuck.
-+	 * GPIO0=mod-def0, GPIO3=tx-disable.
++	/* Warm-boot recovery: module stayed powered → I2C/PHY may be stuck.
++	 * mod-def0 already asserted → pulse TX_DISABLE 300ms, wait 500ms,
++	 * retry 3×, then recover I2C bus.  Cold boot: mod-def0 not yet ready.
 +	 */
 +	if (sfp->gpio[0] && !IS_ERR(sfp->gpio[0]) &&
 +	    gpiod_get_value_cansleep(sfp->gpio[0])) {
++		int retry;
++
 +		if (sfp->gpio[3] && !IS_ERR(sfp->gpio[3])) {
-+			dev_dbg(&pdev->dev,
-+				"warm boot: resetting module via TX_DISABLE\n");
-+			gpiod_set_value_cansleep(sfp->gpio[3], 1);
-+			msleep(100);
-+			gpiod_set_value_cansleep(sfp->gpio[3], 0);
-+			msleep(100);
++			for (retry = 0; retry < 3; retry++) {
++				dev_info(&pdev->dev,
++					 "warm boot: TX_DISABLE pulse %d/3\n",
++					 retry + 1);
++				gpiod_set_value_cansleep(sfp->gpio[3], 1);
++				msleep(300);
++				gpiod_set_value_cansleep(sfp->gpio[3], 0);
++				msleep(500);
++
++				if (gpiod_get_value_cansleep(sfp->gpio[0]))
++					break;
++			}
 +		}
++
++		if (sfp->i2c)
++			i2c_recover_bus(sfp->i2c);
++
++		if (!gpiod_get_value_cansleep(sfp->gpio[0]))
++			dev_warn(&pdev->dev,
++				 "warm boot: module not responding after reset\n");
 +	}
 +
  	if (sfp->need_poll)
