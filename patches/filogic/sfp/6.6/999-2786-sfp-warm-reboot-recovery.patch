@@ -1,50 +1,46 @@
 From: MedyMa <aneylovemzy@gmail.com>
 Date: Thu, 23 Jul 2026 00:00:00 +0800
-Subject: [PATCH 6.6 v2] net: sfp: warm-reboot recovery via TX_DISABLE + I2C recovery
+Subject: [PATCH 6.6 v3] net: sfp: warm-reboot recovery via TX_DISABLE + I2C recovery
 
-On warm reboot SFP modules stay powered while the kernel restarts,
-potentially leaving the I2C state machine stuck.  Detect this by
-checking mod-def0 at sfp_probe() time — if already asserted, the
-module survived a warm reboot.
+On warm reboot SFP modules stay powered, potentially leaving the
+I2C state machine stuck.  Pulse TX_DISABLE 300 ms + settle 500 ms,
+retry 3×, then recover I2C bus.  Also triggers on cold boot with
+module inserted — the recovery is a no-op on a clean bus.
 
-  - Pulse TX_DISABLE 300 ms + settle 500 ms, retry up to 3×.
-  - Recover I2C bus via i2c_recover_bus().
-
-Cold boot is unaffected: mod-def0 is not yet asserted when
-sfp_probe() runs.
-
+v3: GPIO_MODDEF0 / GPIO_TX_DISABLE enum constants, dev_warn→dev_err.
 v2: 300 ms pulse, 500 ms settle, 3 retries, I2C recovery.
 
 Signed-off-by: MedyMa <aneylovemzy@gmail.com>
 ---
- drivers/net/phy/sfp.c | 31 ++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ drivers/net/phy/sfp.c | 32 +++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
 --- a/drivers/net/phy/sfp.c
 +++ b/drivers/net/phy/sfp.c
-@@ -3348,4 +3348,35 @@ static int sfp_probe(struct platform_device *pdev)
+@@ -3348,4 +3348,36 @@ static int sfp_probe(struct platform_device *pdev)
  		}
  	}
  
-+	/* Warm-boot recovery: module stayed powered → I2C/PHY may be stuck.
-+	 * mod-def0 already asserted → pulse TX_DISABLE 300ms, wait 500ms,
-+	 * retry 3×, then recover I2C bus.  Cold boot: mod-def0 not yet ready.
++	/* Warm-boot recovery: pulse TX_DISABLE + I2C recovery to reset
++	 * a potentially stuck I2C state machine.  Also triggers on cold
++	 * boot with module inserted (harmless no-op on clean bus).
 +	 */
-+	if (sfp->gpio[0] && !IS_ERR(sfp->gpio[0]) &&
-+	    gpiod_get_value_cansleep(sfp->gpio[0])) {
++	if (sfp->gpio[GPIO_MODDEF0] && !IS_ERR(sfp->gpio[GPIO_MODDEF0]) &&
++	    gpiod_get_value_cansleep(sfp->gpio[GPIO_MODDEF0])) {
 +		int retry;
 +
-+		if (sfp->gpio[3] && !IS_ERR(sfp->gpio[3])) {
++		if (sfp->gpio[GPIO_TX_DISABLE] &&
++		    !IS_ERR(sfp->gpio[GPIO_TX_DISABLE])) {
 +			for (retry = 0; retry < 3; retry++) {
-+				dev_info(&pdev->dev,
++				dev_info(sfp->dev,
 +					 "warm boot: TX_DISABLE pulse %d/3\n",
 +					 retry + 1);
-+				gpiod_set_value_cansleep(sfp->gpio[3], 1);
++				gpiod_set_value_cansleep(sfp->gpio[GPIO_TX_DISABLE], 1);
 +				msleep(300);
-+				gpiod_set_value_cansleep(sfp->gpio[3], 0);
++				gpiod_set_value_cansleep(sfp->gpio[GPIO_TX_DISABLE], 0);
 +				msleep(500);
 +
-+				if (gpiod_get_value_cansleep(sfp->gpio[0]))
++				if (gpiod_get_value_cansleep(sfp->gpio[GPIO_MODDEF0]))
 +					break;
 +			}
 +		}
@@ -52,9 +48,9 @@ Signed-off-by: MedyMa <aneylovemzy@gmail.com>
 +		if (sfp->i2c)
 +			i2c_recover_bus(sfp->i2c);
 +
-+		if (!gpiod_get_value_cansleep(sfp->gpio[0]))
-+			dev_warn(&pdev->dev,
-+				 "warm boot: module not responding after reset\n");
++		if (!gpiod_get_value_cansleep(sfp->gpio[GPIO_MODDEF0]))
++			dev_err(sfp->dev,
++				"warm boot: module not responding after reset\n");
 +	}
 +
  	if (sfp->need_poll)
