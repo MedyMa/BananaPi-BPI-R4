@@ -1,43 +1,21 @@
 From: BPI-R4 HNAT Fix
 Date: Sun, 27 Jul 2026 00:00:00 +0000
-Subject: [PATCH] net: mediatek: fix CPU-to-WiFi HNAT GSO ordering and flow control
+Subject: [PATCH v2] net: mediatek: fix CPU-to-WiFi HNAT GSO ordering
 
-CPU-to-WiFi HNAT has two interrelated problems:
+QDMA hardware TSO on the CPU-to-WiFi HNAT PPE reinjection path
+interleaves consecutive GSO batches, creating TCP sequence holes
+(44 segments per batch).  Non-GSO packets (UDP, DNS, small TCP)
+keep the HNAT fast path; GSO packets are segmented in software via
+skb_gso_segment() before PPE submission, so the hardware only sees
+wire-sized packets.
 
-1. GSO ordering: QDMA hardware TSO interleaves consecutive GSO batches
-   on the PPE/WED output path, creating TCP sequence holes of exactly
-   44 segments (one batch). Client-side captures show valid checksums
-   within each batch but complete batches swapped.
+Also adds NULL guard on hnat_priv in hnat_cpu_to_ge_xmit().
 
-2. Flow control bypass: HNAT pushes packets directly to PPE which feeds
-   WiFi DMA descriptors, bypassing mt76's three-layer flow control
-   (per-queue q->queued, per-station non_aql_packets, global token
-   budget). This causes silent drops under load.
-
-Fix: Force software GSO segmentation on the CPU-to-WiFi PPE reinjection
-path. Non-GSO packets (UDP games, DNS, small TCP) still use the HNAT
-fast path. GSO packets are segmented via skb_gso_segment() before PPE
-submission — each wire-sized segment gets its HNAT descriptor and
-cb[44] PPE metadata rebuilt, since GSO allocates fresh skb heads.
-
-After segmentation, the QDMA hardware only sees wire-sized packets,
-eliminating batch interleaving. Wire-sized bursts are also less likely
-to overflow WiFi DMA rings, mitigating (though not fully fixing) the
-flow control issue.
-
-The Ethernet header has already been pulled when the bridge local-out
-hook runs. Push it back before skb_gso_segment() so every segment
-inherits correct L2 addresses. Use skb_cow_head() instead of the
-original skb_cow() so cloned headers can be safely modified.
-
-On segmentation error, consume the original skb — returning it to the
-bridge path would reuse an skb whose MAC header and control block have
-already been used as GSO workspace.
-
+v2: Simplified commit message, const on features, hnat_priv NULL guard.
 Signed-off-by: BPI-R4 HNAT Fix
 ---
- drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c | 148 +++++++++++++++++------
- 1 file changed, 108 insertions(+), 40 deletions(-)
+ drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c | 124 +++++++++++++++++------
+ 1 file changed, 97 insertions(+), 27 deletions(-)
 
 --- a/drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c
 +++ b/drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c
@@ -49,7 +27,7 @@ Signed-off-by: BPI-R4 HNAT Fix
  
  #include "nf_hnat_mtk.h"
  #include "hnat.h"
-@@ -953,42 +954,107 @@
+@@ -953,42 +954,111 @@
  	return 0;
  }
  
@@ -62,6 +40,9 @@ Signed-off-by: BPI-R4 HNAT Fix
 +{
 +	u16 vlan_id = skb_vlan_tag_get_id(skb);
 +
++	if (unlikely(!hnat_priv || !hnat_priv->g_ppdev))
++		goto drop;
++
 +	if (unlikely(vlan_id)) {
 +		skb = vlan_insert_tag(skb, skb->vlan_proto, skb->vlan_tci);
 +		if (!skb)
@@ -73,6 +54,7 @@ Signed-off-by: BPI-R4 HNAT Fix
 +	 * descriptor at the beginning of its current head allocation.
 +	 */
 +	if (unlikely(skb_cow_head(skb, FOE_INFO_LEN))) {
++drop:
 +		dev_kfree_skb_any(skb);
 +		return;
 +	}
@@ -93,7 +75,7 @@ Signed-off-by: BPI-R4 HNAT Fix
  static unsigned int do_hnat_cpu_to_ge(struct sk_buff *skb)
  {
 +	struct sk_buff *segs, *seg, *next;
-+	netdev_features_t features;
+
 +
  	if (unlikely(skb_shinfo(skb)->frag_list))
 -                return -1;
@@ -160,7 +142,8 @@ Signed-off-by: BPI-R4 HNAT Fix
 +	 * heads, so the transmit helper deliberately restores both
 +	 * MediaTek metadata areas after segmentation.
 +	 */
-+	features = hnat_priv->g_ppdev->features & ~NETIF_F_GSO_MASK;
++	static const netdev_features_t features =
++		hnat_priv->g_ppdev->features & ~NETIF_F_GSO_MASK;
 +	segs = skb_gso_segment(skb, features);
 +	if (IS_ERR(segs)) {
 +		pr_warn_ratelimited("HNAT: CPU-to-WiFi GSO segmentation failed: %ld\n",
