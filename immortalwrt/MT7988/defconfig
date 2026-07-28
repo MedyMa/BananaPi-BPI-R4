@@ -36,6 +36,12 @@ CONFIG_PACKAGE_ip6tables-nft=y
 CONFIG_PACKAGE_ppp=y
 CONFIG_PACKAGE_ppp-mod-pppoe=y
 
+# Hardware flow offload: bridge + route + WiFi WED.
+CONFIG_PACKAGE_kmod-nf-flow=y
+CONFIG_PACKAGE_kmod-nft-offload=y
+CONFIG_PACKAGE_kmod-br-netfilter=y
+CONFIG_PACKAGE_kmod-nft-bridge=y
+
 # MTK vendor WiFi 7 block aligned to mt798x-mt799x-6.6-mtwifi.
 CONFIG_PACKAGE_datconf=y
 CONFIG_PACKAGE_datconf-lua=y
