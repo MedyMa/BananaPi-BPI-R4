@@ -9,8 +9,8 @@ Subject: [PATCH] net: mediatek: fix CPU-to-WiFi HNAT (GSO + QDMA SG + PPD)
 Depends: 999-3067 (adds <linux/stddef.h> include to hnat_nf_hook.c)
 ---
  drivers/net/ethernet/mediatek/mtk_eth_soc.c           |  22 +++++-
- drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c | 152 +++++++++++++++++++++++++++------------
- 2 files changed, 130 insertions(+), 44 deletions(-)
+ drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c | 128 ++++++++++++++++++++++++++-----------
+ 2 files changed, 118 insertions(+), 32 deletions(-)
 
 
 --- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
@@ -35,8 +35,8 @@ Depends: 999-3067 (adds <linux/stddef.h> include to hnat_nf_hook.c)
 -		txd->txd4 &= ~(0xf << TX_DMA_FPORT_SHIFT_V2);
 -		txd->txd4 |= 0x3 << TX_DMA_FPORT_SHIFT_V2;
 +		hnat_to_ppe = true;
-+		txd->txd4 &= ~(TX_DMA_FPORT_MASK_V2 << TX_DMA_FPORT_SHIFT_V2);
-+		txd->txd4 |= PSE_PPE0_PORT << TX_DMA_FPORT_SHIFT_V2;
++		txd->txd4 &= ~(0xf << TX_DMA_FPORT_SHIFT_V2);
++		txd->txd4 |= 0x3 << TX_DMA_FPORT_SHIFT_V2;
  	}
  #endif
  
@@ -50,8 +50,8 @@ Depends: 999-3067 (adds <linux/stddef.h> include to hnat_nf_hook.c)
 +			 * the normal GMAC FPORT for each SG descriptor.
 +			 */
 +			if (hnat_to_ppe) {
-+				txd->txd4 &= ~(TX_DMA_FPORT_MASK_V2 << TX_DMA_FPORT_SHIFT_V2);
-+				txd->txd4 |= PSE_PPE0_PORT << TX_DMA_FPORT_SHIFT_V2;
++				txd->txd4 &= ~(0xf << TX_DMA_FPORT_SHIFT_V2);
++				txd->txd4 |= 0x3 << TX_DMA_FPORT_SHIFT_V2;
 +			}
 +#endif
  			tx_buf = mtk_desc_to_tx_buf(ring, txd,
@@ -84,7 +84,7 @@ Depends: 999-3067 (adds <linux/stddef.h> include to hnat_nf_hook.c)
  
  #include "nf_hnat_mtk.h"
  #include "hnat.h"
-@@ -953,43 +954,114 @@
+@@ -953,42 +954,114 @@
  	return 0;
  }
  
