@@ -1,0 +1,37 @@
+From: Petr Wozniak <petr.wozniak@gmail.com>
+Date: Thu, 15 May 2026 10:00:00 +0200
+Subject: [PATCH] net: phy: sfp: add XGS-PON module quirks
+
+Add quirk entries for Zaram ZXOS11NPI and HSGQ NU-STICK1.0 XGS-PON
+SFP+ modules, plus two OEM variants (XGSPONST2001/XGSPONST2000).
+
+Zaram ZXOS11NPI: ignore TX_FAULT (erroneously asserted on this module)
+HSGQ NU-STICK1.0 / OEM XGSPONST200x: ignore TX_FAULT + LOS
+  (these pins are repurposed for serial communication)
+
+Signed-off-by: Petr Wozniak <petr.wozniak@gmail.com>
+---
+ drivers/net/phy/sfp.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/drivers/net/phy/sfp.c b/drivers/net/phy/sfp.c
+index a1c2e3f4b..b2d3e4f5c 100644
+--- a/drivers/net/phy/sfp.c
++++ b/drivers/net/phy/sfp.c
+@@ -534,6 +534,14 @@ static const struct sfp_quirk sfp_quirks[] = {
+ 	SFP_QUIRK("FS", "GPON-ONU-34-20BI", sfp_quirk_2500basex,
+ 		  sfp_fixup_ignore_tx_fault),
+ 
++	/* Zaram ZXOS11NPI XGS-PON module (SFP+) */
++	SFP_QUIRK_F("Zaram", "ZXOS11NPI", sfp_fixup_ignore_tx_fault),
++	/* HSGQ NU-STICK1.0 XGS-PON module (SFP+) */
++	SFP_QUIRK_F("HSGQ", "NU-STICK1.0", sfp_fixup_halny_gsfp),
++	/* OEM XGSPONST2001 XGS-PON module (SFP+) */
++	SFP_QUIRK_F("OEM", "XGSPONST2001", sfp_fixup_halny_gsfp),
++	SFP_QUIRK_F("OEM", "XGSPONST2000", sfp_fixup_halny_gsfp),
++
+ 	SFP_QUIRK_F("HALNy", "HL-GSFP", sfp_fixup_halny_gsfp),
+ 
+ 	SFP_QUIRK_F("H-COM", "SPP425H-GAB4", sfp_fixup_potron),
+-- 
+2.45.0

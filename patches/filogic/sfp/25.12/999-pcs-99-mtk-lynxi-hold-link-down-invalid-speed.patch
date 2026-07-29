@@ -1,0 +1,52 @@
+From: Petr Wozniak <petr.wozniak@gmail.com>
+Date: Fri, 26 Jun 2026 16:00:00 +0200
+Subject: [PATCH] net: pcs: mtk-lynxi: don't report link up with unresolved
+ speed in get_state
+
+The MTK SDK link_poll mechanism caches the link state produced by
+mtk_pcs_lynxi_update_state(). In the non-autoneg path the speed is decoded
+from the SGMII speed field. During a 10GBASE-R -> 1000BASE-X (XGDM->GDM)
+transition this field can briefly read as transient or reserved, leaving
+the cached speed unresolved while link is already up.
+
+get_state then reports "Link is Up - Unsupported/Half", phylink brings the
+MAC up with no valid speed configured, and on MediaTek GMAC the Rx FSM
+wedges ("GMAC Rx hang", recoverable only by reboot). Observed on BPI-R4
+Pro 8X with a copper (RTL8261BE) SFP module, reproducible on a warm reboot
+with a 1G link partner.
+
+Don't report the link as up while the speed is not a valid value; keep it
+down so phylink re-polls until the speed resolves. Apply the guard in
+get_state() after copying MTK link_poll's cached state.
+
+This patch is intentionally named 999-pcs-99 so it applies after MTK SDK's
+999-pcs-01..08 chain has added the link_poll cached-state path.
+
+Signed-off-by: Petr Wozniak <petr.wozniak@gmail.com>
+---
+ drivers/net/pcs/pcs-mtk-lynxi.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
+
+diff --git a/drivers/net/pcs/pcs-mtk-lynxi.c b/drivers/net/pcs/pcs-mtk-lynxi.c
+index a1b2c3d4e..b2c3d4e5f 100644
+--- a/drivers/net/pcs/pcs-mtk-lynxi.c
++++ b/drivers/net/pcs/pcs-mtk-lynxi.c
+@@ -197,6 +197,16 @@ static void mtk_pcs_lynxi_get_state(struct phylink_pcs *pcs,
+ 	state->speed = mpcs->state.speed;
+ 	state->duplex = mpcs->state.duplex;
+ 	state->link = mpcs->state.link;
++
++	/* Never report link-up with an unresolved/invalid speed: during a
++	 * mode change (e.g. 10GBASE-R -> 1000BASE-X) the SGMII speed field can
++	 * read back a reserved value, surfacing as "Link is Up - Unsupported".
++	 * Hold the link down so phylink re-polls until the speed resolves.
++	 */
++	if (state->link && state->speed != SPEED_10 &&
++	    state->speed != SPEED_100 && state->speed != SPEED_1000 &&
++	    state->speed != SPEED_2500)
++		state->link = false;
+ }
+ 
+ static void mtk_pcs_lynxi_hw_reset(struct mtk_pcs_lynxi *mpcs)
+-- 
+2.45.0
