@@ -60,40 +60,6 @@ install_kernel_patch() {
     install -m 0644 "$patch_file" "$target_patch"
 }
 
-install_sfp_warm_reboot_patches() {
-    local workspace_root="${GITHUB_WORKSPACE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-    local patch_root="$workspace_root/patches/filogic/sfp/6.6"
-    local patch_name
-
-    [ -d "$patch_root" ] || return 0
-
-    # padavanonly MTK vendor SFP patches (existing)
-    for patch_name in \
-        999-2753-net-phy-sfp-support-additional-RollBall-modules.patch \
-        999-2754-net-phy-sfp-support-shared-mod-def0-gpio.patch \
-        999-2764-net-phy-sfp-add-some-FS-copper-SFP-fixes.patch \
-        999-2765-net-phy-sfp-add-some-checksum-fail-SFP-war.patch \
-        999-2769-net-phy-aquantia-add-software-reset-to-aqr107_probe.patch
-    do
-        install_kernel_patch "$patch_root/$patch_name" "$patch_name"
-    done
-
-    # woziwrt community SFP/PCS patches for padavanonly 6.6 kernel.
-    # 999-2784 adds a PCS speed-validity guard in mtk_pcs_lynxi_get_state()
-    # to prevent "Link is Up - Unsupported/Half" on warm reboot when the
-    # SGMII speed field reads a reserved value during XGDM->GDM transition.
-    for patch_name in \
-        999-2781-sfp-add-xgspon-module-quirks-6.6.patch \
-        999-2782-sfp-rtl8261be-rollball-probe-fix-6.6.patch \
-        999-2783-sfp-rtl8261be-1g-reprobe-watchdog-6.6.patch \
-        999-2784-pcs-mtk-lynxi-hold-link-down-invalid-speed-6.6.patch \
-        999-2785-sfp-backport-upstream.patch \
-        999-2786-sfp-warm-reboot-recovery.patch
-    do
-        install_kernel_patch "$patch_root/$patch_name" "$patch_name"
-    done
-}
-
 patch_bpi_r4_sysupgrade_itb_check() {
     local platform_sh="target/linux/mediatek/filogic_a73/base-files/lib/upgrade/platform.sh"
 
@@ -193,10 +159,6 @@ rm -rf feeds/packages/net/mosdns
 git clone https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
 
 create_aqr10g_phy_fw_package
-
-# BPI-R4 SFP warm reboot recovery: allow shared MOD_DEF0 probing, extend
-# copper-module quirks, and force Aquantia AQR/CUX PHY software reset on probe.
-install_sfp_warm_reboot_patches
 
 # BPI-R4 HNAT: segment CPU-to-WiFi GSO packets before PPE reinjection.
 install_kernel_patch \
