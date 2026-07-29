@@ -1,0 +1,230 @@
+From: BPI-R4 HNAT Fix
+Date: Mon, 28 Jul 2026 00:00:00 +0000
+Subject: [PATCH] net: mediatek: fix CPU-to-WiFi HNAT (GSO + QDMA SG + PPD)
+
+1. GSO: skb_gso_segment() before PPE to avoid QDMA TSO batch holes.
+2. QDMA SG: lock all descriptors to PPE0, not just the first.
+3. PPD: per-packet sent_ppd in NAPI poll, prevent state leakage.
+
+Depends: 999-3067 (adds <linux/stddef.h> include to hnat_nf_hook.c)
+---
+ drivers/net/ethernet/mediatek/mtk_eth_soc.c           |  22 +++++-
+ drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c | 152 +++++++++++++++++++++++++++------------
+ 2 files changed, 130 insertions(+), 44 deletions(-)
+
+
+--- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
++++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
+@@ -1854,6 +1854,9 @@ static int mtk_tx_map(struct sk_buff *sk
+ 	struct mtk_tx_dma *itxd_pdma, *txd_pdma;
+ 	struct mtk_tx_buf *itx_buf, *tx_buf;
+ 	int i, n_desc = 1;
++#if IS_ENABLED(CONFIG_NET_MEDIATEK_HNAT)
++	bool hnat_to_ppe = false;
++#endif
+ 	int queue = skb_get_queue_mapping(skb);
+ 	int k = 0;
+ 
+@@ -1882,10 +1885,11 @@ static int mtk_tx_map(struct sk_buff *sk
+ 	/* TX SG offload */
+ 	txd = itxd;
+ 	txd_pdma = qdma_to_pdma(ring, txd);
+-	#if defined(CONFIG_NET_MEDIATEK_HNAT) || defined(CONFIG_NET_MEDIATEK_HNAT_MODULE)
++#if IS_ENABLED(CONFIG_NET_MEDIATEK_HNAT)
+ 	if (HNAT_SKB_CB2(skb)->magic == 0x78681415) {
+-		txd->txd4 &= ~(0xf << TX_DMA_FPORT_SHIFT_V2);
+-		txd->txd4 |= 0x3 << TX_DMA_FPORT_SHIFT_V2;
++		hnat_to_ppe = true;
++		txd->txd4 &= ~(TX_DMA_FPORT_MASK_V2 << TX_DMA_FPORT_SHIFT_V2);
++		txd->txd4 |= PSE_PPE0_PORT << TX_DMA_FPORT_SHIFT_V2;
+ 	}
+ #endif
+ 
+@@ -1921,6 +1925,16 @@ static int mtk_tx_map(struct sk_buff *sk
+ 
+ 			mtk_tx_set_dma_desc(dev, txd, &txd_info);
+ 
++#if IS_ENABLED(CONFIG_NET_MEDIATEK_HNAT)
++			/* Keep all descriptors of this packet on the same PSE
++			 * destination. mtk_tx_set_dma_desc() otherwise restores
++			 * the normal GMAC FPORT for each SG descriptor.
++			 */
++			if (hnat_to_ppe) {
++				txd->txd4 &= ~(TX_DMA_FPORT_MASK_V2 << TX_DMA_FPORT_SHIFT_V2);
++				txd->txd4 |= PSE_PPE0_PORT << TX_DMA_FPORT_SHIFT_V2;
++			}
++#endif
+ 			tx_buf = mtk_desc_to_tx_buf(ring, txd,
+ 						    soc->tx.desc_size);
+ 			if (new_desc)
+@@ -2470,7 +2484,6 @@ static int mtk_poll_rx(struct napi_struc
+ 	int done = 0, bytes = 0;
+ 	dma_addr_t dma_addr = DMA_MAPPING_ERROR;
+ 	int ppe_idx = 0;
+-	int sent_ppd = 0;
+ 
+ 	if (unlikely(!ring))
+ 		goto rx_done;
+@@ -2480,6 +2493,7 @@ static int mtk_poll_rx(struct napi_struc
+ 		struct net_device *netdev;
+ 		u32 hash, reason;
+ 		int mac = 0;
++		bool sent_ppd = false;
+ 
+ 		idx = NEXT_DESP_IDX(ring->calc_idx, ring->dma_size);
+ 		rxd = ring->dma + idx * eth->soc->rx.desc_size;
+
+--- a/drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c
++++ b/drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c
+@@ -26,6 +26,7 @@
+ #include <net/netfilter/nf_conntrack.h>
+ #include <net/netfilter/nf_conntrack_acct.h>
+ #include <linux/stddef.h>
++#include <net/gso.h>
+ 
+ #include "nf_hnat_mtk.h"
+ #include "hnat.h"
+@@ -953,43 +954,114 @@
+ 	return 0;
+ }
+ 
++/* Submit a single wire-sized skb to PPE for CPU-to-WiFi HNAT.
++ * Called both for non-GSO packets and for individual GSO segments.
++ * Rebuilds HNAT head descriptor and cb[44] PPE metadata because
++ * GSO allocates fresh skb heads that lack these vendor fields.
++ */
++static void hnat_cpu_to_ge_xmit(struct sk_buff *skb)
++{
++	u16 vlan_id;
++
++	if (unlikely(!hnat_priv || !hnat_priv->g_ppdev)) {
++		dev_kfree_skb_any(skb);
++		return;
++	}
++
++	vlan_id = skb_vlan_tag_get_id(skb);
++
++	if (unlikely(vlan_id)) {
++		skb = vlan_insert_tag(skb, skb->vlan_proto, skb->vlan_tci);
++		if (!skb)
++			return;
++	}
++
++	/* vlan_insert_tag() may replace skb->head.  Initialize the vendor
++	 * metadata only after it, so every segment queued to PPE owns a valid
++	 * descriptor at the beginning of its current head allocation.
++	 */
++	if (unlikely(skb_cow_head(skb, FOE_INFO_LEN))) {
++		dev_kfree_skb_any(skb);
++		return;
++	}
++
++	memset(skb_hnat_info(skb), 0, FOE_INFO_LEN);
++	skb_hnat_alg(skb) = 0;
++	skb_hnat_magic_tag(skb) = HNAT_MAGIC_TAG;
++	skb_hnat_filled(skb) = 0;
++	set_to_ppe(skb);
++
++	/* Set where the reinjected packet came from. */
++	__vlan_hwaccel_put_tag(skb, htons(ETH_P_8021Q),
++			       VLAN_CFI_MASK | (1234 & VLAN_VID_MASK));
++	skb->dev = hnat_priv->g_ppdev;
++	dev_queue_xmit(skb);
++}
++
+ static unsigned int do_hnat_cpu_to_ge(struct sk_buff *skb)
+ {
++	struct sk_buff *segs, *seg, *next;
++	netdev_features_t features;
++
+ 	if (unlikely(skb_shinfo(skb)->frag_list))
+-                return -1;
+-        if (unlikely(skb_headroom(skb) < (FOE_INFO_LEN + ETH_HLEN))) {
+-                if(unlikely(skb_cow(skb, FOE_INFO_LEN + ETH_HLEN)))
+-                return -1;
+-        }
++		return -1;
++	if (unlikely(skb_cow_head(skb, FOE_INFO_LEN + ETH_HLEN)))
++		return -1;
+ 
++	memset(skb_hnat_info(skb), 0, FOE_INFO_LEN);
+ 	skb_hnat_alg(skb) = 0;
+ 	skb_hnat_magic_tag(skb) = HNAT_MAGIC_TAG;
+ 	skb_hnat_filled(skb) = 0;
+ 
+ 	if (unlikely(!is_ppe_support_type(skb))) {
+-                skb_hnat_alg(skb) = 1;
+-                return -1;
+-        }
+-        if (hnat_priv->g_ppdev && hnat_priv->g_ppdev->flags & IFF_UP) {
+-                u16 vlan_id = 0;
+-                skb_set_network_header(skb, 0);
+-                skb_push(skb, ETH_HLEN);
+-		set_to_ppe(skb);
+-                vlan_id = skb_vlan_tag_get_id(skb);
+-                if (unlikely(vlan_id)) {
+-                        skb = vlan_insert_tag(skb, skb->vlan_proto, skb->vlan_tci);
+-                        if (!skb)
+-                                return -1;
+-                }
+-
+-                /*set where we come from */
+-                __vlan_hwaccel_put_tag(skb, htons(ETH_P_8021Q), VLAN_CFI_MASK | (1234 & VLAN_VID_MASK));
+-                skb->dev = hnat_priv->g_ppdev;
+-                dev_queue_xmit(skb);
+-     		return 0;
+-        }
+-	return -1;
++		skb_hnat_alg(skb) = 1;
++		return -1;
++	}
++
++	if (unlikely(!hnat_priv || !hnat_priv->g_ppdev) ||
++	    unlikely(!(hnat_priv->g_ppdev->flags & IFF_UP)))
++		return -1;
++
++	/* The bridge hook has pulled the Ethernet header.  Put it back before
++	 * GSO so skb_segment() copies real L2 bytes into every new skb.
++	 */
++	skb_set_network_header(skb, 0);
++	skb_push(skb, ETH_HLEN);
++	skb_reset_mac_header(skb);
++	skb_reset_mac_len(skb);
++
++	if (!skb_is_gso(skb)) {
++		hnat_cpu_to_ge_xmit(skb);
++		return 0;
++	}
++
++	/* QDMA/PPE/WED can reorder consecutive hardware-TSO batches.
++	 * Produce wire-sized skbs here while retaining SG and checksum
++	 * offload.  GSO uses skb->cb[32..47] and allocates fresh skb
++	 * heads, so the transmit helper deliberately restores both
++	 * MediaTek metadata areas after segmentation.
++	 */
++	features = hnat_priv->g_ppdev->features & ~NETIF_F_GSO_MASK;
++	segs = skb_gso_segment(skb, features);
++	if (IS_ERR(segs)) {
++		pr_warn_ratelimited("HNAT: CPU-to-WiFi GSO segmentation failed: %ld\n",
++				    PTR_ERR(segs));
++		dev_kfree_skb_any(skb);
++		return 0;
++	}
++
++	if (!segs) {
++		hnat_cpu_to_ge_xmit(skb);
++		return 0;
++	}
++
++	consume_skb(skb);
++	skb_list_walk_safe(segs, seg, next) {
++		skb_mark_not_on_list(seg);
++		hnat_cpu_to_ge_xmit(seg);
++	}
++
++	return 0;
+ }
+ 
+ static void mtk_hnat_nf_update(struct sk_buff *skb)
+-- 
+2.45.0

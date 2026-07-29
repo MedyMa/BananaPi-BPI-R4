@@ -37,11 +37,11 @@ apply_workspace_patch() {
 
     [ -f "$patch_file" ] || return 0
 
-    if git apply --ignore-space-change --ignore-whitespace --reverse --check "$patch_file" >/dev/null 2>&1; then
+    if git apply --recount --ignore-space-change --ignore-whitespace --reverse --check "$patch_file" >/dev/null 2>&1; then
         return 0
     fi
 
-    git apply --ignore-space-change --ignore-whitespace "$patch_file"
+    git apply --recount --ignore-space-change --ignore-whitespace "$patch_file"
 }
 
 install_kernel_patch() {
@@ -62,11 +62,12 @@ install_kernel_patch() {
 
 install_sfp_warm_reboot_patches() {
     local workspace_root="${GITHUB_WORKSPACE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-    local patch_root="$workspace_root/patches/filogic/sfp"
+    local patch_root="$workspace_root/patches/filogic/sfp/6.6"
     local patch_name
 
     [ -d "$patch_root" ] || return 0
 
+    # padavanonly MTK vendor SFP patches (existing)
     for patch_name in \
         999-2753-net-phy-sfp-support-additional-RollBall-modules.patch \
         999-2754-net-phy-sfp-support-shared-mod-def0-gpio.patch \
@@ -76,6 +77,34 @@ install_sfp_warm_reboot_patches() {
     do
         install_kernel_patch "$patch_root/$patch_name" "$patch_name"
     done
+
+    # woziwrt community SFP/PCS patches for padavanonly 6.6 kernel.
+    # 999-2784 adds a PCS speed-validity guard in mtk_pcs_lynxi_get_state()
+    # to prevent "Link is Up - Unsupported/Half" on warm reboot when the
+    # SGMII speed field reads a reserved value during XGDM->GDM transition.
+    for patch_name in \
+        999-2781-sfp-add-xgspon-module-quirks-6.6.patch \
+        999-2782-sfp-rtl8261be-rollball-probe-fix-6.6.patch \
+        999-2783-sfp-rtl8261be-1g-reprobe-watchdog-6.6.patch \
+        999-2784-pcs-mtk-lynxi-hold-link-down-invalid-speed-6.6.patch \
+        999-2785-sfp-backport-upstream.patch \
+        999-2786-sfp-warm-reboot-recovery.patch
+    do
+        install_kernel_patch "$patch_root/$patch_name" "$patch_name"
+    done
+}
+
+patch_bpi_r4_sysupgrade_itb_check() {
+    local platform_sh="target/linux/mediatek/filogic_a73/base-files/lib/upgrade/platform.sh"
+
+    [ -f "$platform_sh" ] || return 0
+    grep -q 'bananapi,bpi-r4' "$platform_sh" || return 0
+    grep -q 'dd if="$1" bs=1 skip=257 count=5' "$platform_sh" || return 0
+
+    perl -0pi -e '
+        $count = s/\n\tmediatek,mt7988a-rfb\|\\\n\tbananapi,bpi-r4\|\\\n\tbananapi,bpi-r4-poe\|\\\n\tbananapi,bpi-r4-pro\|\\\n\ttplink,tl-7dr7230-rev1\.0-sp2\|\\\n\ttplink,tl-7dr7299-v1\)\n\t\tmagic="\$\(dd if="\$1" bs=1 skip=257 count=5 2>\/dev\/null\)"\n\n\t\t\[ "\$magic" != "ustar" \] && \{\n\t\t\techo "Invalid image type\."\n\t\t\treturn 1\n\t\t\}\n\n\t\treturn 0\n\t\t;;/\n\tmediatek,mt7988a-rfb|\\\n\tbananapi,bpi-r4|\\\n\tbananapi,bpi-r4-poe|\\\n\tbananapi,bpi-r4-pro|\\\n\ttplink,tl-7dr7230-rev1.0-sp2|\\\n\ttplink,tl-7dr7299-v1)\n\t\t[ "\$(identify_magic_long "\$magic")" != "fit" ] && {\n\t\t\techo "Invalid image type."\n\t\t\treturn 1\n\t\t}\n\n\t\treturn 0\n\t\t;;/s;
+        END { exit($count ? 0 : 2); }
+    ' "$platform_sh"
 }
 
 create_aqr10g_phy_fw_package() {
@@ -131,6 +160,7 @@ rm -rf feeds/luci/applications/luci-app-argon-config
 rm -rf feeds/luci/applications/luci-app-passwall
 rm -rf feeds/luci/applications/luci-app-modemband
 rm -rf package/mtk/applications/luci-app-turboacc-mtk
+rm -rf feeds/packages/net/adguardhome
 rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2socks,hysteria,ipt2socks,microsocks,naiveproxy,shadowsocks-libev,shadowsocks-rust,shadowsocksr-libev,simple-obfs,tcping,trojan-plus,tuic-client,v2ray-plugin,xray-plugin,geoview,shadow-tls}
 
 # Clone community packages to package/community
@@ -146,13 +176,14 @@ git clone --depth=1 https://github.com/nikkinikki-org/OpenWrt-nikki
 git clone --depth=1 https://github.com/1522042029/luci-app-socat
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
+merge_package https://github.com/kenzok8/jell jell/adguardhome
+merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnsto-openwrt-package/ddnsto
+merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnsto-openwrt-package/luci-app-ddnsto
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-fan
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-adguardhome
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-modemband
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-sfp-status
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-turboacc-mtk
-merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnsto-openwrt-package/ddnsto
-merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnsto-openwrt-package/luci-app-ddnsto
 popd
 
 # add luci-app-mosdns
@@ -167,12 +198,43 @@ create_aqr10g_phy_fw_package
 # copper-module quirks, and force Aquantia AQR/CUX PHY software reset on probe.
 install_sfp_warm_reboot_patches
 
+# BPI-R4 HNAT: disable CPU-to-WiFi shortcut (bypasses WiFi flow control, silent drops)
+install_kernel_patch \
+    "${GITHUB_WORKSPACE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/patches/filogic/mtwifi-6.6/999-9101-hnat-cpu-wifi-fix.patch" \
+    "999-9101-hnat-cpu-wifi-fix.patch"
+
 # add luci-app-OpenClash
 mkdir -p package/OpenClash
 pushd package/OpenClash
 git clone --depth=1  https://github.com/vernesong/OpenClash
 git config core.sparsecheckout true
 popd
+
+# Fix opkg feed URLs: 24.10-SNAPSHOT feeds are gone, use latest stable 24.10.6
+sed -i 's|24.10-SNAPSHOT|24.10.6|g' include/version.mk
+sed -i 's|24.10-SNAPSHOT|24.10.6|g' package/base-files/image-config.in
+
+# padavanonly filogic_a73 upgrades these boards via fit_do_upgrade, but
+# platform_check_image still checked them like tar sysupgrade.bin images.
+patch_bpi_r4_sysupgrade_itb_check
+
+# Belt-and-suspenders: uci-defaults script that writes the correct distfeeds.conf
+# on first boot, in case any other post-install script reverts it.
+mkdir -p files/etc/uci-defaults
+cat > files/etc/uci-defaults/99-fix-distfeeds <<'UCIEOF'
+#!/bin/sh
+FEEDCONF="/etc/opkg/distfeeds.conf"
+BASE="https://downloads.immortalwrt.org/releases/24.10.6"
+cat > "$FEEDCONF" <<EOF
+src/gz immortalwrt_core ${BASE}/targets/mediatek/filogic/packages
+src/gz immortalwrt_base ${BASE}/packages/aarch64_cortex-a53/base
+src/gz immortalwrt_luci ${BASE}/packages/aarch64_cortex-a53/luci
+src/gz immortalwrt_packages ${BASE}/packages/aarch64_cortex-a53/packages
+src/gz immortalwrt_routing ${BASE}/packages/aarch64_cortex-a53/routing
+src/gz immortalwrt_telephony ${BASE}/packages/aarch64_cortex-a53/telephony
+EOF
+UCIEOF
+chmod +x files/etc/uci-defaults/99-fix-distfeeds
 
 ./scripts/feeds update -a
 
@@ -290,7 +352,11 @@ patch_makefile_dep \
 	# or GPON SFP modules during EEPROM/PHY probe.
 	bpi_dtsi="target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4.dtsi"
 	if [ -f "$bpi_dtsi" ] && grep -q 'mediatek,pnswap-rx' "$bpi_dtsi"; then
-		perl -0pi -e 's/\n&usxgmiisys0[ \t\r]*\{[ \t\r\n]*mediatek,pnswap-rx;[ \t\r\n]*\};[ \t\r]*\n[ \t\r]*\n?&usxgmiisys1[ \t\r]*\{[ \t\r\n]*mediatek,pnswap-rx;[ \t\r\n]*\};[ \t\r]*\n/\n/g' "$bpi_dtsi"
+		# Match each &usxgmiisys{0,1} pnswap-rx block independently so the
+		# removal succeeds even when comments or blank lines separate the two
+		# blocks (the original regex required them to be adjacent and would
+		# silently fail to match if they weren't, leaving pnswap-rx in place).
+		perl -0pi -e 's/\n[ \t]*&usxgmiisys[01][ \t]*\{[ \t]*\n[ \t]*mediatek,pnswap-rx;[ \t]*\n[ \t]*\};[ \t]*(?:\r?\n)?//g' "$bpi_dtsi"
 	fi
 }
 
@@ -308,27 +374,16 @@ _purge_libcrypt_compat
 # Downgrade the usign SHA-512 padding warning from ERROR_MESSAGE (red/scary) 
 sed -i 's/ERROR_MESSAGE,WARNING: Applying padding in/MESSAGE,WARNING: Applying padding in/' package/Makefile
 
+# LuCI and mtwifi patches for padavanonly/immortalwrt-mt798x-6.6 only.
+# Do not reuse the openwrt-24.10 or master patch filenames in this chain.
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1000-luci-status-overview-wifi7-mlo.patch"
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/mtwifi-6.6/1000-mtwifi-6.6-luci-status-overview-wifi7-mlo.patch"
 
 [ -f feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1001-luci-network-wireless-station-hints.patch"
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/mtwifi-6.6/1001-mtwifi-6.6-luci-network-wireless-station-hints.patch"
 
 [ -f feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/999-luci-wireless-mtk-mode-matrix.patch"
-
-[ -d package/system/rpcd ] && {
-    mkdir -p package/system/rpcd/patches
-    install -m 0644 \
-        "$GITHUB_WORKSPACE/patches/filogic/997-mtwifi-6.6-rpcd-iwinfo-export-mhz-hi.patch" \
-        package/system/rpcd/patches/997-iwinfo-export-eht-dcm.patch
-}
-
-[ -f package/network/utils/iwinfo/src/iwinfo_mtk.c ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/998-iwinfo-mtk-fix-6ghz-reporting.patch"
-
-[ -f package/mtk/applications/luci-app-mtwifi-cfg/root/usr/share/luci-app-mtwifi-cfg/wireless-mtk.js ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1005-luci-wireless-mtk-station-and-rate-fixes.patch"
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/mtwifi-6.6/999-mtwifi-6.6-luci-wireless-mtk-mode-matrix.patch"
 
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/1002-luci-status-overview-rate-mhz-hi.patch"
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/mtwifi-6.6/1002-mtwifi-6.6-luci-status-overview-rate-mhz-hi.patch"
