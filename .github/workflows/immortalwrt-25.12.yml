@@ -1,4 +1,4 @@
-name: immortalwrt_25_12
+name: immortalwrt_25.12
 
 on:
   schedule:
@@ -91,7 +91,7 @@ jobs:
       run: |
         ./scripts/feeds update -a
 
-    - name: Load feeds.conf.default
+    - name: Load feeds and community packages
       run: |
         chmod +x $OPENWRT_NAME/*.sh
         cd openwrt
@@ -109,7 +109,7 @@ jobs:
         cd openwrt
         make defconfig
         cat .config
-        make download -j$(nproc)
+        make download -j$(nproc) DOWNLOAD_TOOL_CUSTOM="aria2c -c -s4 -x4 -k1M --connect-timeout=10 --max-connection-per-server=4 --min-split-size=1M" 2>&1
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
 

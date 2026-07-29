@@ -1,8 +1,8 @@
-name: MT7988-Action
+name: immortalwrt_25.12_wifi7
 
 on:
   schedule:
-    - cron: 0 15 * * *
+    - cron: 0 16 * * *
   workflow_dispatch:
 
 permissions:
@@ -10,17 +10,15 @@ permissions:
   contents: write
 
 env:
-  REPO_URL: https://github.com/MedyMa/immortalwrt-mt798x-6.6
-  REPO_BRANCH: mt798x-mt799x-6.6-mtwifi
-  CONFIG_FILE: immortalwrt/MT7988/defconfig
-  DIY_P1_SH: immortalwrt/diy-part3.sh
-  DIY_P2_SH: immortalwrt/diy-part4.sh
+  REPO_URL: https://github.com/chasey-dev/immortalwrt-mt798x-rebase.git
+  REPO_BRANCH: 25.12-dev-wifi7
+  CONFIG_FILE: immortalwrt/MTK/defconfig-vendor-wifi
+  DIY_P1_SH: immortalwrt/diy-mtk.sh
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
   OPENWRT_NAME: immortalwrt
-  OPENWRT_DEVICE: MT7988
-  OPENWRT_FLAVOR: draft
+  OPENWRT_DEVICE: mediatek
 
 jobs:
   build:
@@ -36,7 +34,7 @@ jobs:
         remove-android: 'true'
         remove-haskell: 'true'
         remove-codeql: 'true'
-        
+
     - name: Check out the project branch
       uses: actions/checkout@v6.0.2
 
@@ -52,20 +50,18 @@ jobs:
         sudo -E apt-get -qq autoremove --purge
         sudo -E apt-get -qq clean ) &
         sudo timedatectl set-timezone "$TZ"
-        
+
     - name: Initialize Environment and Display System Info
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
         chmod +x $OPENWRT_NAME/*.sh
         $GITHUB_WORKSPACE/$OPENWRT_NAME/system-Information.sh
-        
+
     - name: Download firmware source code
       run: |
         git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
         cd openwrt
-        rm -rf feeds.conf.default
-        cp -f $GITHUB_WORKSPACE/patches/filogic/feeds.conf.default feeds.conf.default
         git log --pretty=tformat:"%h" -n1 tools toolchain || echo "No toolchain history"
 
     - name: Generate cache keys
@@ -93,8 +89,8 @@ jobs:
       working-directory: ./openwrt
       run: |
         ./scripts/feeds update -a
-        
-    - name: Load feeds.conf.default
+
+    - name: Load feeds and community packages
       run: |
         chmod +x $OPENWRT_NAME/*.sh
         cd openwrt
@@ -103,8 +99,6 @@ jobs:
     - name: Load config
       run: |
         [ -e "$CONFIG_FILE" ] && cat "$CONFIG_FILE" > openwrt/.config
-        chmod +x $OPENWRT_NAME/*.sh && cd openwrt
-        $GITHUB_WORKSPACE/$DIY_P2_SH
 
     - name: Download the installation package
       id: package
@@ -115,7 +109,7 @@ jobs:
         make download -j$(nproc) DOWNLOAD_TOOL_CUSTOM="aria2c -c -s4 -x4 -k1M --connect-timeout=10 --max-connection-per-server=4 --min-split-size=1M" 2>&1
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
-             
+
     - name: Compile the firmware
       id: compile
       run: |
@@ -231,29 +225,27 @@ jobs:
       id: organize
       if: ${{ steps.compile.outputs.status == 'success' && env.UPLOAD_FIRMWARE == 'true' && !cancelled() }}
       run: |
-        cd openwrt/bin/targets/mediatek/filogic_a73
+        cd openwrt/bin/targets/mediatek/filogic
         rm -rf packages *mt798* *.config *.buildinfo *.json sha256sums
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
-        
+
     - name: Upload the firmware to github
       uses: actions/upload-artifact@v7.0.1
       if: steps.organize.outputs.status == 'success' && !cancelled()
       with:
-        name: ${{ env.date1 }}_${{ env.OPENWRT_NAME }}_${{ env.OPENWRT_DEVICE }}_${{ env.OPENWRT_FLAVOR }}_${{ env.REPO_BRANCH }}
+        name: ${{ env.date1 }}_${{ env.OPENWRT_NAME }}_${{ env.OPENWRT_DEVICE }}_${{ env.REPO_BRANCH }}
         path: ${{ env.FIRMWARE }}
 
     - name: Generate release tags
       id: tag
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_RELEASE == 'true' && !cancelled()
       run: |
-        echo "release_tag=${{ env.date1 }}-${{ env.OPENWRT_NAME }}_${{ env.OPENWRT_DEVICE }}_${{ env.OPENWRT_FLAVOR }}_${{ env.REPO_BRANCH }}" >> $GITHUB_OUTPUT
+        echo "release_tag=${{ env.date1 }}-${{ env.OPENWRT_NAME }}_${{ env.REPO_BRANCH }}" >> $GITHUB_OUTPUT
         touch release.txt
         echo "📥 固件下载" >> release.txt
-        echo "Target flavor: ${{ env.OPENWRT_FLAVOR }}" >> release.txt
-        echo "Source branch: ${{ env.REPO_BRANCH }}" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
-        
+
     - name: Publish to release
       uses: softprops/action-gh-release@v3
       if: steps.tag.outputs.status == 'success' && !cancelled()
@@ -268,10 +260,9 @@ jobs:
     - name: 删除旧的Releases
       if: steps.tag.outputs.status == 'success' && !cancelled()
       uses: MedyMa/delete-older-releases@v0.3.4
-
       with:
         keep_latest: 3
         delete_tags: true
-        delete_tag_pattern: '^.*-immortalwrt_MT7988_draft_mt798x-mt799x-6\.6-mtwifi$'
+        delete_tag_pattern: '^.*-immortalwrt_openwrt-25\.12$'
       env:
         GITHUB_TOKEN: ${{ secrets.RELEASES_TOKEN }}
