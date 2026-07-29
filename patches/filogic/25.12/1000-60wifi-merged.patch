@@ -1,0 +1,104 @@
+diff --git a/feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js b/feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js
+
+--- a/feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js
++++ b/feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js
+@@ -25,33 +25,76 @@ return baseclass.extend({
+ 		expect: { 'access': false }
+ 	}),
+ 
+-	wifirate(rate) {
+-		let s = `${rate.rate / 1000}\xa0${_('Mbit/s')}, ${rate.mhz}\xa0${_('MHz')}`;
+-
+-		if (rate?.ht || rate?.vht) s += [
+-			rate?.vht && `, VHT-MCS\xa0${rate?.mcs}`,
+-			rate?.nss && `, VHT-NSS\xa0${rate?.nss}`,
+-			rate?.ht  && `, MCS\xa0${rate?.mcs}`,
+-			rate?.short_gi && ', ' + _('Short GI').replace(/ /g, '\xa0')
+-		].filter(Boolean).join('');
+-
+-		if (rate?.he) s += [
+-			`, HE-MCS\xa0${rate?.mcs}`,
+-			rate?.nss    && `, HE-NSS\xa0${rate?.nss}`,
+-			rate?.he_gi  && `, HE-GI\xa0${rate?.he_gi}`,
+-			rate?.he_dcm && `, HE-DCM\xa0${rate?.he_dcm}`
+-		].filter(Boolean).join('');
+-
+-		if (rate?.eht) s += [
+-			`, EHT-MCS\xa0${rate?.mcs}`,
+-			rate?.nss    && `, EHT-NSS\xa0${rate?.nss}`,
+-			rate?.eht_gi  && `, EHT-GI\xa0${rate?.eht_gi}`,
+-			rate?.eht_dcm && `, EHT-DCM\xa0${rate?.eht_dcm}`
+-		].filter(Boolean).join('');
++	callWifiStationHints: rpc.declare({
++		object: 'luci',
++		method: 'getWifiStationHints',
++		expect: { '': {} }
++	}),
++
++	wifirate: function(rt) {
++		if (!rt || rt.rate == null || rt.rate <= 0)
++			return '-';
++
++		var s = '%.1f %s'.format(rt.rate / 1000, _('Mbit/s')),
++		    ht = rt.ht, vht = rt.vht,
++			mhz = (rt.mhz != null) ? (((rt.mhz_hi || 0) << 8) + rt.mhz) : null,
++			nss = rt.nss,
++			mcs = rt.mcs, sgi = rt.short_gi,
++			he = rt.he, he_gi = rt.he_gi,
++			he_dcm = rt.he_dcm,
++			eht = (rt.eht === true),
++			eht_gi = rt.eht_gi,
++			eht_dcm = rt.eht_dcm;
++
++		if (mhz != null)
++			s += ', %d %s'.format(mhz, _('MHz'));
++
++		if (ht || vht) {
++			if (vht && mcs != null) s += ', VHT-MCS %d'.format(mcs);
++			if (vht && nss != null) s += ', VHT-NSS %d'.format(nss);
++			if (ht && mcs != null)  s += ', MCS %s'.format(mcs);
++			if (sgi) s += ', ' + _('Short GI').replace(/ /g, ' ');
++		}
++
++		if (he) {
++			if (mcs != null) s += ', HE-MCS %d'.format(mcs);
++			if (nss != null) s += ', HE-NSS %d'.format(nss);
++			if (he_gi != null) s += ', HE-GI %d'.format(he_gi);
++			if (he_dcm != null) s += ', HE-DCM %d'.format(he_dcm);
++		}
++
++		if (eht) {
++			if (mcs != null) s += ', EHT-MCS %d'.format(mcs);
++			if (nss != null) s += ', EHT-NSS %d'.format(nss);
++			if (eht_gi != null) s += ', EHT-GI %d'.format(eht_gi);
++			if (eht_dcm != null) s += ', EHT-DCM %d'.format(eht_dcm);
++		}
+ 
+ 		return s;
+ 	},
+ 
++	getStationHint: function(hosthints, stationhints, mac) {
++		var alias = stationhints[(mac || '').toUpperCase()] || stationhints[mac] || null,
++		    source_mac = alias ? alias.source_mac : null,
++		    name = hosthints.getHostnameByMACAddr(mac),
++		    ipv4 = hosthints.getIPAddrByMACAddr(mac),
++		    ipv6 = hosthints.getIP6AddrByMACAddr(mac);
++
++		if (!name && alias)
++			name = alias.name || (source_mac ? hosthints.getHostnameByMACAddr(source_mac) : null);
++
++		if (!ipv4 && alias)
++			ipv4 = L.toArray(alias.ipaddrs || alias.ipv4)[0] || (source_mac ? hosthints.getIPAddrByMACAddr(source_mac) : null);
++
++		if (!ipv6 && alias)
++			ipv6 = L.toArray(alias.ip6addrs || alias.ipv6)[0] || (source_mac ? hosthints.getIP6AddrByMACAddr(source_mac) : null);
++
++		if (name == '?')
++			name = null;
++
++		return { name: name, ipv4: ipv4, ipv6: ipv6, source_mac: source_mac };
++	},
++
+ 	handleDelClient(wifinet, mac, ev, cmd) {
+ 		const exec = cmd || 'disconnect';
+ 

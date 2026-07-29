@@ -47,8 +47,8 @@ CONFIG_PACKAGE_kmod-hwmon-pwmfan=y
 CONFIG_PACKAGE_kmod-i2c-mux-pca954x=y
 CONFIG_PACKAGE_kmod-leds-gpio=y
 CONFIG_PACKAGE_kmod-phy-aquantia=y
-CONFIG_PACKAGE_kmod-phy-marvell-10g=y
 CONFIG_PACKAGE_aqr10g-phy-fw=y
+CONFIG_PACKAGE_kmod-phy-marvell-10g=y
 CONFIG_PACKAGE_kmod-phy-realtek=y
 CONFIG_PACKAGE_kmod-rtc-pcf8563=y
 CONFIG_PACKAGE_kmod-sfp=y
@@ -63,6 +63,14 @@ CONFIG_PACKAGE_kmod-usb-net-qmi-wwan-fibocom=y
 CONFIG_PACKAGE_kmod-pcie_mhi=y
 CONFIG_PACKAGE_kmod-mhi-bus=y
 CONFIG_PACKAGE_kmod-mhi-wwan-mbim=y
+CONFIG_PACKAGE_kmod-npu=y
+CONFIG_PACKAGE_npu-rebb-fw=y
+CONFIG_PACKAGE_kmod-npu-flow=y
+CONFIG_PACKAGE_kmod-npu-flow-autoload=y
+CONFIG_PACKAGE_kmod-npu-nf_hnat=y
+CONFIG_PACKAGE_kmod-npu-nf_hnat-autoload=y
+CONFIG_PACKAGE_kmod-npu-mcast=y
+CONFIG_PACKAGE_kmod-npu-mcast-autoload=y
 CONFIG_PACKAGE_kmod-wwan=y
 CONFIG_PACKAGE_kmod-qrtr-mhi=y
 CONFIG_PACKAGE_kmod-mtk-t7xx=y
@@ -90,6 +98,18 @@ CONFIG_PACKAGE_kmod-nls-cp950=y
 CONFIG_PACKAGE_kmod-nls-utf8=y
 CONFIG_PACKAGE_kmod-nft-flow-offload=y
 CONFIG_PACKAGE_kmod-mediatek_hnat=y
+CONFIG_KERNEL_NET_MEDIATEK_HNAT=y
+CONFIG_KERNEL_MEDIATEK_NETSYS_V3=y
+# CONFIG_KERNEL_MEDIATEK_NETSYS_V2 is not set
+
+# MTK debug / diagnostic tools from mtk_openwrt_feed.
+CONFIG_PACKAGE_pce=y
+CONFIG_PACKAGE_mtkhnat_util=y
+CONFIG_PACKAGE_ethswbox=y
+CONFIG_PACKAGE_flowtable=y
+CONFIG_PACKAGE_netsys_dbg_util=y
+CONFIG_PACKAGE_tops-tool=y
+
 CONFIG_PACKAGE_parted=y
 CONFIG_PACKAGE_smartmontools=y
 CONFIG_PACKAGE_kmod-nvme=y
@@ -203,9 +223,9 @@ CONFIG_PACKAGE_wget-ssl=y
 CONFIG_PACKAGE_wireless-tools=y
 CONFIG_PACKAGE_wsdd2=y
 CONFIG_PACKAGE_wrtbwmon=y
-CONFIG_PACKAGE_xz-utils=y
 CONFIG_PACKAGE_xray-core=y
 CONFIG_PACKAGE_xray-plugin=y
+CONFIG_PACKAGE_xz-utils=y
 CONFIG_PACKAGE_yq=y
 CONFIG_PACKAGE_zlib=y
 

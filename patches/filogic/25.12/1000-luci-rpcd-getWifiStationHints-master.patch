@@ -1,0 +1,164 @@
+diff --git a/feeds/luci/modules/luci-base/root/usr/share/rpcd/ucode/luci b/feeds/luci/modules/luci-base/root/usr/share/rpcd/ucode/luci
+--- a/feeds/luci/modules/luci-base/root/usr/share/rpcd/ucode/luci
++++ b/feeds/luci/modules/luci-base/root/usr/share/rpcd/ucode/luci
+@@ -45,6 +45,125 @@ function callPackageVersionCheck(pkg) {
+ 	}
+ 	return version;
+ }
++function normalizeMac(mac) {
++	return mac ? uc(mac) : '';
++}
++
++function getHostHintByMac(hints, mac) {
++	let key = normalizeMac(mac);
++
++	if (!length(key))
++		return null;
++
++	return hints?.[key] ?? hints?.[lc(key)] ?? null;
++}
++
++function getWifiStationMloAliases() {
++	let aliases = {};
++	let fd = popen('logread 2>/dev/null');
++
++	if (!fd)
++		return aliases;
++
++	for (let line = fd.read('line'); length(line); line = fd.read('line')) {
++		let link = null;
++		let mld = null;
++		let m = match(line, /mld\(sta_idx=[0-9]+,addr=([0-9A-Fa-f:]{17})\).*link\(([0-9A-Fa-f:]{17})\)/);
++
++		if (m) {
++			mld = normalizeMac(m[1]);
++			link = normalizeMac(m[2]);
++		}
++		else if ((m = match(line, /mac=([0-9A-Fa-f:]{17}), mld\(sta_idx=[0-9]+,addr=([0-9A-Fa-f:]{17})\)/)) != null) {
++			link = normalizeMac(m[1]);
++			mld = normalizeMac(m[2]);
++		}
++
++		if (length(link) && length(mld) && link != mld)
++			aliases[link] = mld;
++	}
++
++	fd.close();
++
++	return aliases;
++}
++
++function pushUniqueAddress(addrs, addr) {
++	if (!addr)
++		return addrs;
++
++	addrs ??= [];
++
++	for (let existing in addrs)
++		if (existing == addr)
++			return addrs;
++
++	push(addrs, addr);
++
++	return addrs;
++}
++
++function getWifiStationLeaseHints() {
++	let hints = {};
++	let fd = open('/tmp/dhcp.leases', 'r');
++
++	if (!fd)
++		return hints;
++
++	for (let line = fd.read('line'); length(line); line = fd.read('line')) {
++		let fields = split(trim(line), ' ');
++		let mac = normalizeMac(fields[1]);
++		let ip = fields[2];
++		let name = fields[3];
++
++		if (!length(mac))
++			continue;
++
++		hints[mac] ??= {};
++
++		if (name && name != '*')
++			hints[mac].name ??= name;
++
++		if (ip && ip != '*')
++			hints[mac].ipaddrs = pushUniqueAddress(hints[mac].ipaddrs, ip);
++	}
++
++	fd.close();
++
++	return hints;
++}
++
++function appendWifiStationNeighborHints(hints) {
++	let fd = popen('ip neigh show 2>/dev/null; ip -6 neigh show 2>/dev/null');
++
++	if (!fd)
++		return hints;
++
++	for (let line = fd.read('line'); length(line); line = fd.read('line')) {
++		let m = match(trim(line), /^(\S+)\s+dev\s+\S+\s+lladdr\s+([0-9A-Fa-f:]{17})\s+/);
++
++		if (!m)
++			continue;
++
++		let addr = m[1];
++		let mac = normalizeMac(m[2]);
++
++		if (!length(mac))
++			continue;
++
++		hints[mac] ??= {};
++
++		if (match(addr, /:/))
++			hints[mac].ip6addrs = pushUniqueAddress(hints[mac].ip6addrs, addr);
++		else
++			hints[mac].ipaddrs = pushUniqueAddress(hints[mac].ipaddrs, addr);
++	}
++
++	fd.close();
++
++	return hints;
++}
++
+ 
+ const methods = {
+ 	getVersion: {
+@@ -657,6 +776,34 @@ const methods = {
+ 		}
+ 	},
+ 
++	getWifiStationHints: {
++		call: function() {
++			const hosthints = appendWifiStationNeighborHints(getWifiStationLeaseHints());
++			const aliases = getWifiStationMloAliases();
++			let result = {};
++
++			for (let link, source in aliases) {
++				let hint = hosthints?.[source] ?? hosthints?.[lc(source)] ?? null;
++
++				if (!hint)
++					continue;
++
++				result[link] = { source_mac: source };
++
++				if (hint.name)
++					result[link].name = hint.name;
++
++				if (hint.ipaddrs || hint.ipv4)
++					result[link].ipaddrs = hint.ipaddrs || hint.ipv4;
++
++				if (hint.ip6addrs || hint.ipv6)
++					result[link].ip6addrs = hint.ip6addrs || hint.ipv6;
++			}
++
++			return result;
++		}
++	},
++
+ 	getOdhcp6cStats: {
+ 		call: function() {
+ 			const ubus = connect();
