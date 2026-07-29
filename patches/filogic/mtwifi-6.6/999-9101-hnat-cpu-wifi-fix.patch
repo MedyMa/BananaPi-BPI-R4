@@ -84,7 +84,7 @@ Depends: 999-3067 (adds <linux/stddef.h> include to hnat_nf_hook.c)
  
  #include "nf_hnat_mtk.h"
  #include "hnat.h"
-@@ -953,42 +954,111 @@
+@@ -953,43 +954,114 @@
  	return 0;
  }
  
