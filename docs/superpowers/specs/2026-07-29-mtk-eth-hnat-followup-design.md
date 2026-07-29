@@ -30,12 +30,12 @@ The follow-up patch modifies only
 ## Ordering
 
 The installed patch name is
-`99961-hnat-mtk-eth-sg-ppd-fix.patch`. The required order is:
+`9996-zz-hnat-mtk-eth-sg-ppd-fix.patch`. The required order is:
 
 ```text
 999-9101-hnat-cpu-wifi-fix.patch
 9996-ext-hnat.patch
-99961-hnat-mtk-eth-sg-ppd-fix.patch
+9996-zz-hnat-mtk-eth-sg-ppd-fix.patch
 9997-drop-hash.patch
 9998-dsa.patch
 ```
@@ -50,4 +50,3 @@ The installed patch name is
    destination.
 4. Run whitespace and shell syntax checks.
 5. Perform Code Review and fix all findings before committing or pushing.
-

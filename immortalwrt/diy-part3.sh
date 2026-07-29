@@ -198,10 +198,16 @@ create_aqr10g_phy_fw_package
 # copper-module quirks, and force Aquantia AQR/CUX PHY software reset on probe.
 install_sfp_warm_reboot_patches
 
-# BPI-R4 HNAT: disable CPU-to-WiFi shortcut (bypasses WiFi flow control, silent drops)
+# BPI-R4 HNAT: segment CPU-to-WiFi GSO packets before PPE reinjection.
 install_kernel_patch \
     "${GITHUB_WORKSPACE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/patches/filogic/mtwifi-6.6/999-9101-hnat-cpu-wifi-fix.patch" \
     "999-9101-hnat-cpu-wifi-fix.patch"
+
+# Apply after 9996-ext-hnat.patch: preserve PPE routing for every QDMA SG
+# descriptor and reset PPD state for every packet in the NAPI RX loop.
+install_kernel_patch \
+    "${GITHUB_WORKSPACE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/patches/filogic/mtwifi-6.6/9996-zz-hnat-mtk-eth-sg-ppd-fix.patch" \
+    "9996-zz-hnat-mtk-eth-sg-ppd-fix.patch"
 
 # add luci-app-OpenClash
 mkdir -p package/OpenClash
