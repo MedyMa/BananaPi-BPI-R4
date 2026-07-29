@@ -1,78 +1,16 @@
 From: BPI-R4 HNAT Fix
 Date: Mon, 28 Jul 2026 00:00:00 +0000
-Subject: [PATCH] net: mediatek: fix CPU-to-WiFi HNAT (GSO + QDMA SG + PPD)
+Subject: [PATCH] net: mediatek: segment CPU-to-WiFi HNAT GSO packets
 
-1. GSO: skb_gso_segment() before PPE to avoid QDMA TSO batch holes.
-2. QDMA SG: lock all descriptors to PPE0, not just the first.
-3. PPD: per-packet sent_ppd in NAPI poll, prevent state leakage.
+Segment GSO packets before PPE reinjection to avoid QDMA TSO batch holes.
+Rebuild the HNAT metadata for every segment and retain a safe non-GSO
+fallback.
 
 Depends: 999-3067 (adds <linux/stddef.h> include to hnat_nf_hook.c)
 ---
- drivers/net/ethernet/mediatek/mtk_eth_soc.c           |  22 +++++-
- drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c | 128 ++++++++++++++++++++++++++-----------
- 2 files changed, 118 insertions(+), 32 deletions(-)
+ drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c | 127 ++++++++++++++++++++++++++-----------
+ 1 file changed, 100 insertions(+), 27 deletions(-)
 
-
---- a/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-+++ b/drivers/net/ethernet/mediatek/mtk_eth_soc.c
-@@ -1854,6 +1854,9 @@ static int mtk_tx_map(struct sk_buff *sk
- 	struct mtk_tx_dma *itxd_pdma, *txd_pdma;
- 	struct mtk_tx_buf *itx_buf, *tx_buf;
- 	int i, n_desc = 1;
-+#if IS_ENABLED(CONFIG_NET_MEDIATEK_HNAT)
-+	bool hnat_to_ppe = false;
-+#endif
- 	int queue = skb_get_queue_mapping(skb);
- 	int k = 0;
- 
-@@ -1882,10 +1885,11 @@ static int mtk_tx_map(struct sk_buff *sk
- 	/* TX SG offload */
- 	txd = itxd;
- 	txd_pdma = qdma_to_pdma(ring, txd);
--	#if defined(CONFIG_NET_MEDIATEK_HNAT) || defined(CONFIG_NET_MEDIATEK_HNAT_MODULE)
-+#if IS_ENABLED(CONFIG_NET_MEDIATEK_HNAT)
- 	if (HNAT_SKB_CB2(skb)->magic == 0x78681415) {
--		txd->txd4 &= ~(0xf << TX_DMA_FPORT_SHIFT_V2);
--		txd->txd4 |= 0x3 << TX_DMA_FPORT_SHIFT_V2;
-+		hnat_to_ppe = true;
-+		txd->txd4 &= ~(0xf << TX_DMA_FPORT_SHIFT_V2);
-+		txd->txd4 |= 0x3 << TX_DMA_FPORT_SHIFT_V2;
- 	}
- #endif
- 
-@@ -1921,6 +1925,16 @@ static int mtk_tx_map(struct sk_buff *sk
- 
- 			mtk_tx_set_dma_desc(dev, txd, &txd_info);
- 
-+#if IS_ENABLED(CONFIG_NET_MEDIATEK_HNAT)
-+			/* Keep all descriptors of this packet on the same PSE
-+			 * destination. mtk_tx_set_dma_desc() otherwise restores
-+			 * the normal GMAC FPORT for each SG descriptor.
-+			 */
-+			if (hnat_to_ppe) {
-+				txd->txd4 &= ~(0xf << TX_DMA_FPORT_SHIFT_V2);
-+				txd->txd4 |= 0x3 << TX_DMA_FPORT_SHIFT_V2;
-+			}
-+#endif
- 			tx_buf = mtk_desc_to_tx_buf(ring, txd,
- 						    soc->tx.desc_size);
- 			if (new_desc)
-@@ -2470,7 +2484,6 @@ static int mtk_poll_rx(struct napi_struc
- 	int done = 0, bytes = 0;
- 	dma_addr_t dma_addr = DMA_MAPPING_ERROR;
- 	int ppe_idx = 0;
--	int sent_ppd = 0;
- 
- 	if (unlikely(!ring))
- 		goto rx_done;
-@@ -2480,6 +2493,7 @@ static int mtk_poll_rx(struct napi_struc
- 		struct net_device *netdev;
- 		u32 hash, reason;
- 		int mac = 0;
-+		bool sent_ppd = false;
- 
- 		idx = NEXT_DESP_IDX(ring->calc_idx, ring->dma_size);
- 		rxd = ring->dma + idx * eth->soc->rx.desc_size;
 
 --- a/drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c
 +++ b/drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c
