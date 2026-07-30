@@ -344,10 +344,8 @@ _purge_libcrypt_compat
 sed -i 's/ERROR_MESSAGE,WARNING: Applying padding in/MESSAGE,WARNING: Applying padding in/' package/Makefile
 
 # LuCI and mtwifi patches for padavanonly/immortalwrt-mt798x-6.6 only.
-# Do not reuse the openwrt-24.10 or master patch filenames in this chain.
-# Apply 1002 first (targets clean latest source), then 1000 (--recount adapts)
-[ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/mtwifi-6.6/1002-mtwifi-6.6-luci-status-overview-rate-mhz-hi.patch"
-
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/mtwifi-6.6/1000-mtwifi-6.6-luci-status-overview-wifi7-mlo.patch"
+
+[ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/mtwifi-6.6/1002-mtwifi-6.6-luci-status-overview-rate-mhz-hi.patch"
