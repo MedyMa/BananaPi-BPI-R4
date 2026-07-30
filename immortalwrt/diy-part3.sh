@@ -41,7 +41,8 @@ apply_workspace_patch() {
         return 0
     fi
 
-    git apply --recount --ignore-space-change --ignore-whitespace "$patch_file"
+    git apply --recount --ignore-space-change --ignore-whitespace "$patch_file" || \
+        patch -p1 --forward --ignore-whitespace -r /dev/null < "$patch_file"
 }
 
 install_kernel_patch() {
