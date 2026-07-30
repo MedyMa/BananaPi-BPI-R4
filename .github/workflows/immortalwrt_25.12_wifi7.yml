@@ -116,6 +116,8 @@ jobs:
         cd openwrt
         echo -e "$(nproc) thread compile"
         make -j$(nproc) || make -j$(($(nproc)/2 + 1)) || make -j1 V=s
+        CCACHE_DIR="$PWD/.ccache" staging_dir/host/bin/ccache --show-stats
+        du -sh .ccache
         echo "date1=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
         echo "date2=$(date "+%Y年%m月%d日")" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
@@ -135,7 +137,7 @@ jobs:
         CACHE_SCOPE: ${{ env.OPENWRT_NAME }}-${{ env.OPENWRT_DEVICE }}-${{ env.REPO_BRANCH }}
         CCACHE_PREFIX: ccache-${{ env.OPENWRT_NAME }}-${{ env.OPENWRT_DEVICE }}-${{ env.REPO_BRANCH }}-
         TOOLCHAIN_PREFIX: ${{ env.OPENWRT_NAME }}-${{ env.OPENWRT_DEVICE }}-${{ env.REPO_BRANCH }}-cache-openwrt-
-        CURRENT_CCACHE_KEY: ${{ steps.ccache-restore.outputs.cache-matched-key || steps.ccache-restore.outputs.cache-primary-key }}
+        CURRENT_CCACHE_KEY: ${{ steps.ccache-restore.outputs.cache-primary-key }}
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
