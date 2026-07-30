@@ -1,4 +1,5 @@
 diff --git a/feeds/luci/modules/luci-base/root/usr/share/rpcd/ucode/luci b/feeds/luci/modules/luci-base/root/usr/share/rpcd/ucode/luci
+index 55ea39b..8b8bb1e 100644
 --- a/feeds/luci/modules/luci-base/root/usr/share/rpcd/ucode/luci
 +++ b/feeds/luci/modules/luci-base/root/usr/share/rpcd/ucode/luci
 @@ -46,6 +46,125 @@ function callPackageVersionCheck(pkg) {
@@ -163,6 +164,7 @@ diff --git a/feeds/luci/modules/luci-base/root/usr/share/rpcd/ucode/luci b/feeds
  		call: function() {
  			const fd = open('/proc/net/arp', 'r');
 diff --git a/feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js b/feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js
+index 1c6b390..d836c4d 100644
 --- a/feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js
 +++ b/feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js
 @@ -25,31 +25,80 @@ return baseclass.extend({
@@ -256,7 +258,7 @@ diff --git a/feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/vie
  	handleDelClient: function(wifinet, mac, ev, cmd) {
  		var exec = cmd || 'disconnect';
  
-@@ -183,6 +229,7 @@ return baseclass.extend({
+@@ -183,6 +232,7 @@ return baseclass.extend({
  			network.getWifiDevices(),
  			network.getWifiNetworks(),
  			network.getHostHints(),
@@ -264,7 +266,7 @@ diff --git a/feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/vie
  			this.callSessionAccess('access-group', 'luci-mod-status-index-wifi', 'read'),
  			this.callSessionAccess('access-group', 'luci-mod-status-index-wifi', 'write'),
  			firewall.getZones(),
-@@ -217,9 +264,10 @@ return baseclass.extend({
+@@ -217,9 +267,10 @@ return baseclass.extend({
  		    radios = data[0],
  		    networks = data[1],
  		    hosthints = data[2],
@@ -278,7 +280,7 @@ diff --git a/feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/vie
  
  		var table = E('div', { 'class': 'network-status-table' });
  
-@@ -256,9 +304,10 @@ return baseclass.extend({
+@@ -256,9 +307,10 @@ return baseclass.extend({
  
  			for (var k = 0; k < networks[i].assoclist.length; k++) {
  				var bss = networks[i].assoclist[k],
@@ -293,6 +295,7 @@ diff --git a/feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/vie
  				var icon;
  				var q = Math.min((bss.signal + 110) / 70 * 100, 100);
 diff --git a/feeds/luci/modules/luci-mod-status/root/usr/share/rpcd/acl.d/luci-mod-status-index.json b/feeds/luci/modules/luci-mod-status/root/usr/share/rpcd/acl.d/luci-mod-status-index.json
+index db181fc..0cb1cc0 100644
 --- a/feeds/luci/modules/luci-mod-status/root/usr/share/rpcd/acl.d/luci-mod-status-index.json
 +++ b/feeds/luci/modules/luci-mod-status/root/usr/share/rpcd/acl.d/luci-mod-status-index.json
 @@ -60,7 +60,8 @@
