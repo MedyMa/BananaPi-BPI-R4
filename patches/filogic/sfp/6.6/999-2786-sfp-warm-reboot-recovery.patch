@@ -1,36 +1,36 @@
 From: MedyMa <aneylovemzy@gmail.com>
-Date: Wed, 29 Jul 2026 00:00:00 +0800
-Subject: [PATCH 6.6 v4] net: sfp: verify EEPROM during warm-reboot recovery
+Date: Sat, 1 Aug 2026 00:00:00 +0800
+Subject: [PATCH 6.6 v5] net: sfp: fix warm-reboot recovery on muxed I2C buses
 
-Warm reboots can leave a powered SFP module unable to answer I2C
-transactions. Verify the EEPROM before starting the SFP state machine and
-only attempt recovery when that read fails.
+Warm reboots can leave a powered SFP module unable to answer I2C.
+Verify the EEPROM before starting the SFP state machine and only
+attempt recovery when that read fails.
 
-Use five bounded attempts. Each attempt briefly toggles TX_DISABLE, restores
-the disabled state, performs I2C recovery under the segment lock, and reads
-the EEPROM again after the module settles. EEPROM readback is the only
-success criterion; module-presence GPIO state no longer terminates recovery.
-
-Resample the module state after recovery so a removal during the bounded
-delay cannot result in a stale insert event. The normal SFP state machine
-still runs after all attempts fail, preserving its retry and error handling.
-
+v5: walk up the I2C mux parent chain so i2c_recover_bus() reaches an
+adapter that actually supports recovery (a mux child adapter never
+has bus_recovery_info and previously made every attempt return
+-EBUSY); power-cycle the module first when the SFP node provides
+power-gpios; and briefly assert TX_DISABLE to reset GPON module
+firmware. EEPROM readback remains the only success criterion and the
+normal SFP state machine still runs after all attempts fail.
 Signed-off-by: MedyMa <aneylovemzy@gmail.com>
 ---
- drivers/net/phy/sfp.c | 80 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 80 insertions(+)
+ drivers/net/phy/sfp.c | 138 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 138 insertions(+)
 
 diff --git a/drivers/net/phy/sfp.c b/drivers/net/phy/sfp.c
 index 285ad5f..91abd07 100644
 --- a/drivers/net/phy/sfp.c
 +++ b/drivers/net/phy/sfp.c
-@@ -3211,11 +3211,86 @@ put:
+@@ -3211,11 +3211,133 @@ put:
  	return err;
  }
  
 +#define SFP_WARM_BOOT_RETRIES	5
-+#define SFP_WARM_BOOT_PULSE_MS	20
++#define SFP_WARM_BOOT_PULSE_MS	100
 +#define SFP_WARM_BOOT_SETTLE_MS	500
++#define SFP_WARM_BOOT_POWER_OFF_MS	500
++#define SFP_WARM_BOOT_POWER_ON_MS	1500
 +
 +static int sfp_warm_boot_read_eeprom(struct sfp *sfp)
 +{
@@ -44,7 +44,35 @@ index 285ad5f..91abd07 100644
 +	return ret < 0 ? ret : -EIO;
 +}
 +
-+static void sfp_warm_boot_recover(struct sfp *sfp)
++static int sfp_i2c_recover_bus(struct sfp *sfp)
++{
++	struct i2c_adapter *adap = sfp->i2c;
++	int ret = -EBUSY;
++
++	while (adap) {
++		ret = i2c_recover_bus(adap);
++		if (ret != -EBUSY)
++			break;
++		adap = i2c_parent_is_i2c_adapter(adap);
++	}
++
++	if (ret == -EBUSY) {
++		dev_dbg(sfp->dev, "warm boot: no I2C bus recovery support\n");
++		return -EOPNOTSUPP;
++	}
++
++	return ret;
++}
++
++static void sfp_warm_boot_power_cycle(struct sfp *sfp, struct gpio_desc *power)
++{
++	gpiod_set_value_cansleep(power, 0);
++	msleep(SFP_WARM_BOOT_POWER_OFF_MS);
++	gpiod_set_value_cansleep(power, 1);
++	msleep(SFP_WARM_BOOT_POWER_ON_MS);
++}
++
++static void sfp_warm_boot_recover(struct sfp *sfp, struct gpio_desc *power)
 +{
 +	int recover_ret, retry, ret;
 +
@@ -54,6 +82,19 @@ index 285ad5f..91abd07 100644
 +	ret = sfp_warm_boot_read_eeprom(sfp);
 +	if (!ret)
 +		return;
++
++	if (power) {
++		dev_warn(sfp->dev,
++			 "warm boot: EEPROM read failed (%d), power-cycling module\n",
++			 ret);
++		sfp_warm_boot_power_cycle(sfp, power);
++		ret = sfp_warm_boot_read_eeprom(sfp);
++		if (!ret) {
++			dev_info(sfp->dev,
++				 "warm boot: module recovered after power cycle\n");
++			return;
++		}
++	}
 +
 +	if (!sfp->gpio[GPIO_TX_DISABLE])
 +		dev_warn(sfp->dev,
@@ -65,14 +106,17 @@ index 285ad5f..91abd07 100644
 +			 ret, retry + 1, SFP_WARM_BOOT_RETRIES);
 +
 +		if (sfp->gpio[GPIO_TX_DISABLE]) {
-+			gpiod_set_value_cansleep(sfp->gpio[GPIO_TX_DISABLE], 0);
-+			msleep(SFP_WARM_BOOT_PULSE_MS);
++			/* Assert TX_DISABLE briefly: several GPON modules
++			 * reset their management firmware on this edge,
++			 * re-initialising the EEPROM interface. */
 +			gpiod_set_value_cansleep(sfp->gpio[GPIO_TX_DISABLE], 1);
++			msleep(SFP_WARM_BOOT_PULSE_MS);
++			gpiod_set_value_cansleep(sfp->gpio[GPIO_TX_DISABLE], 0);
 +		}
 +
 +		if (sfp->i2c) {
 +			i2c_lock_bus(sfp->i2c, I2C_LOCK_SEGMENT);
-+			recover_ret = i2c_recover_bus(sfp->i2c);
++			recover_ret = sfp_i2c_recover_bus(sfp);
 +			i2c_unlock_bus(sfp->i2c, I2C_LOCK_SEGMENT);
 +		} else {
 +			recover_ret = -ENODEV;
@@ -107,16 +151,28 @@ index 285ad5f..91abd07 100644
  	const struct sff_data *sff;
  	char *sfp_irq_name;
  	struct sfp *sfp;
++	struct gpio_desc *power;
 +	unsigned int state;
  	int err, i;
  
  	sfp = sfp_alloc(&pdev->dev);
-@@ -3278,6 +3353,11 @@ static int sfp_probe(struct platform_device *pdev)
+@@ -3278,6 +3400,22 @@ static int sfp_probe(struct platform_device *pdev)
  		sfp->state |= SFP_F_RS0;
  	sfp_set_state(sfp, sfp->state);
  	sfp_module_tx_disable(sfp);
 +	if (sfp->state & SFP_F_PRESENT) {
-+		sfp_warm_boot_recover(sfp);
++		power = devm_gpiod_get_optional(sfp->dev, "power",
++					       GPIOD_OUT_HIGH);
++		if (IS_ERR(power)) {
++			err = PTR_ERR(power);
++			if (err == -EPROBE_DEFER)
++				return err;
++			dev_warn(sfp->dev,
++				 "warm boot: power GPIO unavailable: %d\n",
++				 err);
++			power = NULL;
++		}
++		sfp_warm_boot_recover(sfp, power);
 +		state = sfp_get_state(sfp);
 +		sfp->state = state | (sfp->state & SFP_F_OUTPUTS);
 +	}
