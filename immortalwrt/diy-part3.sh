@@ -145,6 +145,10 @@ git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
 merge_package https://github.com/kenzok8/jell jell/adguardhome
 merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnsto-openwrt-package/ddnsto
 merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnsto-openwrt-package/luci-app-ddnsto
+# Fix ddnsto binary arch: the tarball ships ddnsto.aa64/8664/aa32/1b0c,
+# not ddnsto.$(ARCH), so map the hex code in the merged package Makefile.
+[ -f package/community/package/openwrt-packages/ddnsto/Makefile ] && \
+    sed -i 's/^PKG_ARCH_DDNSTO:=$(ARCH)$/PKG_ARCH_DDNSTO=$(ARCH_HEXCODE)/' package/community/package/openwrt-packages/ddnsto/Makefile
 merge_package "-b main https://github.com/linkease/nas-packages-luci" nas-packages-luci/luci/luci-app-baidudrive
 merge_package "-b master https://github.com/linkease/nas-packages" nas-packages/network/services/baidudrive
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-fan
