@@ -76,8 +76,6 @@ merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-mode
 merge_package https://github.com/kenzok8/jell jell/wrtbwmon
 merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnsto-openwrt-package/ddnsto
 merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnsto-openwrt-package/luci-app-ddnsto
-merge_package "-b main https://github.com/linkease/nas-packages-luci" nas-packages-luci/luci/luci-app-baidudrive
-merge_package "-b master https://github.com/linkease/nas-packages" nas-packages/network/services/baidudrive
 popd
 
 # Wireless stack migration lives in diy-part2.sh to keep diy-part1 focused on
