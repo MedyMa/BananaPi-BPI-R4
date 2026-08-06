@@ -2,19 +2,19 @@ From: Petr Wozniak <petr.wozniak@gmail.com>
 Date: Thu, 15 May 2026 12:00:00 +0200
 Subject: [PATCH] net: sfp: probe-based RTL8261BE rollball detection
 
-RTL8261BE is a pure media converter — it has no I2C-to-MDIO PHY bridge
+RTL8261BE is a pure media converter 鈥?it has no I2C-to-MDIO PHY bridge
 and does not support the ROLLBALL protocol. Previously, the kernel
 unconditionally matched it via sfp_fixup_rollball_cc, causing an 8-minute
 PHY probe retry loop that never succeeds.
 
 Add i2c_mii_probe_rollball() which sends the ROLLBALL unlock password,
 switches to the MDIO page, issues CMD_READ, and polls CMD_DONE for up
-to 200ms (10×20ms). A real RollBall bridge asserts CMD_DONE within ~70ms;
+to 200ms (10脳20ms). A real RollBall bridge asserts CMD_DONE within ~70ms;
 RTL8261BE (no bridge) never asserts it, so the probe times out.
 
 Modify sfp_fixup_rollball_cc() to call sfp_has_rollball_bridge() first:
-- Bridge detected  → MDIO_I2C_ROLLBALL + extended_cc fix (normal path)
-- No bridge (RTL8261BE) → MDIO_I2C_NONE (skip PHY probing entirely)
+- Bridge detected  鈫?MDIO_I2C_ROLLBALL + extended_cc fix (normal path)
+- No bridge (RTL8261BE) 鈫?MDIO_I2C_NONE (skip PHY probing entirely)
 
 Also fix mdio_i2c_alloc() to treat -ENODEV from rollball init as a
 non-fatal condition (gracefully downgrade to no MDIO bus).
@@ -121,5 +121,3 @@ index c3d4e5f6a..d4e5f6a7b 100644
 @@ -607,1 +607,2 @@ static const struct sfp_quirk sfp_quirks[] = {
 +	SFP_QUIRK_F("OEM", "SFP-10G-T-I", sfp_fixup_rollball_cc),
  	SFP_QUIRK_F("OEM", "SFP-10G-T", sfp_fixup_rollball_cc),
--- 
-2.45.0

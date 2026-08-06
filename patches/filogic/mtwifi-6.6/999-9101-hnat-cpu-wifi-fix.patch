@@ -164,5 +164,3 @@ Depends: 999-3067 (adds <linux/stddef.h> include to hnat_nf_hook.c)
  }
  
  static void mtk_hnat_nf_update(struct sk_buff *skb)
--- 
-2.45.0

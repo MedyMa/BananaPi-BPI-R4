@@ -188,5 +188,3 @@ index d4e5f6a7b..e5f6a7b8c 100644
  }
  
  static struct platform_driver sfp_driver = {
--- 
-2.45.0

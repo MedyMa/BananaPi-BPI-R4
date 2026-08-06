@@ -48,5 +48,3 @@ Depends: 9996-ext-hnat.patch
  
  		idx = NEXT_DESP_IDX(ring->calc_idx, ring->dma_size);
  		rxd = ring->dma + idx * eth->soc->rx.desc_size;
--- 
-2.45.0

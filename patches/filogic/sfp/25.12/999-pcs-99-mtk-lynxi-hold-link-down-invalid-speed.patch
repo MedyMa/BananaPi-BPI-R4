@@ -48,5 +48,3 @@ index a1b2c3d4e..b2c3d4e5f 100644
  }
  
  static void mtk_pcs_lynxi_hw_reset(struct mtk_pcs_lynxi *mpcs)
--- 
-2.45.0

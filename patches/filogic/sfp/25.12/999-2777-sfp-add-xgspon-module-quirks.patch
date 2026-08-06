@@ -33,5 +33,3 @@ index a1c2e3f4b..b2d3e4f5c 100644
  	SFP_QUIRK_F("HALNy", "HL-GSFP", sfp_fixup_halny_gsfp),
  
  	SFP_QUIRK_F("H-COM", "SPP425H-GAB4", sfp_fixup_potron),
--- 
-2.45.0
