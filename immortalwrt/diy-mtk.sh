@@ -223,7 +223,9 @@ _mt_wifi7_kconfig_replacement='$(foreach c, $(PKG_KCONFIG),$(if $(CONFIG_MTK_WIF
 if [ ! -f "$_mt_wifi7_makefile" ]; then
     echo "Required mt_wifi7 Makefile not found: $_mt_wifi7_makefile" >&2
     exit 1
-elif grep -qzF "$_mt_wifi7_kconfig_replacement" "$_mt_wifi7_makefile"; then
+elif grep -qE '^[[:space:]]*CONFIG_WIFI_DRIVER=\$\(CONFIG_MTK_WIFI7_DRIVER\)[[:space:]]*\\$' "$_mt_wifi7_makefile" && \
+     grep -qE '^[[:space:]]*CONFIG_DOT11_HE_AX=\$\(CONFIG_MTK_WIFI7_DOT11_AX_SUPPORT\)[[:space:]]*\\$' "$_mt_wifi7_makefile" && \
+     grep -qE '^[[:space:]]*CONFIG_DOT11_EHT_BE=\$\(CONFIG_MTK_WIFI7_DOT11_BE_SUPPORT\)[[:space:]]*\\$' "$_mt_wifi7_makefile"; then
     echo "[DIY] mt_wifi7/Makefile: vendor Kbuild mappings already present"
 elif grep -qF "$_mt_wifi7_kconfig_anchor" "$_mt_wifi7_makefile"; then
     patch_makefile_dep \
