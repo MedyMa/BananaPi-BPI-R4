@@ -145,7 +145,7 @@ jobs:
         TOOLCHAIN_PREFIX: ${{ env.OPENWRT_NAME }}-${{ env.OPENWRT_DEVICE }}-${{ env.REPO_BRANCH }}-cache-openwrt-
         CURRENT_CCACHE_KEY: ${{ steps.ccache-restore.outputs.cache-primary-key }}
       with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
+        github-token: ${{ secrets.GIT_USER_TOKEN }}
         script: |
           const owner = context.repo.owner;
           const repo = context.repo.repo;
@@ -260,7 +260,7 @@ jobs:
       uses: softprops/action-gh-release@v3
       if: steps.tag.outputs.status == 'success' && !cancelled()
       env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GIT_USER_TOKEN }}
       with:
         files: ${{ env.FIRMWARE }}/*
         name: ${{ steps.tag.outputs.release_tag }}
@@ -276,4 +276,4 @@ jobs:
         delete_tags: true
         delete_tag_pattern: '^.*-immortalwrt_MT7988_draft_mt798x-mt799x-6\.6-mtwifi$'
       env:
-        GITHUB_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        GITHUB_TOKEN: ${{ secrets.GIT_USER_TOKEN }}
