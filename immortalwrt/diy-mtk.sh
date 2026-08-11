@@ -212,6 +212,30 @@ if [ -f "package/mtk/drivers/mt_wifi7/Makefile" ] && \
     echo "[DIY] mt_wifi7/Makefile: CONFIG_*_card_name fixed for make expansion"
 fi
 
+# MTK mt_wifi7: map OpenWrt Kconfig names to vendor Kbuild names
+_mt_wifi7_makefile="package/mtk/drivers/mt_wifi7/Makefile"
+_mt_wifi7_kconfig_anchor='$(foreach c, $(PKG_KCONFIG),$(if $(CONFIG_MTK_WIFI7_$c),CONFIG_$(c)=$(CONFIG_MTK_WIFI7_$(c)))) \'
+_mt_wifi7_kconfig_replacement='$(foreach c, $(PKG_KCONFIG),$(if $(CONFIG_MTK_WIFI7_$c),CONFIG_$(c)=$(CONFIG_MTK_WIFI7_$(c)))) \
+		CONFIG_WIFI_DRIVER=$(CONFIG_MTK_WIFI7_DRIVER) \
+		CONFIG_DOT11_HE_AX=$(CONFIG_MTK_WIFI7_DOT11_AX_SUPPORT) \
+		CONFIG_DOT11_EHT_BE=$(CONFIG_MTK_WIFI7_DOT11_BE_SUPPORT) \'
+
+if [ ! -f "$_mt_wifi7_makefile" ]; then
+    echo "Required mt_wifi7 Makefile not found: $_mt_wifi7_makefile" >&2
+    exit 1
+elif grep -qzF "$_mt_wifi7_kconfig_replacement" "$_mt_wifi7_makefile"; then
+    echo "[DIY] mt_wifi7/Makefile: vendor Kbuild mappings already present"
+elif grep -qF "$_mt_wifi7_kconfig_anchor" "$_mt_wifi7_makefile"; then
+    patch_makefile_dep \
+        "$_mt_wifi7_makefile" \
+        "$_mt_wifi7_kconfig_anchor" \
+        "$_mt_wifi7_kconfig_replacement" || exit 1
+    echo "[DIY] mt_wifi7/Makefile: vendor Kbuild mappings injected"
+else
+    echo "Failed to locate mt_wifi7 Kconfig compile anchor in $_mt_wifi7_makefile" >&2
+    exit 1
+fi
+
 # datconf: disable parallel build (5 sub-packages share one CMake tree, race with -j>1)
 if [ -f "package/mtk/applications/datconf/Makefile" ] && \
    ! grep -q 'PKG_BUILD_PARALLEL' "package/mtk/applications/datconf/Makefile"; then
