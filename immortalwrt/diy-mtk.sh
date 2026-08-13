@@ -264,6 +264,20 @@ fi
 install -Dm0644 "$_mt_wifi7_declarations_patch_src" "$_mt_wifi7_declarations_patch_dst"
 echo "[DIY] mt_wifi7: GCC 14 missing declarations compatibility patch installed"
 
+# MTK mt_wifi7: rt_channel.c references MAX_TRANSMIT_POWER, which the
+# vendor source only defines locally in bcn.c. GCC 14 -Werror rejects the
+# undeclared identifier; provide the same constant in rt_channel.c.
+_mt_wifi7_max_tx_power_patch_src="$GITHUB_WORKSPACE/patches/filogic/25.12/1008-mt_wifi7-fix-max-transmit-power.patch"
+_mt_wifi7_max_tx_power_patch_dst="package/mtk/drivers/mt_wifi7/patches/016-fix-max-transmit-power.patch"
+
+if [ ! -f "$_mt_wifi7_max_tx_power_patch_src" ]; then
+    echo "Required mt_wifi7 compatibility patch not found: $_mt_wifi7_max_tx_power_patch_src" >&2
+    exit 1
+fi
+
+install -Dm0644 "$_mt_wifi7_max_tx_power_patch_src" "$_mt_wifi7_max_tx_power_patch_dst"
+echo "[DIY] mt_wifi7: MAX_TRANSMIT_POWER declaration compatibility patch installed"
+
 # datconf: disable parallel build (5 sub-packages share one CMake tree, race with -j>1)
 if [ -f "package/mtk/applications/datconf/Makefile" ] && \
    ! grep -q 'PKG_BUILD_PARALLEL' "package/mtk/applications/datconf/Makefile"; then
