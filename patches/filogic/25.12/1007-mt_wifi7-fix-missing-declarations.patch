@@ -1,0 +1,35 @@
+From: MedyMa <75345465+MedyMa@users.noreply.github.com>
+Subject: [PATCH] mt_wifi7: fix missing declarations under GCC 14
+
+The vendor sources use AC_NUM in sr_cmd.h without ensuring that the WMM
+access-category count is defined first. They also expose a pointer to
+mt_priv_pmksa_info in sta_cfg.h without a prior declaration, which GCC 14
+rejects because the build enables -Werror.
+
+Provide the standard four WMM access categories as a guarded fallback and
+forward-declare the PMKSA structure before it is used in function prototypes.
+
+--- a/mt_wifi/include/sr_cmd.h
++++ b/mt_wifi/include/sr_cmd.h
+@@ -20,6 +20,10 @@
+ 
+ #ifndef __CMM_SR_CMD_H__
+ #define __CMM_SR_CMD_H__
++
++#ifndef AC_NUM
++#define AC_NUM 4
++#endif
+ 
+ #ifdef CFG_SUPPORT_FALCON_SR
+ /*******************************************************************************
+--- a/mt_wifi/include/sta/sta_cfg.h
++++ b/mt_wifi/include/sta/sta_cfg.h
+@@ -28,6 +28,8 @@
+ 
+ #ifndef __STA_CFG_H__
+ #define __STA_CFG_H__
++
++struct mt_priv_pmksa_info;
+ 
+ INT RTMPSTAPrivIoctlSet(
+ 	IN RTMP_ADAPTER * pAd,

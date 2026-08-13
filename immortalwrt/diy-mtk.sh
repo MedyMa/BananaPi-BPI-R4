@@ -250,6 +250,20 @@ fi
 install -Dm0644 "$_mt_wifi7_unaligned_patch_src" "$_mt_wifi7_unaligned_patch_dst"
 echo "[DIY] mt_wifi7: Linux 6.12 unaligned header compatibility patch installed"
 
+# MTK mt_wifi7: GCC 14 rejects missing AC_NUM and PMKSA declarations under
+# the driver's -Werror policy. Keep this separate from the unaligned fix so
+# either compatibility patch can be reviewed or removed independently.
+_mt_wifi7_declarations_patch_src="$GITHUB_WORKSPACE/patches/filogic/25.12/1007-mt_wifi7-fix-missing-declarations.patch"
+_mt_wifi7_declarations_patch_dst="package/mtk/drivers/mt_wifi7/patches/015-fix-missing-declarations.patch"
+
+if [ ! -f "$_mt_wifi7_declarations_patch_src" ]; then
+    echo "Required mt_wifi7 compatibility patch not found: $_mt_wifi7_declarations_patch_src" >&2
+    exit 1
+fi
+
+install -Dm0644 "$_mt_wifi7_declarations_patch_src" "$_mt_wifi7_declarations_patch_dst"
+echo "[DIY] mt_wifi7: GCC 14 missing declarations compatibility patch installed"
+
 # datconf: disable parallel build (5 sub-packages share one CMake tree, race with -j>1)
 if [ -f "package/mtk/applications/datconf/Makefile" ] && \
    ! grep -q 'PKG_BUILD_PARALLEL' "package/mtk/applications/datconf/Makefile"; then
