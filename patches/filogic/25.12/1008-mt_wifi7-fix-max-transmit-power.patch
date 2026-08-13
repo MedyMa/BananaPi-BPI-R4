@@ -1,0 +1,26 @@
+From: MedyMa <75345465+MedyMa@users.noreply.github.com>
+Subject: [PATCH] mt_wifi7: define MAX_TRANSMIT_POWER for rt_channel.c
+
+BuildCountryIEChList in rt_channel.c assigns MaxTxPower =
+MAX_TRANSMIT_POWER, but the vendor source only defines that macro
+locally in bcn.c. Under the driver's -Werror policy, GCC 14 rejects the
+undeclared identifier and package/mtk/drivers/mt_wifi7 fails to build.
+
+Provide the same 30 dBm constant (matching bcn.c) behind an #ifndef
+guard so rt_channel.c compiles without changing runtime behavior.
+
+diff --git a/mt_wifi/common/rt_channel.c b/mt_wifi/common/rt_channel.c
+index 072444e..15c2e21 100644
+--- a/mt_wifi/common/rt_channel.c
++++ b/mt_wifi/common/rt_channel.c
+@@ -8,6 +8,10 @@
+ #include "hdev/hdev_basic.h"
+ #endif
+ 
++#ifndef MAX_TRANSMIT_POWER
++#define MAX_TRANSMIT_POWER 30
++#endif
++
+ CH_DESC Country_Region0_ChDesc_2GHZ[] = {
+ 	{1, 11, 2402, 2472, CHANNEL_DEFAULT_PROP},
+ 	{}
