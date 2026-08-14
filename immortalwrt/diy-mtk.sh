@@ -296,6 +296,22 @@ fi
 install -Dm0644 "$_mt_wifi7_sae_patch_src" "$_mt_wifi7_sae_patch_dst"
 echo "[DIY] mt_wifi7: incomplete SAE struct compatibility patch installed"
 
+# MTK mt_wifi7: struct wifi_dev's cac_required is guarded by
+# CONFIG_MAP_SUPPORT, but rt_channel.c (MTK_CFG80211_CHAN_SET_FLAG_CAC_REQUIRED
+# vendor cmd) and cmm_rdm_mt.c DfsZwBypassCac (MT_DFS_SUPPORT) use the field
+# unconditionally, so with MAP off every such TU fails with "no member named
+# 'cac_required'". Move the field out of the MAP guard.
+_mt_wifi7_cac_patch_src="$GITHUB_WORKSPACE/patches/filogic/25.12/1010-mt_wifi7-fix-cac-required-field.patch"
+_mt_wifi7_cac_patch_dst="package/mtk/drivers/mt_wifi7/patches/018-fix-cac-required-field.patch"
+
+if [ ! -f "$_mt_wifi7_cac_patch_src" ]; then
+    echo "Required mt_wifi7 compatibility patch not found: $_mt_wifi7_cac_patch_src" >&2
+    exit 1
+fi
+
+install -Dm0644 "$_mt_wifi7_cac_patch_src" "$_mt_wifi7_cac_patch_dst"
+echo "[DIY] mt_wifi7: cac_required field compatibility patch installed"
+
 # datconf: disable parallel build (5 sub-packages share one CMake tree, race with -j>1)
 if [ -f "package/mtk/applications/datconf/Makefile" ] && \
    ! grep -q 'PKG_BUILD_PARALLEL' "package/mtk/applications/datconf/Makefile"; then

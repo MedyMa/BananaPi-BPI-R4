@@ -1,0 +1,45 @@
+From: MedyMa <75345465+MedyMa@users.noreply.github.com>
+Subject: [PATCH] mt_wifi7: fix cac_required field hidden behind CONFIG_MAP_SUPPORT
+
+struct wifi_dev's cac_required member is wrapped in
+"#ifdef CONFIG_MAP_SUPPORT", but the field is DFS/CAC state used by
+non-MAP code paths too:
+
+  - rt_channel.c mtk_cfg80211_vndr_cmd_set_channel_attributes handles
+    MTK_CFG80211_CHAN_SET_FLAG_CAC_REQUIRED unconditionally and writes
+    wdev.cac_required (always compiled in AP mode);
+  - cmm_rdm_mt.c DfsZwBypassCac reads wdev.cac_required under
+    "#if defined(MT_DFS_SUPPORT)".
+
+With CONFIG_MAP_SUPPORT left off (default in the OpenWrt Kconfig),
+every TU using the field fails with:
+
+  error: 'struct wifi_dev' has no member named 'cac_required'
+
+Move the single UCHAR field out of the CONFIG_MAP_SUPPORT guard so it
+is always present; MAPCfg, dev_role and cac_capability stay guarded.
+CAC_REQUIRED_* (mt_rdm.h) are already defined unconditionally.
+
+diff --git a/mt_wifi/include/rtmp.h b/mt_wifi/include/rtmp.h
+index b147465..2a309b2 100644
+--- a/mt_wifi/include/rtmp.h
++++ b/mt_wifi/include/rtmp.h
+@@ -2832,13 +2832,17 @@ struct wifi_dev {
+ 	UCHAR quick_ch_change;
+ #ifdef CONFIG_MAP_SUPPORT
+ 	MAP_CONFIG MAPCfg;
+-	UCHAR cac_required;
+ 
+ 	UCHAR dev_role;
+ #ifdef DFS_CAC_R2
+ 	struct cac_capability_lib cac_capability;
+ #endif
+ #endif
++	/* cac_required is DFS/CAC state used outside the MAP feature too:
++	 * rt_channel.c (MTK_CFG80211_CHAN_SET_FLAG_CAC_REQUIRED vendor cmd) and
++	 * cmm_rdm_mt.c DfsZwBypassCac (compiled under MT_DFS_SUPPORT). Keep the
++	 * field outside the CONFIG_MAP_SUPPORT guard so non-MAP builds compile. */
++	UCHAR cac_required;
+ 	UINT8 auto_channel_cen_ch_2;
+ 	BOOLEAN is_marvell_ap;
+ 	VOID *pDot11_H;
