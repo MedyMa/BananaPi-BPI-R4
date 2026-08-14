@@ -60,21 +60,6 @@ install_kernel_patch() {
     install -m 0644 "$patch_file" "$target_patch"
 }
 
-install_mtwifi_patch() {
-    local patch_file="$1"
-    local patch_dir="package/mtk/drivers/mt_wifi7/patches"
-    local target_patch="$patch_dir/$(basename "$patch_file")"
-
-    [ -f "$patch_file" ] || return 0
-    [ -d "$patch_dir" ] || return 0
-
-    if [ -f "$target_patch" ] && cmp -s "$patch_file" "$target_patch"; then
-        return 0
-    fi
-
-    install -m 0644 "$patch_file" "$target_patch"
-}
-
 patch_bpi_r4_sysupgrade_itb_check() {
     local platform_sh="target/linux/mediatek/filogic_a73/base-files/lib/upgrade/platform.sh"
 
@@ -185,12 +170,6 @@ install_kernel_patch \
 install_kernel_patch \
     "${GITHUB_WORKSPACE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/patches/filogic/mtwifi-6.6/9996-zz-hnat-mtk-eth-sg-ppd-fix.patch" \
     "9996-zz-hnat-mtk-eth-sg-ppd-fix.patch"
-
-# 5G 160MHz: every country with a complete 5G block (36-64/100-128/
-# 149-177) can use 160MHz; US additionally exposes the full 5G band
-# (36-48, 52-64, 100-144, 149-177). Works for WiFi6 and WiFi7.
-install_mtwifi_patch \
-    "${GITHUB_WORKSPACE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/patches/filogic/mtwifi-6.6/1010-mtwifi-6.6-5g-160mhz.patch"
 
 # add luci-app-OpenClash
 mkdir -p package/OpenClash
