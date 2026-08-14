@@ -278,6 +278,24 @@ fi
 install -Dm0644 "$_mt_wifi7_max_tx_power_patch_src" "$_mt_wifi7_max_tx_power_patch_dst"
 echo "[DIY] mt_wifi7: MAX_TRANSMIT_POWER declaration compatibility patch installed"
 
+# MTK mt_wifi7: with CONFIG_MTK_WIFI7_CFG80211_SUPPORT=y the vendor build
+# defines RT_CFG80211_SUPPORT, which makes owe_cmm.h skip its sae_cmm.h
+# include ("#ifndef RT_CFG80211_SUPPORT"). sec_cmm.h still compiles the
+# struct pwd_id_list / struct sae_capability fields under
+# DOT11_SAE_SUPPORT, but only pulls sae_cmm.h in under SUPP_SAE_SUPPORT,
+# so with APCLI_SUPPLICANT_SUPPORT off every TU fails with "field ...
+# has incomplete type". Align the include guard with the field guard.
+_mt_wifi7_sae_patch_src="$GITHUB_WORKSPACE/patches/filogic/25.12/1009-mt_wifi7-fix-incomplete-sae-structs.patch"
+_mt_wifi7_sae_patch_dst="package/mtk/drivers/mt_wifi7/patches/017-fix-incomplete-sae-structs.patch"
+
+if [ ! -f "$_mt_wifi7_sae_patch_src" ]; then
+    echo "Required mt_wifi7 compatibility patch not found: $_mt_wifi7_sae_patch_src" >&2
+    exit 1
+fi
+
+install -Dm0644 "$_mt_wifi7_sae_patch_src" "$_mt_wifi7_sae_patch_dst"
+echo "[DIY] mt_wifi7: incomplete SAE struct compatibility patch installed"
+
 # datconf: disable parallel build (5 sub-packages share one CMake tree, race with -j>1)
 if [ -f "package/mtk/applications/datconf/Makefile" ] && \
    ! grep -q 'PKG_BUILD_PARALLEL' "package/mtk/applications/datconf/Makefile"; then
