@@ -156,38 +156,37 @@ if grep -q 'mkdir $(PKG_BUILD_DIR)/bin' feeds/packages/net/vpnc/Makefile 2>/dev/
     sed -i '/mkdir $(PKG_BUILD_DIR)\/bin/s/mkdir /mkdir -p /' feeds/packages/net/vpnc/Makefile
 fi
 
-# hostapd: keep MTK private MLO PMKSA patch out of non-BE builds
-patch_makefile_dep \
-    package/network/services/hostapd/patches/975-mtk-mlo-pass-pmksa-link-address.patch \
-    '@@ -1158,6 +1158,18 @@ static int sae_assign_vlan(struct hostap' \
-    '@@ -1158,6 +1158,21 @@ static int sae_assign_vlan(struct hostap' \
-    && echo "[DIY] hostapd 975 hunk header: 18 -> 21" \
-    || echo "[DIY] hostapd 975 hunk header: SKIP (already patched or not found)"
-patch_makefile_dep \
-    package/network/services/hostapd/patches/975-mtk-mlo-pass-pmksa-link-address.patch \
-    '+	bool is_ml = ap_sta_has_ml_rsn(hapd, sta);
-+
-+	if (is_ml) {
-+		u8 link_id = sta->mld_assoc_link_id;
-+
-+		/* PMKSA is keyed by MLD address; driver sync also needs link addr. */
-+		pmksa_addr = sta->mld_info.common_info.mld_addr;
-+		pmksa_link_addr = sta->mld_info.links[link_id].peer_addr;
-+	}' \
-    '+	bool is_ml = false;
-+
-+#ifdef CONFIG_IEEE80211BE
-+	is_ml = ap_sta_has_ml_rsn(hapd, sta);
-+	if (is_ml) {
-+		u8 link_id = sta->mld_assoc_link_id;
-+
-+		/* PMKSA is keyed by MLD address; driver sync also needs link addr. */
-+		pmksa_addr = sta->mld_info.common_info.mld_addr;
-+		pmksa_link_addr = sta->mld_info.links[link_id].peer_addr;
-+	}
-+#endif /* CONFIG_IEEE80211BE */' \
-    && echo "[DIY] hostapd 975 guard: #ifdef CONFIG_IEEE80211BE injected" \
-    || echo "[DIY] hostapd 975 guard: SKIP (already patched or not found)"
+# hostapd: keep MTK private MLO PMKSA patch (975) out of non-11BE builds.
+# The upstream patch references sta->mld_assoc_link_id / sta->mld_info, which
+# only exist under CONFIG_IEEE80211BE; this tree builds wpad without 11BE
+# (DRIVER_11x_SUPPORT are default-n hidden symbols and `make defconfig` resets
+# them), so the MLO block must be compiled out. Upstream rewrote the patch on
+# 2025-08-15/16 (new pmksa_addr/pmksa_link_addr variables, new comment style),
+# which broke the previous literal-text guard injection. Use regex-based guards
+# that survive comment/text churn, and bump the hunk line count by the +3 lines
+# the injection adds.
+_mt975="package/network/services/hostapd/patches/975-mtk-mlo-pass-pmksa-link-address.patch"
+if [ -f "$_mt975" ]; then
+    if perl -0777 -e '
+        local $/;
+        my $txt = <STDIN>;
+        my $n = 0;
+        $n++ if $txt =~ s/^(\+\t)bool is_ml = ap_sta_has_ml_rsn\(hapd, sta\);\n/${1}bool is_ml = false;\n+#ifdef CONFIG_IEEE80211BE\n${1}is_ml = ap_sta_has_ml_rsn(hapd, sta);\n/m;
+        $n++ if $txt =~ s/^(\+\tif \(is_ml\) \{.*?^(\+\t)\}\n)/$1+#endif \/* CONFIG_IEEE80211BE *\/\n/ms;
+        if ($n == 2) {
+            $txt =~ s/^(\@\@ [^\n]*\+[0-9]+,)(\d+)( \@\@(?=[^\n]*\n \n void sae_accept_sta))/sprintf("%s%d%s", $1, $2 + 3, $3)/me;
+            print $txt;
+            exit 0;
+        }
+        exit 2;
+    ' < "$_mt975" > "$_mt975.new"; then
+        mv "$_mt975.new" "$_mt975"
+        echo "[DIY] hostapd 975 guard: #ifdef CONFIG_IEEE80211BE injected (regex, hunk count +3)"
+    else
+        rm -f "$_mt975.new"
+        echo "[DIY] hostapd 975 guard: SKIP - 975 patch format changed, MLO block left unguarded" >&2
+    fi
+fi
 
 # MTK Wi-Fi profiles: replace chasey-dev version with padavanonly's mt7990-only build
 # (chasey-dev version references nonexistent mt7622/mt7615 files and uses broken
