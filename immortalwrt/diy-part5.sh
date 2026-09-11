@@ -74,7 +74,7 @@ popd
 
 # luci-app-mosdns
 rm -rf feeds/packages/lang/golang
-git clone --depth=1 https://github.com/sbwml/packages_lang_golang -b 26.x feeds/packages/lang/golang
+git clone --depth=1 https://github.com/sbwml/packages_lang_golang -b 27.x feeds/packages/lang/golang
 rm -rf feeds/packages/net/mosdns
 git clone --depth=1 https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
 
@@ -84,27 +84,13 @@ pushd package/OpenClash
 git clone --depth=1 https://github.com/vernesong/OpenClash
 popd
 
-# simple-obfs: skip tarball hash (git archive + submodule produces non-deterministic hash)
-patch_makefile_dep \
+# helloworld simple-obfs / shadowsocks-libev: git archive + submodules produce a
+# non-deterministic tarball, so replace PKG_MIRROR_HASH line-wise (no hardcoded hash)
+for f in \
     package/community/helloworld/simple-obfs/Makefile \
-    'PKG_MIRROR_HASH:=7a0154d2de18373e52783d1b64cf5204471049c2d2c64f0b3323d7f430aa4275' \
-    'PKG_MIRROR_HASH:=skip'
-    
-# Fix non-deterministic PKG_MIRROR_HASH in helloworld/shadowsocks-libev
-patch_makefile_dep \
-    package/community/helloworld/shadowsocks-libev/Makefile \
-    'PKG_MIRROR_HASH:=b3898ad0a557bc8b0bbb2f3888101d461944239b0b7d4d4c6f164d73694a4595' \
-    'PKG_MIRROR_HASH:=skip'
-
-# shadowsocksr-libev: replace brittle LTO with no-lto
-[ -f package/community/openwrt-passwall-packages/shadowsocksr-libev/Makefile ] && {
-    sed -i '/^[[:space:]]*TARGET_CFLAGS += -flto$/c\PKG_BUILD_FLAGS+=no-lto' \
-        package/community/openwrt-passwall-packages/shadowsocksr-libev/Makefile
-    patch_makefile_dep \
-        package/community/openwrt-passwall-packages/shadowsocksr-libev/Makefile \
-        '146fa4511a52da2aaa1e11ea0294cfb450e62643156c5da3b10e037ef43961f6' \
-        'skip'
-}
+    package/community/helloworld/shadowsocks-libev/Makefile; do
+    [ -f "$f" ] && sed -i '/^PKG_MIRROR_HASH:=/s/:=.*/:=skip/' "$f"
+done
 
 # GCC 14 + musl fortify workaround for mbedtls
 if ! grep -q '_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile; then
