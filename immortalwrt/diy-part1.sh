@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# Merge_package
 function merge_package(){
     repo=`echo $1 | rev | cut -d'/' -f 1 | rev`
     pkg=`echo $2 | rev | cut -d'/' -f 1 | rev`
@@ -44,8 +43,7 @@ apply_workspace_patch() {
     git apply --recount --ignore-space-change --ignore-whitespace "$patch_file"
 }
 
-# Remove feeds packages that will be replaced by community clones below.
-# This MUST run after the workflow's initial feeds update but BEFORE feeds install.
+# Remove feed packages replaced by community clones (before feeds install)
 rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/luci/applications/luci-app-argon-config
 rm -rf feeds/luci/applications/luci-app-passwall
@@ -53,7 +51,7 @@ rm -rf feeds/luci/applications/luci-app-modemband
 rm -rf feeds/packages/net/adguardhome
 rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2socks,hysteria,ipt2socks,microsocks,naiveproxy,shadowsocks-libev,shadowsocks-rust,shadowsocksr-libev,simple-obfs,tcping,trojan-plus,tuic-client,v2ray-plugin,xray-plugin,geoview,shadow-tls}
 
-# Clone community packages to package/community
+# Clone community packages
 mkdir -p package/community
 pushd package/community
 git clone --depth=1 -b dev https://github.com/fw876/helloworld
@@ -78,16 +76,13 @@ merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnst
 merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnsto-openwrt-package/luci-app-ddnsto
 popd
 
-# Wireless stack migration lives in diy-part2.sh to keep diy-part1 focused on
-# feed/package preparation.
+# Wireless stack migration lives in diy-part2.sh
 
-# add luci-app-mosdns
 rm -rf feeds/packages/lang/golang
 git clone --depth=1 https://github.com/sbwml/packages_lang_golang -b 27.x feeds/packages/lang/golang
 rm -rf feeds/packages/net/mosdns
 git clone --depth=1 https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
 
-# add luci-app-OpenClash
 mkdir -p package/OpenClash
 pushd package/OpenClash
 git clone --depth=1 https://github.com/vernesong/OpenClash
@@ -95,7 +90,7 @@ popd
 
 # merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/package/mtk/applications/mtkhqos_util
 
-# openwrt-24.10 compatibility fixes for floating packages feed metadata.
+# openwrt-24.10 feed metadata compatibility fixes
 patch_makefile_dep \
     feeds/packages/lang/python/python-ubus/Makefile \
     'PKG_BUILD_DEPENDS:=python-setuptools/host' \
@@ -114,7 +109,13 @@ patch_makefile_dep \
     'libnetsnmp-ssl' \
     'libnetsnmp'
     
-# Shrink the BPI-R4 U-Boot autoboot wait so boot time is not dominated by a 30s delay.
+# containerd vendors cpuid v2.0.4, which trips the Go >= 1.23 linkname check
+f=feeds/packages/utils/containerd/Makefile
+if [ -f "$f" ] && ! grep -q 'checklinkname=0' "$f"; then
+    printf '\nMAKE_FLAGS += EXTRA_LDFLAGS=-checklinkname=0\n' >> "$f"
+fi
+
+# Shrink BPI-R4 U-Boot autoboot wait (30s -> 10s)
 patch_makefile_dep \
     package/boot/uboot-mediatek/patches/450-add-bpi-r4.patch \
     'CONFIG_BOOTDELAY=30' \
@@ -122,8 +123,7 @@ patch_makefile_dep \
 
 ./scripts/feeds install -a
 
-# LuCI patches for immortalwrt/openwrt-24.10 only. Keep these filenames
-# separate from the padavanonly mtwifi 6.6 patch set used by diy-part3.sh.
+# LuCI patches for immortalwrt/openwrt-24.10 (not the diy-part3.sh mtwifi set)
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/24.10/1000-openwrt-24.10-luci-status-overview-wifi7-mlo.patch"
 

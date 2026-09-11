@@ -1,5 +1,5 @@
 #!/bin/bash
-#
+
 # Modify default IP
 sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generate
 
@@ -26,8 +26,7 @@ validate_and_apply_mt76_patch() {
     (cd package/kernel/mt76 && patch -p1 < "$patch_file")
 }
 
-# openwrt-25.12 上游已自带 mt7990-firmware，只需追加 wed_enable=1 参数。
-# 使用 master 版 patch（仅添加 MODPARAMS），非 master 版会重复添加 mt7990-firmware。
+# 25.12 上游自带 mt7990-firmware，只需 master 版 patch 追加 wed_enable=1
 MT76_PATCH="1005-mt76-makefile-2ab64980-master.patch"
 
 validate_and_apply_mt76_patch \

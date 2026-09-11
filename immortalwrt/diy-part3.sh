@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# Merge_package
 function merge_package(){
     repo=`echo $1 | rev | cut -d'/' -f 1 | rev`
     pkg=`echo $2 | rev | cut -d'/' -f 1 | rev`
@@ -144,7 +143,7 @@ rm -rf package/mtk/applications/luci-app-turboacc-mtk
 rm -rf feeds/packages/net/adguardhome
 rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2socks,hysteria,ipt2socks,microsocks,naiveproxy,shadowsocks-libev,shadowsocks-rust,shadowsocksr-libev,simple-obfs,tcping,trojan-plus,tuic-client,v2ray-plugin,xray-plugin,geoview,shadow-tls}
 
-# Clone community packages to package/community
+# Clone community packages
 mkdir -p package/community
 pushd package/community
 git clone --depth=1 -b dev https://github.com/fw876/helloworld
@@ -167,7 +166,6 @@ merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-sfp-
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-turboacc-mtk
 popd
 
-# add luci-app-mosdns
 rm -rf feeds/packages/lang/golang
 git clone https://github.com/sbwml/packages_lang_golang -b 27.x feeds/packages/lang/golang
 rm -rf feeds/packages/net/mosdns
@@ -180,19 +178,16 @@ install_kernel_patch \
     "${GITHUB_WORKSPACE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/patches/filogic/mtwifi-6.6/999-9101-hnat-cpu-wifi-fix.patch" \
     "999-9101-hnat-cpu-wifi-fix.patch"
 
-# Apply after 9996-ext-hnat.patch: preserve PPE routing for every QDMA SG
-# descriptor and reset PPD state for every packet in the NAPI RX loop.
+# Apply after 9996-ext-hnat.patch (PPE routing for QDMA SG / PPD state)
 install_kernel_patch \
     "${GITHUB_WORKSPACE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/patches/filogic/mtwifi-6.6/9996-zz-hnat-mtk-eth-sg-ppd-fix.patch" \
     "9996-zz-hnat-mtk-eth-sg-ppd-fix.patch"
 
-# 5G 160MHz: every country with a complete 5G block (36-64/100-128/
-# 149-177) can use 160MHz; US additionally exposes the full 5G band
-# (36-48, 52-64, 100-144, 149-177). Works for WiFi6 and WiFi7.
+# 5G 160MHz: countries with a complete 5G block get 160MHz; US also exposes the
+# full 5G band (36-48, 52-64, 100-144, 149-177). WiFi6 + WiFi7.
 install_mtwifi_patch \
     "${GITHUB_WORKSPACE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/patches/filogic/mtwifi-6.6/1010-mtwifi-6.6-5g-160mhz.patch"
 
-# add luci-app-OpenClash
 mkdir -p package/OpenClash
 pushd package/OpenClash
 git clone --depth=1  https://github.com/vernesong/OpenClash
@@ -203,12 +198,10 @@ popd
 sed -i 's|24.10-SNAPSHOT|24.10.6|g' include/version.mk
 sed -i 's|24.10-SNAPSHOT|24.10.6|g' package/base-files/image-config.in
 
-# padavanonly filogic_a73 upgrades these boards via fit_do_upgrade, but
-# platform_check_image still checked them like tar sysupgrade.bin images.
+# padavanonly filogic_a73 upgrades via fit_do_upgrade; fix platform_check_image
 patch_bpi_r4_sysupgrade_itb_check
 
-# Belt-and-suspenders: uci-defaults script that writes the correct distfeeds.conf
-# on first boot, in case any other post-install script reverts it.
+# uci-defaults fallback that rewrites distfeeds.conf on first boot
 mkdir -p files/etc/uci-defaults
 cat > files/etc/uci-defaults/99-fix-distfeeds <<'UCIEOF'
 #!/bin/sh
@@ -228,12 +221,17 @@ chmod +x files/etc/uci-defaults/99-fix-distfeeds
 rm -rf feeds/luci
 ./scripts/feeds update -a
 
-# helloworld shadowsocks-libev: git archive + submodules produce a
-# non-deterministic tarball, so replace PKG_MIRROR_HASH line-wise (no hardcoded hash)
+# helloworld shadowsocks-libev: skip the non-deterministic PKG_MIRROR_HASH
 for f in \
     package/community/helloworld/shadowsocks-libev/Makefile; do
     [ -f "$f" ] && sed -i '/^PKG_MIRROR_HASH:=/s/:=.*/:=skip/' "$f"
 done
+
+# containerd vendors cpuid v2.0.4, which trips the Go >= 1.23 linkname check
+f=feeds/packages/utils/containerd/Makefile
+if [ -f "$f" ] && ! grep -q 'checklinkname=0' "$f"; then
+    printf '\nMAKE_FLAGS += EXTRA_LDFLAGS=-checklinkname=0\n' >> "$f"
+fi
 
 # GCC 14 + musl fortify workaround for mbedtls
 if ! grep -q '_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile; then
@@ -244,7 +242,7 @@ if ! grep -q '_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile; then
   fi
 fi
 
-# Search multiple path variants: base package dir, feeds/base, and the feeds-installed symlink target.
+# locate libcrypt-compat references across all feed path variants
 _purge_libcrypt_compat() {
     local pattern='+USE_GLIBC:libcrypt-compat'
     local paths=(
@@ -255,8 +253,7 @@ _purge_libcrypt_compat() {
         package/system/rpcd/Makefile
         package/network/services/uhttpd/Makefile
     )
-    # Alternative locations after feeds update/install.
-    # The base feed may preserve the full "package/" prefix or strip it.
+    # feed copies may keep or strip the "package/" prefix
     for basedir in feeds/base package/feeds/base; do
         for pfx in '' 'package/'; do
             paths+=(
@@ -295,7 +292,7 @@ patch_makefile_dep \
     'libnetsnmp-ssl' \
     'libnetsnmp'
     
-# Shrink the BPI-R4 U-Boot autoboot wait so boot time is not dominated by a 30s delay.
+# Shrink BPI-R4 U-Boot autoboot wait (30s -> 10s)
 patch_makefile_dep \
     package/boot/uboot-mediatek/patches/450-add-bpi-r4.patch \
     'CONFIG_BOOTDELAY=30' \
@@ -316,8 +313,7 @@ patch_makefile_dep \
 	sed -i '/groups = "mdc_mdio0";/{N; s/drive-strength = <MTK_DRIVE_8mA>/drive-strength = <MTK_DRIVE_10mA>/}' \
 		target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a.dtsi
 
-	# Keep the BPI-R4 SFP I2C mux from leaving an SFP channel selected across
-	# idle periods. This helps warm-reboot SFP reprobe reliability.
+	# keep the SFP I2C mux from staying selected across idle periods
 	for dts in \
 		mt7988a-bananapi-bpi-r4.dtsi \
 		mt7988a-bananapi-bpi-r4-pro.dts
@@ -328,15 +324,10 @@ patch_makefile_dep \
 		i2c-mux-idle-disconnect;' "$dts_path"
 	done
 
-	# Do not force mediatek,pnswap-rx on BPI-R4. The board DTS does not set it
-	# upstream, and forcing PCS RX polarity can break RTL8672/RTL9601C copper
-	# or GPON SFP modules during EEPROM/PHY probe.
+	# do not force mediatek,pnswap-rx (breaks some copper/GPON SFP modules)
 	bpi_dtsi="target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4.dtsi"
 	if [ -f "$bpi_dtsi" ] && grep -q 'mediatek,pnswap-rx' "$bpi_dtsi"; then
-		# Match each &usxgmiisys{0,1} pnswap-rx block independently so the
-		# removal succeeds even when comments or blank lines separate the two
-		# blocks (the original regex required them to be adjacent and would
-		# silently fail to match if they weren't, leaving pnswap-rx in place).
+		# match each &usxgmiisys{0,1} block independently (blank lines may separate them)
 		perl -0pi -e 's/\n[ \t]*&usxgmiisys[01][ \t]*\{[ \t]*\n[ \t]*mediatek,pnswap-rx;[ \t]*\n[ \t]*\};[ \t]*(?:\r?\n)?//g' "$bpi_dtsi"
 	fi
 }
@@ -352,7 +343,7 @@ patch_makefile_dep \
 # Re-patch libcrypt-compat after feeds install in case feed symlinks/copies brought it back
 _purge_libcrypt_compat
 
-# Downgrade the usign SHA-512 padding warning from ERROR_MESSAGE (red/scary) 
+# Downgrade the usign SHA-512 padding warning from ERROR_MESSAGE
 sed -i 's/ERROR_MESSAGE,WARNING: Applying padding in/MESSAGE,WARNING: Applying padding in/' package/Makefile
 
 # LuCI and mtwifi patches for padavanonly/immortalwrt-mt798x-6.6 only.

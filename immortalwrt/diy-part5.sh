@@ -1,7 +1,5 @@
 #!/bin/bash
-#
 # diy-part5.sh — ImmortalWrt 25.12 feeds & community packages
-#
 
 merge_package(){
     repo=`echo $1 | rev | cut -d'/' -f 1 | rev`
@@ -45,7 +43,7 @@ apply_workspace_patch() {
     git apply --recount --ignore-space-change --ignore-whitespace "$patch_file"
 }
 
-# Remove upstream feeds replaced by community clones below
+# Remove feed packages replaced by community clones
 rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/luci/applications/luci-app-argon-config
 rm -rf feeds/luci/applications/luci-app-passwall
@@ -72,25 +70,28 @@ merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnst
 merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnsto-openwrt-package/luci-app-ddnsto
 popd
 
-# luci-app-mosdns
 rm -rf feeds/packages/lang/golang
 git clone --depth=1 https://github.com/sbwml/packages_lang_golang -b 27.x feeds/packages/lang/golang
 rm -rf feeds/packages/net/mosdns
 git clone --depth=1 https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
 
-# luci-app-OpenClash
 mkdir -p package/OpenClash
 pushd package/OpenClash
 git clone --depth=1 https://github.com/vernesong/OpenClash
 popd
 
-# helloworld simple-obfs / shadowsocks-libev: git archive + submodules produce a
-# non-deterministic tarball, so replace PKG_MIRROR_HASH line-wise (no hardcoded hash)
+# helloworld simple-obfs/shadowsocks-libev: skip the non-deterministic PKG_MIRROR_HASH
 for f in \
     package/community/helloworld/simple-obfs/Makefile \
     package/community/helloworld/shadowsocks-libev/Makefile; do
     [ -f "$f" ] && sed -i '/^PKG_MIRROR_HASH:=/s/:=.*/:=skip/' "$f"
 done
+
+# containerd vendors cpuid v2.0.4, which trips the Go >= 1.23 linkname check
+f=feeds/packages/utils/containerd/Makefile
+if [ -f "$f" ] && ! grep -q 'checklinkname=0' "$f"; then
+    printf '\nMAKE_FLAGS += EXTRA_LDFLAGS=-checklinkname=0\n' >> "$f"
+fi
 
 # GCC 14 + musl fortify workaround for mbedtls
 if ! grep -q '_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile; then
@@ -116,8 +117,6 @@ fi
 
 # Feed deps needed by community clones (pcre2 is in main tree since 25.12)
 ./scripts/feeds install c-ares udns
-
-
 
 # Remove kiddin9 APK repo (triggers broken video/ sub-repo)
 for f in \
@@ -145,10 +144,7 @@ export GOPROXY=https://proxy.golang.org,direct
 
 # Compatibility fixes for floating feeds metadata
 # rust: rust-lang pruned the 1.94.0 CI LLVM artifacts, so download-ci-llvm=true
-# 404s and rust/host (required by shadowsocks-rust) fails to build. Build LLVM
-# from source instead (mirrors immortalwrt/packages 47cadedca2). configure.py
-# dedupes repeated --set flags with last-wins, so the flag must be REPLACED,
-# not duplicated.
+# 404s; build LLVM from source instead (configure.py: last --set wins).
 _rust_makefile="feeds/packages/lang/rust/Makefile"
 if [ -f "$_rust_makefile" ]; then
     if grep -qF -- '--set=llvm.download-ci-llvm=false' "$_rust_makefile"; then
@@ -165,9 +161,7 @@ if [ -f "$_rust_makefile" ]; then
     fi
 fi
 
-# luci-ssl-openssl: the luci feed's 2026-08-24 merge made it depend on
-# px5g-openssl. The immortalwrt 25.12 tree ships it, but guard anyway and fall
-# back to px5g-standalone if a future tree drops it (same /usr/sbin/px5g).
+# luci-ssl-openssl: fall back to px5g-standalone if px5g-openssl is absent
 _ssl_makefile="feeds/luci/collections/luci-ssl-openssl/Makefile"
 if [ -f "$_ssl_makefile" ] && \
     grep -qF -- '+px5g-openssl' "$_ssl_makefile" && \
@@ -180,10 +174,8 @@ if [ -f "$_ssl_makefile" ] && \
     echo "[DIY] luci-ssl-openssl: dep px5g-openssl -> px5g-standalone"
 fi
 
-# kernel 6.12.103: the 2026-08-24 "Merge Official Source" added fmsh SPI-NAND
-# backport patches (436/437) whose context does not match the 6.12.103 kernel,
-# breaking toolchain/kernel-headers. The fmsh chips are not used by BPI-R4, so
-# drop the broken patches.
+# kernel 6.12.103: the 2026-08-24 merge added fmsh SPI-NAND patches (436/437)
+# that do not apply; the chips are unused by BPI-R4, so drop them.
 rm -f target/linux/generic/backport-6.12/436-v7.3-mtd-spinand-fmsh-*.patch \
       target/linux/generic/backport-6.12/437-v7.3-mtd-spinand-fmsh-*.patch
 echo "[DIY] removed fmsh backport patches 436/437 (broken against kernel 6.12.103)"
@@ -212,9 +204,8 @@ patch_makefile_dep \
     'CONFIG_BOOTDELAY=30' \
     'CONFIG_BOOTDELAY=10'
 
-# Apply LuCI patches for master/25.12 (regenerated 2026-07-03 against openwrt-25.12).
-# Each call is guarded with || true: if the luci feed has moved past the patch's
-# base commit the apply fails silently rather than aborting the build.
+# LuCI patches for 25.12 (regenerated 2026-07-03); guarded with || true so a
+# moved feed base fails silently instead of aborting the build.
 
 # RPCD: add getWifiStationHints ubus method + helper functions
 [ -f feeds/luci/modules/luci-base/root/usr/share/rpcd/ucode/luci ] && \

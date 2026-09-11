@@ -1,7 +1,5 @@
 #!/bin/bash
-#
 # diy-mtk.sh -- Community packages & config for chasey-dev build
-#
 
 merge_package(){
     repo=`echo $1 | rev | cut -d'/' -f 1 | rev`
@@ -45,7 +43,7 @@ apply_workspace_patch() {
     git apply --recount --ignore-space-change --ignore-whitespace "$patch_file"
 }
 
-# Remove upstream feeds replaced by community clones below
+# Remove feed packages replaced by community clones
 rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/luci/applications/luci-app-argon-config
 rm -rf feeds/luci/applications/luci-app-passwall
@@ -66,10 +64,8 @@ git clone --depth=1 https://github.com/1522042029/luci-app-socat
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
 merge_package https://github.com/kenzok8/jell jell/adguardhome
-# Fix broken default_username.patch: upstream zh-cn.json was reorganized since
-# the patch was created (hunk context moved from ~L571 to ~L755, indentation
-# changed from 4-space to 2-space). Replace with corrected hunk so the build
-# does not fail at AdGuardHome prepare stage.
+# default_username.patch: upstream zh-cn.json moved/indent changed; rewrite the
+# hunk so the AdGuardHome prepare stage does not fail
 _adguardhome_patch="package/openwrt-packages/adguardhome/patches/default_username.patch"
 if [ -f "$_adguardhome_patch" ]; then
 	cat > "$_adguardhome_patch" << 'AGPATCH'
@@ -96,20 +92,17 @@ merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnst
 merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnsto-openwrt-package/luci-app-ddnsto
 popd
 
-# luci-app-mosdns
 rm -rf feeds/packages/lang/golang
 git clone --depth=1 https://github.com/sbwml/packages_lang_golang -b 27.x feeds/packages/lang/golang
 rm -rf feeds/packages/net/mosdns
 git clone --depth=1 https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
 
-# luci-app-OpenClash
 mkdir -p package/OpenClash
 pushd package/OpenClash
 git clone --depth=1 https://github.com/vernesong/OpenClash
 popd
 
-# helloworld simple-obfs / shadowsocks-libev: git archive + submodules produce a
-# non-deterministic tarball, so replace PKG_MIRROR_HASH line-wise (no hardcoded hash)
+# helloworld simple-obfs/shadowsocks-libev: skip the non-deterministic PKG_MIRROR_HASH
 for f in \
     package/community/helloworld/simple-obfs/Makefile \
     package/community/helloworld/shadowsocks-libev/Makefile; do
@@ -121,6 +114,12 @@ patch_makefile_dep \
     package/community/package/openwrt-packages/adguardhome/Makefile \
     'FRONTEND_HASH:=084bf3e00ca3e49487fc5a87270b4e1eb26617710ca6116b9e42ce90cb1ad358' \
     'FRONTEND_HASH:=skip'
+
+# containerd vendors cpuid v2.0.4, which trips the Go >= 1.23 linkname check
+f=feeds/packages/utils/containerd/Makefile
+if [ -f "$f" ] && ! grep -q 'checklinkname=0' "$f"; then
+    printf '\nMAKE_FLAGS += EXTRA_LDFLAGS=-checklinkname=0\n' >> "$f"
+fi
 
 # GCC 14 + musl fortify workaround for mbedtls
 if ! grep -q '_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile; then
@@ -142,15 +141,9 @@ if grep -q 'mkdir $(PKG_BUILD_DIR)/bin' feeds/packages/net/vpnc/Makefile 2>/dev/
     sed -i '/mkdir $(PKG_BUILD_DIR)\/bin/s/mkdir /mkdir -p /' feeds/packages/net/vpnc/Makefile
 fi
 
-# hostapd: keep MTK private MLO PMKSA patch (975) out of non-11BE builds.
-# The upstream patch references sta->mld_assoc_link_id / sta->mld_info, which
-# only exist under CONFIG_IEEE80211BE; this tree builds wpad without 11BE
-# (DRIVER_11x_SUPPORT are default-n hidden symbols and `make defconfig` resets
-# them), so the MLO block must be compiled out. Upstream rewrote the patch on
-# 2025-08-15/16 (new pmksa_addr/pmksa_link_addr variables, new comment style),
-# which broke the previous literal-text guard injection. Use regex-based guards
-# that survive comment/text churn, and bump the hunk line count by the +3 lines
-# the injection adds.
+# hostapd 975 (MTK MLO PMKSA): sta->mld_* only exist under CONFIG_IEEE80211BE and
+# this tree builds wpad without 11BE, so the MLO block must be compiled out.
+# Regex guards survive upstream churn; bump the hunk line count by +3.
 _mt975="package/network/services/hostapd/patches/975-mtk-mlo-pass-pmksa-link-address.patch"
 if [ -f "$_mt975" ]; then
     if perl -0777 -e '
@@ -174,9 +167,8 @@ if [ -f "$_mt975" ]; then
     fi
 fi
 
-# MTK Wi-Fi profiles: replace chasey-dev version with padavanonly's mt7990-only build
-# (chasey-dev version references nonexistent mt7622/mt7615 files and uses broken
-#  shell command-substitution for Kconfig values)
+# wifi-profile: use padavanonly's mt7990-only build (chasey-dev's references
+# nonexistent files and breaks on shell command-substitution)
 rm -rf package/mtk/drivers/wifi-profile
 git clone --depth=1 -b mt798x-mt799x-6.6-mtwifi \
     https://github.com/padavanonly/immortalwrt-mt798x-6.6.git \
@@ -235,9 +227,8 @@ fi
 install -Dm0644 "$_mt_wifi7_unaligned_patch_src" "$_mt_wifi7_unaligned_patch_dst"
 echo "[DIY] mt_wifi7: Linux 6.12 unaligned header compatibility patch installed"
 
-# MTK mt_wifi7: GCC 14 rejects missing AC_NUM and PMKSA declarations under
-# the driver's -Werror policy. Keep this separate from the unaligned fix so
-# either compatibility patch can be reviewed or removed independently.
+# mt_wifi7: GCC 14 -Werror rejects missing AC_NUM/PMKSA declarations (kept
+# separate from the unaligned fix so either patch can be dropped)
 _mt_wifi7_declarations_patch_src="$GITHUB_WORKSPACE/patches/filogic/25.12/1007-mt_wifi7-fix-missing-declarations.patch"
 _mt_wifi7_declarations_patch_dst="package/mtk/drivers/mt_wifi7/patches/901-fix-missing-declarations.patch"
 
@@ -249,9 +240,8 @@ fi
 install -Dm0644 "$_mt_wifi7_declarations_patch_src" "$_mt_wifi7_declarations_patch_dst"
 echo "[DIY] mt_wifi7: GCC 14 missing declarations compatibility patch installed"
 
-# MTK mt_wifi7: rt_channel.c references MAX_TRANSMIT_POWER, which the
-# vendor source only defines locally in bcn.c. GCC 14 -Werror rejects the
-# undeclared identifier; provide the same constant in rt_channel.c.
+# mt_wifi7: GCC 14 -Werror rejects MAX_TRANSMIT_POWER in rt_channel.c (vendor
+# only defines it locally in bcn.c)
 _mt_wifi7_max_tx_power_patch_src="$GITHUB_WORKSPACE/patches/filogic/25.12/1008-mt_wifi7-fix-max-transmit-power.patch"
 _mt_wifi7_max_tx_power_patch_dst="package/mtk/drivers/mt_wifi7/patches/902-fix-max-transmit-power.patch"
 
@@ -263,13 +253,9 @@ fi
 install -Dm0644 "$_mt_wifi7_max_tx_power_patch_src" "$_mt_wifi7_max_tx_power_patch_dst"
 echo "[DIY] mt_wifi7: MAX_TRANSMIT_POWER declaration compatibility patch installed"
 
-# MTK mt_wifi7: with CONFIG_MTK_WIFI7_CFG80211_SUPPORT=y the vendor build
-# defines RT_CFG80211_SUPPORT, which makes owe_cmm.h skip its sae_cmm.h
-# include ("#ifndef RT_CFG80211_SUPPORT"). sec_cmm.h still compiles the
-# struct pwd_id_list / struct sae_capability fields under
-# DOT11_SAE_SUPPORT, but only pulls sae_cmm.h in under SUPP_SAE_SUPPORT,
-# so with APCLI_SUPPLICANT_SUPPORT off every TU fails with "field ...
-# has incomplete type". Align the include guard with the field guard.
+# mt_wifi7: RT_CFG80211_SUPPORT makes owe_cmm.h skip sae_cmm.h while sec_cmm.h
+# still compiles the SAE structs -> "field has incomplete type". Align the
+# include guard with the field guard.
 _mt_wifi7_sae_patch_src="$GITHUB_WORKSPACE/patches/filogic/25.12/1009-mt_wifi7-fix-incomplete-sae-structs.patch"
 _mt_wifi7_sae_patch_dst="package/mtk/drivers/mt_wifi7/patches/903-fix-incomplete-sae-structs.patch"
 
@@ -281,11 +267,8 @@ fi
 install -Dm0644 "$_mt_wifi7_sae_patch_src" "$_mt_wifi7_sae_patch_dst"
 echo "[DIY] mt_wifi7: incomplete SAE struct compatibility patch installed"
 
-# MTK mt_wifi7: struct wifi_dev's cac_required is guarded by
-# CONFIG_MAP_SUPPORT, but rt_channel.c (MTK_CFG80211_CHAN_SET_FLAG_CAC_REQUIRED
-# vendor cmd) and cmm_rdm_mt.c DfsZwBypassCac (MT_DFS_SUPPORT) use the field
-# unconditionally, so with MAP off every such TU fails with "no member named
-# 'cac_required'". Move the field out of the MAP guard.
+# mt_wifi7: cac_required is MAP-guarded but used unconditionally by rt_channel.c
+# and cmm_rdm_mt.c -> move the field out of the MAP guard
 _mt_wifi7_cac_patch_src="$GITHUB_WORKSPACE/patches/filogic/25.12/1010-mt_wifi7-fix-cac-required-field.patch"
 _mt_wifi7_cac_patch_dst="package/mtk/drivers/mt_wifi7/patches/904-fix-cac-required-field.patch"
 
@@ -308,8 +291,6 @@ fi
 ./scripts/feeds update -a
 ./scripts/feeds install -a
 ./scripts/feeds install c-ares udns
-
-
 
 # Remove kiddin9 APK repo (triggers broken video/ sub-repo)
 for f in \
@@ -337,10 +318,7 @@ export GOPROXY=https://proxy.golang.org,direct
 
 # Compatibility fixes for floating feeds metadata
 # rust: rust-lang pruned the 1.94.0 CI LLVM artifacts, so download-ci-llvm=true
-# 404s and rust/host (required by shadowsocks-rust) fails to build. Build LLVM
-# from source instead (mirrors immortalwrt/packages 47cadedca2). configure.py
-# dedupes repeated --set flags with last-wins, so the flag must be REPLACED,
-# not duplicated.
+# 404s; build LLVM from source instead (configure.py: last --set wins).
 _rust_makefile="feeds/packages/lang/rust/Makefile"
 if [ -f "$_rust_makefile" ]; then
     if grep -qF -- '--set=llvm.download-ci-llvm=false' "$_rust_makefile"; then
@@ -357,10 +335,7 @@ if [ -f "$_rust_makefile" ]; then
     fi
 fi
 
-# luci-ssl-openssl: the luci feed's 2026-08-24 merge made it depend on
-# px5g-openssl, which this SDK (chasey-dev rebase) does not ship (immortalwrt
-# added it to their own tree on 08-20). Fall back to px5g-standalone, which is
-# present here and installs the same /usr/sbin/px5g.
+# luci-ssl-openssl: fall back to px5g-standalone (same /usr/sbin/px5g)
 _ssl_makefile="feeds/luci/collections/luci-ssl-openssl/Makefile"
 if [ -f "$_ssl_makefile" ] && \
     grep -qF -- '+px5g-openssl' "$_ssl_makefile" && \
