@@ -227,10 +227,14 @@ for f in \
     [ -f "$f" ] && sed -i '/^PKG_MIRROR_HASH:=/s/:=.*/:=skip/' "$f"
 done
 
-# containerd vendors cpuid v2.0.4, which trips the Go >= 1.23 linkname check
+# containerd's vendored cpuid v2.0.4 hits Go's >= 1.23 linkname check. MAKE_FLAGS is
+# frozen by the BuildPackage eval, so the line must be injected before it.
 f=feeds/packages/utils/containerd/Makefile
-if [ -f "$f" ] && ! grep -q 'checklinkname=0' "$f"; then
-    printf '\nMAKE_FLAGS += EXTRA_LDFLAGS=-checklinkname=0\n' >> "$f"
+if [ ! -f "$f" ]; then
+    echo "[DIY] containerd Makefile missing: $f" >&2
+elif ! grep -q 'checklinkname=0' "$f"; then
+    awk '{print} /^Build\/Compile=/ {print "MAKE_FLAGS += EXTRA_LDFLAGS=-s -w -checklinkname=0"}' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+    echo "[DIY] containerd: -checklinkname=0 injected=$(grep -c 'checklinkname=0' "$f")"
 fi
 
 # GCC 14 + musl fortify workaround for mbedtls
