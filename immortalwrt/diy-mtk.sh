@@ -121,7 +121,7 @@ f=feeds/packages/utils/containerd/Makefile
 if [ ! -f "$f" ]; then
     echo "[DIY] containerd Makefile missing: $f" >&2
 elif ! grep -q 'checklinkname=0' "$f"; then
-    awk '{print} /^Build\/Compile=/ {print "MAKE_FLAGS += EXTRA_LDFLAGS=-s -w -checklinkname=0"}' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+    awk -v ins="MAKE_FLAGS += EXTRA_LDFLAGS='-s -w -checklinkname=0'" '{print} /^Build\/Compile=/ {print ins}' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
     echo "[DIY] containerd: -checklinkname=0 injected=$(grep -c 'checklinkname=0' "$f")"
 fi
 
