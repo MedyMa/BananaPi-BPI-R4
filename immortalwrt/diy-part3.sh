@@ -335,24 +335,16 @@ patch_makefile_dep \
 		perl -0pi -e 's/\n[ \t]*&usxgmiisys[01][ \t]*\{[ \t]*\n[ \t]*mediatek,pnswap-rx;[ \t]*\n[ \t]*\};[ \t]*(?:\r?\n)?//g' "$bpi_dtsi"
 	fi
 
-	# ramoops/pstore: keep the previous boot's kernel log across a warm reset, so
-	# a failed warm reboot can be inspected on the next boot.  The 64 KiB slot
-	# just below secmon@43000000 is the one mt7981/mt7986 already use and must not
-	# grow past it.  console-size is required for the live log tail to be recorded
-	# (record-size alone only stores oops/panic dumps).
-	if [ -f "$bpi_dtsi" ] && ! grep -q 'ramoops@42ff0000' "$bpi_dtsi"; then
-		cat >> "$bpi_dtsi" <<'BPI_RAMOOPS'
-
-/* 64 KiB for ramoops/pstore: previous boot's log readable via /sys/fs/pstore. */
-&{/reserved-memory} {
-	ramoops@42ff0000 {
-		compatible = "ramoops";
-		reg = <0 0x42ff0000 0 0x10000>;
-		console-size = <0x8000>;
-		record-size = <0x2000>;
-	};
-};
-BPI_RAMOOPS
+	# ramoops/pstore now lives in the source tree's SoC devicetree instead of
+	# being appended here:
+	#   target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a.dtsi
+	# carries ramoops@42ff0000 in the 64 KiB slot just below secmon@43000000.
+	# Keeping it there means every mt7988 board gets it - including the BPI-R4
+	# Pro, which does not include this board dtsi - and a kernel version bump
+	# cannot silently drop it.  Warn when the tree we are building lacks it.
+	soc_dtsi="target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a.dtsi"
+	if [ -f "$soc_dtsi" ] && ! grep -q 'ramoops@42ff0000' "$soc_dtsi"; then
+		echo "[DIY] warning: ${soc_dtsi##*/} has no ramoops node; the previous boot's log will not be kept" >&2
 	fi
 }
 

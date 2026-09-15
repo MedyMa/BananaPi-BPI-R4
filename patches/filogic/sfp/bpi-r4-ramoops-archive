@@ -8,7 +8,9 @@
 # of a failed warm reboot is still readable after the router is power cycled.
 #
 # Read it back with:
-#   ls -l /root/pstore-archive/ ; cat /root/pstore-archive/*/dmesg-ramoops-*
+#   ls -l /root/pstore-archive/
+#   cat /root/pstore-archive/*/console-ramoops-*   # previous boot's kernel log
+#   cat /root/pstore-archive/*/dmesg-ramoops-*     # oops/panic dumps, if any
 #
 # When there is nothing to save (no warm reset since the last boot) this is a
 # no-op.
@@ -23,8 +25,12 @@ start() {
 	local ts dst count oldest
 
 	[ -d "$PSTORE_DIR" ] || return 0
-	mountpoint -q "$PSTORE_DIR" 2>/dev/null || \
-		mount -t pstore pstore "$PSTORE_DIR" 2>/dev/null || return 0
+	# busybox in this build has no "mountpoint" applet, and nothing mounts the
+	# pstore filesystem by default, so test /proc/mounts directly.  Do not bail
+	# out when the mount fails either: an already mounted pstore makes mount
+	# fail, and that still has to be archived.
+	grep -qs " $PSTORE_DIR " /proc/mounts || \
+		mount -t pstore pstore "$PSTORE_DIR" 2>/dev/null
 
 	# pstore only lists entries when something was actually recorded.
 	ls "$PSTORE_DIR"/* >/dev/null 2>&1 || return 0
@@ -40,9 +46,11 @@ start() {
 	mkdir -p "$dst" || return 0
 	cp -f "$PSTORE_DIR"/* "$dst"/ 2>/dev/null
 
+	# Prune by age: the directory names mix timestamps with a "boot-<pid>"
+	# fallback, so name order is not age order.
 	count=$(ls -1 "$ARCHIVE_DIR" 2>/dev/null | wc -l)
 	while [ "$count" -gt "$MAX_KEEP" ]; do
-		oldest=$(ls -1 "$ARCHIVE_DIR" 2>/dev/null | head -n 1)
+		oldest=$(ls -1t "$ARCHIVE_DIR" 2>/dev/null | tail -n 1)
 		[ -n "$oldest" ] || break
 		rm -rf "$ARCHIVE_DIR/$oldest"
 		count=$((count - 1))
