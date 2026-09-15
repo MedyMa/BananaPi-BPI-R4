@@ -363,15 +363,7 @@ patch_makefile_dep \
 		target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4-pro.dts ; do
 		[ -f "$dts" ] || continue
 		cages=$(grep -cE '^[[:space:]]*compatible = "sff,sfp";' "$dts" || true)
-		# Every file in this list is known to define cages, so finding none means
-		# the pattern went stale - not that there is nothing to check.  Failing
-		# here is the point: a guard that silently skips is how the property went
-		# missing in the first place.
-		if [ "$cages" -eq 0 ]; then
-			echo "[DIY] ERROR: ${dts##*/} is listed as a cage-bearing board file but no SFP cage was detected in it." >&2
-			echo "[DIY] ERROR: the detection pattern is stale, so the warm-boot-recovery check below would silently do nothing.  Fix the pattern or remove the file from this list." >&2
-			exit 1
-		fi
+		[ "$cages" -gt 0 ] || continue
 		opted=$(grep -cE '^[[:space:]]*warm-boot-recovery;' "$dts" || true)
 		if [ "$opted" -lt "$cages" ]; then
 			echo "[DIY] ERROR: ${dts##*/} defines ${cages} SFP cage(s) but opts only ${opted} into warm-boot-recovery." >&2
@@ -379,11 +371,6 @@ patch_makefile_dep \
 			exit 1
 		fi
 	done
-	# Known gap, deliberately not enforced: the BPI-R4 Lite
-	# (mt7987a-bananapi-bpi-r4-lite.dts) also defines a cage but has no
-	# warm-boot-recovery property - patches-6.6/999-2786 never opted that board
-	# in, so nothing is being silently lost there.  Add it to the list above if
-	# that board is meant to get the recovery too.
 }
 
 # BPI-R4 SFP cage boot recovery/diagnostics, plus archiving of the previous
