@@ -346,6 +346,31 @@ patch_makefile_dep \
 	if [ -f "$soc_dtsi" ] && ! grep -q 'ramoops@42ff0000' "$soc_dtsi"; then
 		echo "[DIY] warning: ${soc_dtsi##*/} has no ramoops node; the previous boot's log will not be kept" >&2
 	fi
+
+	# Hard failure, not a warning: the SFP warm-reboot recovery
+	# (patches-6.6/999-2786) is opt-in through the "warm-boot-recovery" DT
+	# property, and the patch that adds it edits the kernel's OWN copy of the
+	# BPI-R4 board files - while the overlay copies above replace exactly those
+	# files.  A missing property therefore does not fail anything: the driver's
+	# recovery (EEPROM wait, TX_DISABLE pulse, I2C bus recovery) simply never
+	# runs, the copper modules this board uses stay powered across a warm reboot
+	# and stop answering I2C, and the link never comes back.  That is how a
+	# finished, committed fix shipped as dead code for weeks, so make the build
+	# stop instead of repeating it.
+	for dts in \
+		target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4.dtsi \
+		target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4.dts \
+		target/linux/mediatek/files-6.6/arch/arm64/boot/dts/mediatek/mt7988a-bananapi-bpi-r4-pro.dts ; do
+		[ -f "$dts" ] || continue
+		cages=$(grep -cE '^[[:space:]]*compatible = "sff,sfp";' "$dts" || true)
+		[ "$cages" -gt 0 ] || continue
+		opted=$(grep -cE '^[[:space:]]*warm-boot-recovery;' "$dts" || true)
+		if [ "$opted" -lt "$cages" ]; then
+			echo "[DIY] ERROR: ${dts##*/} defines ${cages} SFP cage(s) but opts only ${opted} into warm-boot-recovery." >&2
+			echo "[DIY] ERROR: the overlay replaces the kernel's copy of this file, so the patch adding that property is shadowed and the SFP warm-reboot recovery would be dead code." >&2
+			exit 1
+		fi
+	done
 }
 
 # BPI-R4 SFP cage boot recovery/diagnostics, plus archiving of the previous
