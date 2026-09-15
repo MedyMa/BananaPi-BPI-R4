@@ -334,7 +334,45 @@ patch_makefile_dep \
 		# match each &usxgmiisys{0,1} block independently (blank lines may separate them)
 		perl -0pi -e 's/\n[ \t]*&usxgmiisys[01][ \t]*\{[ \t]*\n[ \t]*mediatek,pnswap-rx;[ \t]*\n[ \t]*\};[ \t]*(?:\r?\n)?//g' "$bpi_dtsi"
 	fi
+
+	# ramoops/pstore: keep the previous boot's kernel log across a warm reset, so
+	# a failed warm reboot can be inspected on the next boot.  The 64 KiB slot
+	# just below secmon@43000000 is the one mt7981/mt7986 already use and must not
+	# grow past it.  console-size is required for the live log tail to be recorded
+	# (record-size alone only stores oops/panic dumps).
+	if [ -f "$bpi_dtsi" ] && ! grep -q 'ramoops@42ff0000' "$bpi_dtsi"; then
+		cat >> "$bpi_dtsi" <<'BPI_RAMOOPS'
+
+/* 64 KiB for ramoops/pstore: previous boot's log readable via /sys/fs/pstore. */
+&{/reserved-memory} {
+	ramoops@42ff0000 {
+		compatible = "ramoops";
+		reg = <0 0x42ff0000 0 0x10000>;
+		console-size = <0x8000>;
+		record-size = <0x2000>;
+	};
+};
+BPI_RAMOOPS
+	fi
 }
+
+# BPI-R4 SFP cage boot recovery/diagnostics, plus archiving of the previous
+# boot's pstore log.  This replaces patches/filogic/99-bpi-r4-sfp-retrain, which
+# could never run on this board: it only accepted interfaces reporting
+# "Port: FIBRE" or named sfp-*, while the two cages are eth1/eth2 with copper
+# modules that report "Port: Twisted Pair", and it hooked a hotplug ifup event
+# for a netdev that is only a bridge member.
+sfp_ws="${GITHUB_WORKSPACE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+if [ -f "$sfp_ws/patches/filogic/sfp/bpi-r4-sfp-recover" ]; then
+	mkdir -p files/etc/init.d files/etc/rc.d
+	install -m 0755 "$sfp_ws/patches/filogic/sfp/bpi-r4-sfp-recover" files/etc/init.d/sfp-recover
+	install -m 0755 "$sfp_ws/patches/filogic/sfp/bpi-r4-ramoops-archive" files/etc/init.d/ramoops-archive
+	ln -sfn ../init.d/sfp-recover files/etc/rc.d/S98sfp-recover
+	ln -sfn ../init.d/ramoops-archive files/etc/rc.d/S00ramoops-archive
+	echo "[DIY] SFP recovery + ramoops archive installed"
+else
+	echo "[DIY] SFP recovery scripts missing: $sfp_ws/patches/filogic/sfp/" >&2
+fi
 
 [ -f "$GITHUB_WORKSPACE/scripts/cpuinfo" ] && \
 	install -m 0755 "$GITHUB_WORKSPACE/scripts/cpuinfo" package/emortal/autocore/files/generic/cpuinfo

@@ -1,0 +1,165 @@
+#!/bin/sh /etc/rc.common
+# BPI-R4 SFP+ cage boot recovery and diagnostics.
+#
+# Why this exists
+# ---------------
+# On a warm reboot the two SFP+ cages can come up late (observed: link_up at
+# t+56s) or not at all, while netifd has already finished configuring the
+# bridges they belong to.  The old attempt at this was a hotplug handler
+# (patches/filogic/99-bpi-r4-sfp-retrain) that never ran, for two reasons:
+#
+#   1. it only accepted interfaces reporting "Port: FIBRE" or named sfp-*, but
+#      the copper modules this board uses report "Port: Twisted Pair" and the
+#      interfaces are eth1/eth2, so its guard always rejected them;
+#   2. it hooked the hotplug "ifup" event for a netdev name, while eth1/eth2 are
+#      members of br-lan/br-wan - there is no evidence such an event fires for
+#      a bridge member at all.
+#
+# So this runs once per boot instead, after the network is up, and for each cage:
+#
+#   1. waits for the netdev to appear (the module may still be probing),
+#   2. if the module never appears, re-probes the SFP device so the kernel runs
+#      its warm-boot recovery again (sfp_warm_boot_recover: EEPROM wait,
+#      TX_DISABLE pulse, I2C bus recovery),
+#   3. if the netdev exists but has no carrier, retrains it a few times,
+#   4. then forces link down/up, then re-probes the SFP device once more,
+#   5. logs every step, so `logread | grep sfp-recover` shows what happened even
+#      when nobody could log in to ask.
+#
+# Scope: this helps a late or stuck link.  A module whose management interface
+# is wedged needs its 3.3V cycled, which this board cannot do (its SFP nodes
+# have no power-gpios), so that case still needs the power unplugged.  The log
+# says which case it was, which is the point: it turns "it did not boot" into
+# either "carrier was late" or "module unrecovered".
+#
+# Manual re-run: rm -f /var/run/sfp_recover_done; /etc/init.d/sfp-recover start
+
+START=98
+
+# cage netdev : SFP platform device.  From the DTS: &gmac1 { sfp = <&sfp2>; }
+# and &gmac2 { sfp = <&sfp1>; }, i.e. eth1 carries the SFP2 cage and eth2 the
+# SFP1 cage.  Overridable so the logic can be exercised in tests.
+: "${SFP_CAGES:=eth1:sfp2 eth2:sfp1}"
+: "${SFP_IFACE_WAIT:=60}"
+: "${SFP_RETRIES:=5}"
+: "${SFP_RETRY_DELAY:=3}"
+: "${SFP_NET_SYSFS:=/sys/class/net}"
+: "${SFP_DRV_DIR:=/sys/bus/platform/drivers/sfp}"
+: "${SFP_STAMP_DIR:=/var/run}"
+
+sfp_log() {
+	logger -t sfp-recover "$*"
+}
+
+sfp_iface_exists() {
+	[ -e "$SFP_NET_SYSFS/$1" ]
+}
+
+sfp_have_carrier() {
+	ethtool "$1" 2>/dev/null | grep -q 'Link detected: yes'
+}
+
+sfp_port_type() {
+	ethtool "$1" 2>/dev/null | sed -n 's/^[[:space:]]*Port: //p' | head -n 1
+}
+
+# Re-probe the SFP device so the kernel re-runs its warm-boot recovery.
+sfp_reprobe() {
+	[ -e "$SFP_DRV_DIR/$1" ] || {
+		sfp_log "$1: no entry under $SFP_DRV_DIR, cannot re-probe"
+		return 1
+	}
+	sfp_log "$1: re-probing so the kernel re-runs its warm-boot recovery"
+	echo "$1" > "$SFP_DRV_DIR/unbind" 2>/dev/null || return 1
+	sleep 1
+	echo "$1" > "$SFP_DRV_DIR/bind" 2>/dev/null || return 1
+	return 0
+}
+
+sfp_wait_iface() { # $1 = iface, $2 = seconds
+	local i=0
+	while [ "$i" -lt "$2" ]; do
+		sfp_iface_exists "$1" && return 0
+		i=$((i + 1))
+		sleep 1
+	done
+	sfp_iface_exists "$1"
+}
+
+sfp_recover_cage() { # $1 = iface, $2 = platform device
+	local iface="$1" dev="$2" i
+
+	if ! sfp_iface_exists "$iface"; then
+		sfp_log "$iface: waiting up to ${SFP_IFACE_WAIT}s for the netdev"
+		sfp_wait_iface "$iface" "$SFP_IFACE_WAIT" || {
+			sfp_log "$iface: netdev still missing (SFP probe did not complete)"
+			sfp_reprobe "$dev"
+			if sfp_wait_iface "$iface" 20; then
+				sfp_log "$iface: netdev appeared after re-probing $dev"
+			else
+				sfp_log "$iface: STILL MISSING after re-probe - module needs a power cycle"
+				return 1
+			fi
+		}
+	fi
+
+	if sfp_have_carrier "$iface"; then
+		sfp_log "$iface: carrier present at boot (Port: $(sfp_port_type "$iface"))"
+		return 0
+	fi
+
+	sfp_log "$iface: no carrier at boot (Port: $(sfp_port_type "$iface")), retraining up to ${SFP_RETRIES} times"
+	i=0
+	while [ "$i" -lt "$SFP_RETRIES" ]; do
+		i=$((i + 1))
+		ethtool -r "$iface" >/dev/null 2>&1
+		sleep "$SFP_RETRY_DELAY"
+		if sfp_have_carrier "$iface"; then
+			sfp_log "$iface: carrier up after retrain ${i}"
+			return 0
+		fi
+	done
+
+	sfp_log "$iface: retrain did not help, forcing link down/up"
+	ip link set "$iface" down 2>/dev/null
+	sleep 1
+	ip link set "$iface" up 2>/dev/null
+	sleep "$SFP_RETRY_DELAY"
+	if sfp_have_carrier "$iface"; then
+		sfp_log "$iface: carrier up after link down/up"
+		return 0
+	fi
+
+	sfp_reprobe "$dev"
+	sleep "$SFP_RETRY_DELAY"
+	if sfp_have_carrier "$iface"; then
+		sfp_log "$iface: carrier up after re-probing $dev"
+		return 0
+	fi
+
+	sfp_log "$iface: UNRECOVERED - module likely wedged, needs its power cycled"
+	return 1
+}
+
+sfp_recover_all() {
+	local pair
+	for pair in $SFP_CAGES; do
+		sfp_recover_cage "${pair%%:*}" "${pair##*:}"
+	done
+	sfp_log "recovery pass finished"
+}
+
+start() {
+	# Once per boot: the retrain path is slow and touches live links.
+	[ -e "$SFP_STAMP_DIR/sfp_recover_done" ] && return 0
+	: > "$SFP_STAMP_DIR/sfp_recover_done"
+	( sfp_recover_all ) &
+}
+
+boot() {
+	start
+}
+
+stop() {
+	:
+}
