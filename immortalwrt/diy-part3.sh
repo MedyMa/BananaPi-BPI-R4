@@ -356,11 +356,15 @@ patch_makefile_dep \
 # for a netdev that is only a bridge member.
 sfp_ws="${GITHUB_WORKSPACE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 if [ -f "$sfp_ws/patches/filogic/sfp/bpi-r4-sfp-recover" ]; then
-	mkdir -p files/etc/init.d files/etc/rc.d
+	mkdir -p files/etc/init.d
 	install -m 0755 "$sfp_ws/patches/filogic/sfp/bpi-r4-sfp-recover" files/etc/init.d/sfp-recover
 	install -m 0755 "$sfp_ws/patches/filogic/sfp/bpi-r4-ramoops-archive" files/etc/init.d/ramoops-archive
-	ln -sfn ../init.d/sfp-recover files/etc/rc.d/S98sfp-recover
-	ln -sfn ../init.d/ramoops-archive files/etc/rc.d/S00ramoops-archive
+	# Do not pre-create the /etc/rc.d/S?? symlinks here: include/rootfs.mk
+	# enables every /etc/init.d script whose shebang is "#!/bin/sh /etc/rc.common"
+	# (its only caller, include/image.mk, passes no disabled-services list, so
+	# that loop always enables these two), and that enable is what creates the
+	# symlink.  Writing them here as well only implies that boot-time enablement
+	# depends on this script.
 	echo "[DIY] SFP recovery + ramoops archive installed"
 else
 	echo "[DIY] SFP recovery scripts missing: $sfp_ws/patches/filogic/sfp/" >&2
