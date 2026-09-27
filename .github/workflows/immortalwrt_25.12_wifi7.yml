@@ -10,9 +10,9 @@ permissions:
   contents: write
 
 env:
-  REPO_URL: https://github.com/chasey-dev/immortalwrt-mt798x-rebase.git
-  REPO_BRANCH: 25.12-dev-wifi7
-  CONFIG_FILE: immortalwrt/MTK/defconfig-vendor-wifi
+  REPO_URL: https://github.com/amhelibrary/immortalwrt.git
+  REPO_BRANCH: openwrt-25.12-mtk-hqos
+  CONFIG_FILE: immortalwrt/MTK/defconfig
   DIY_P1_SH: immortalwrt/diy-mtk.sh
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
@@ -307,6 +307,6 @@ jobs:
       with:
         keep_latest: 3
         delete_tags: true
-        delete_tag_pattern: '^.*-immortalwrt_25\.12-dev-wifi7$'
+        delete_tag_pattern: '^.*-immortalwrt_openwrt-25\.12-mtk-hqos$'
       env:
         GITHUB_TOKEN: ${{ secrets.RELEASES_TOKEN }}

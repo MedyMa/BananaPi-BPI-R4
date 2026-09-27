@@ -1,5 +1,10 @@
 #!/bin/bash
-# diy-mtk.sh -- Community packages & config for chasey-dev build
+# diy-mtk.sh -- Community packages & config for the WiFi7 (mt76/mt7996e) build
+#
+# Used with REPO_BRANCH openwrt-25.12-mtk-hqos (amhelibrary/immortalwrt).  Steps
+# that need the MTK vendor WiFi7 tree are guarded and skipped when that tree is
+# absent, so the same script still works on the chasey-dev style branches that
+# ship package/mtk/drivers.
 
 merge_package(){
     repo=`echo $1 | rev | cut -d'/' -f 1 | rev`
@@ -171,6 +176,21 @@ if [ -f "$_mt975" ]; then
     fi
 fi
 
+# ---------------------------------------------------------------------------
+# Vendor WiFi7 tree (wifi-profile / mt_wifi7 / datconf).
+#
+# These steps belong to trees that actually ship the MTK vendor WiFi driver:
+# the mt_wifi7 Makefile, its five compat patches and padavanonly's wifi-profile
+# all live under package/mtk/.  The mtk-hqos tree ships mainline
+# mt76/mt7996e instead and has no package/mtk/drivers at all, so on it every
+# step here would either fail (mv/sed/install) or - in the case of the mt_wifi7
+# Makefile check below - abort the build with `exit 1`.
+#
+# Guarded as one block rather than step by step, because the vendor-only steps
+# are only correct together: the patches target the Makefile the others edit.
+# ---------------------------------------------------------------------------
+if [ -d "package/mtk/drivers" ]; then
+
 # wifi-profile: use padavanonly's mt7990-only build (chasey-dev's references
 # nonexistent files and breaks on shell command-substitution)
 rm -rf package/mtk/drivers/wifi-profile
@@ -289,6 +309,10 @@ if [ -f "package/mtk/applications/datconf/Makefile" ] && \
    ! grep -q 'PKG_BUILD_PARALLEL' "package/mtk/applications/datconf/Makefile"; then
     sed -i '/^PKG_RELEASE:=/a PKG_BUILD_PARALLEL:=0' "package/mtk/applications/datconf/Makefile"
     echo "[DIY] datconf parallel build disabled"
+fi
+
+else
+    echo "[DIY] package/mtk/drivers absent: mainline mt76 build, vendor WiFi7 steps skipped"
 fi
 
 # Feed deps needed by community clones (pcre2 is in main tree since 25.12)
