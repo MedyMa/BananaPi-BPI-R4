@@ -96,7 +96,7 @@ CONFIG_PACKAGE_kmod-nls-cp932=y
 CONFIG_PACKAGE_kmod-nls-cp936=y
 CONFIG_PACKAGE_kmod-nls-cp950=y
 CONFIG_PACKAGE_kmod-nls-utf8=y
-CONFIG_PACKAGE_kmod-nft-flow-offload=y
+CONFIG_PACKAGE_kmod-nft-offload=y
 CONFIG_PACKAGE_kmod-mediatek_hnat=y
 CONFIG_KERNEL_NET_MEDIATEK_HNAT=y
 CONFIG_KERNEL_MEDIATEK_NETSYS_V3=y
@@ -107,7 +107,7 @@ CONFIG_PACKAGE_mtk-hqos=y
 CONFIG_PACKAGE_luci-app-mtk-hqos=y
 
 # MTK debug / diagnostic tools from mtk_openwrt_feed.
-CONFIG_PACKAGE_pce=y
+CONFIG_PACKAGE_kmod-pce=y
 CONFIG_PACKAGE_mtkhnat_util=y
 CONFIG_PACKAGE_ethswbox=y
 CONFIG_PACKAGE_flowtable=y
