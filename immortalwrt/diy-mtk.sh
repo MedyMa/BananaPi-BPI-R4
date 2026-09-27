@@ -390,6 +390,21 @@ patch_makefile_dep \
 # Modify default IP
 sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generate
 
+# BE14 WiFi EEPROM overlay: the 911 dts patch builds it, but filogic.mk's BPI-R4
+# device does not list it, so it is packaged and never installed.
+BE14_PATCH="target/linux/mediatek/patches-6.12/911-dts-mt7988a-bpi-r4-be14-wifi-eeprom.patch"
+FILOGIC_MK="target/linux/mediatek/image/filogic.mk"
+if [ -f "$BE14_PATCH" ] && [ -f "$FILOGIC_MK" ]; then
+    if grep -q 'mt7988a-bananapi-bpi-r4-wifi-be14' "$FILOGIC_MK"; then
+        echo "[DIY] BE14 overlay already in DEVICE_DTS_OVERLAY"
+    else
+        sed -i 's|^\tmt7988a-bananapi-bpi-r4-sd *$|\tmt7988a-bananapi-bpi-r4-sd \\\n\tmt7988a-bananapi-bpi-r4-wifi-be14|' "$FILOGIC_MK"
+        grep -q 'mt7988a-bananapi-bpi-r4-wifi-be14' "$FILOGIC_MK" \
+            && echo "[DIY] BE14 EEPROM overlay added to BPI-R4 DEVICE_DTS_OVERLAY" \
+            || echo "Failed to add BE14 overlay to $FILOGIC_MK" >&2
+    fi
+fi
+
 # Pin kernel Kconfig symbols to avoid interactive prompts (NEW symbols)
 CFG="target/linux/mediatek/filogic/config-6.12"
 if [ -f "$CFG" ]; then
