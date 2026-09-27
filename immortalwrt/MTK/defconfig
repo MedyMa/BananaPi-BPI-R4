@@ -102,13 +102,7 @@ CONFIG_KERNEL_NET_MEDIATEK_HNAT=y
 CONFIG_KERNEL_MEDIATEK_NETSYS_V3=y
 # CONFIG_KERNEL_MEDIATEK_NETSYS_V2 is not set
 
-# --- Hardware QoS (HQoS) ---
-# package/mtk/app/mtk-hqos provides both halves of this: the service that drives
-# the QDMA queues through /sys/kernel/debug/hnat/{qos_toggle,qdma_sch*,qdma_txq*}
-# and luci-app-mtk-hqos for the UI.  It depends on kmod-mediatek_hnat, which the
-# kernel symbol above builds in.  The older mtkhqos_util name belongs to the
-# vendor-feed trees (package/mtk/applications/) and does not exist on this
-# branch, so selecting it here would have been dropped silently by defconfig.
+# Hardware QoS (HQoS): mtk-hqos + luci-app-mtk-hqos, needs kmod-mediatek_hnat above.
 CONFIG_PACKAGE_mtk-hqos=y
 CONFIG_PACKAGE_luci-app-mtk-hqos=y
 

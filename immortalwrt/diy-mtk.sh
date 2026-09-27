@@ -1,10 +1,6 @@
 #!/bin/bash
-# diy-mtk.sh -- Community packages & config for the WiFi7 (mt76/mt7996e) build
-#
-# Used with REPO_BRANCH openwrt-25.12-mtk-hqos (amhelibrary/immortalwrt).  Steps
-# that need the MTK vendor WiFi7 tree are guarded and skipped when that tree is
-# absent, so the same script still works on the chasey-dev style branches that
-# ship package/mtk/drivers.
+# diy-mtk.sh -- Community packages & config for the WiFi7 (mt76/mt7996e) build,
+# used with REPO_BRANCH openwrt-25.12-mtk-hqos.  Vendor-tree steps are guarded.
 
 merge_package(){
     repo=`echo $1 | rev | cut -d'/' -f 1 | rev`
@@ -177,19 +173,9 @@ if [ -f "$_mt975" ]; then
     fi
 fi
 
-# ---------------------------------------------------------------------------
-# Vendor WiFi7 tree (wifi-profile / mt_wifi7 / datconf).
-#
-# These steps belong to trees that actually ship the MTK vendor WiFi driver:
-# the mt_wifi7 Makefile, its five compat patches and padavanonly's wifi-profile
-# all live under package/mtk/.  The mtk-hqos tree ships mainline
-# mt76/mt7996e instead and has no package/mtk/drivers at all, so on it every
-# step here would either fail (mv/sed/install) or - in the case of the mt_wifi7
-# Makefile check below - abort the build with `exit 1`.
-#
-# Guarded as one block rather than step by step, because the vendor-only steps
-# are only correct together: the patches target the Makefile the others edit.
-# ---------------------------------------------------------------------------
+# Vendor WiFi7 steps (wifi-profile / mt_wifi7 / datconf) exist only in trees that
+# ship package/mtk/drivers.  On mtk-hqos (mainline mt76) the mt_wifi7 Makefile
+# check below would abort the build with exit 1, so the block is guarded whole.
 if [ -d "package/mtk/drivers" ]; then
 
 # wifi-profile: use padavanonly's mt7990-only build (chasey-dev's references
