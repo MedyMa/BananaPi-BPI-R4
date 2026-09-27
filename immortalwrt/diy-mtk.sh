@@ -147,9 +147,10 @@ if grep -q 'mkdir $(PKG_BUILD_DIR)/bin' feeds/packages/net/vpnc/Makefile 2>/dev/
     sed -i '/mkdir $(PKG_BUILD_DIR)\/bin/s/mkdir /mkdir -p /' feeds/packages/net/vpnc/Makefile
 fi
 
-# hostapd 975 (MTK MLO PMKSA): sta->mld_* only exist under CONFIG_IEEE80211BE and
-# this tree builds wpad without 11BE, so the MLO block must be compiled out.
-# Regex guards survive upstream churn; bump the hunk line count by +3.
+# hostapd 975 (MTK MLO PMKSA) ships only on the chasey-dev trees, so this is
+# skipped on mtk-hqos.  Where it does exist, sta->mld_* need CONFIG_IEEE80211BE:
+# with DRIVER_11BE_SUPPORT unset they are compiled out and the MLO block must be
+# guarded.  Regex guards survive upstream churn; hunk count +3.
 _mt975="package/network/services/hostapd/patches/975-mtk-mlo-pass-pmksa-link-address.patch"
 if [ -f "$_mt975" ]; then
     if perl -0777 -e '
