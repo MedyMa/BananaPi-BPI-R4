@@ -480,6 +480,55 @@ fi
 install -Dm0644 "$_mt76_wed_patch_src" "$_mt76_wed_patch_dst"
 echo "[DIY] mt76 WED wpdma_tx array-index fix installed"
 
+# Enable WED on mt7996e.  mt7996_mmio_wed_init() starts with
+#     if (!wed_enable)
+#             return 0;
+# and wed_enable is declared `static bool wed_enable;` (module_param, default
+# false), so the driver never initialises WED unless the module is loaded with
+# wed_enable=1.  MODPARAMS.mt7996e in the mt76 package Makefile is what arranges
+# that; diy-part2.sh and diy-part6.sh apply a patch for it, but this workflow
+# runs neither, so it has to happen here.
+#
+# 1007 is used instead of the pre-existing
+# 1005-mt76-makefile-2ab64980-master.patch because that one is malformed: its
+# single hunk header claims 6 old and 7 new lines while the body carries only
+# 5 context lines plus 1 added line, so patch(1) rejects it outright with
+# "Hunk #1 FAILED at 327" (leaving a .rej).  diy-part6.sh validates with
+# --dry-run and returns non-zero, but that script has no `set -e`, so the
+# failure is swallowed and wed_enable has never actually been enabled on that
+# path either.  Repairing 1005 would silently start enabling WED on the other
+# workflows, so that is deliberately left alone and this path gets its own
+# well-formed patch.
+#
+# The target is package/kernel/mt76/Makefile, which belongs to the recipe
+# directory rather than the extracted source tree, so it is patched in place
+# with `patch -p1`, exactly as diy-part6.sh does it.  The reverse dry-run first
+# makes re-running this script a no-op instead of stacking a second
+# MODPARAMS line, and a forward dry-run at --fuzz=0 means a drifted Makefile
+# fails the build loudly rather than quietly leaving WED disabled.
+_mt76_wed_mk_name="1007-mt76-makefile-wed-enable.patch"
+_mt76_wed_mk_patch="$GITHUB_WORKSPACE/patches/filogic/mt76/$_mt76_wed_mk_name"
+
+if [ ! -f "$_mt76_wed_mk_patch" ]; then
+    echo "Required mt76 wed_enable patch not found: $_mt76_wed_mk_patch" >&2
+    exit 1
+fi
+
+if [ ! -f package/kernel/mt76/Makefile ]; then
+    echo "package/kernel/mt76/Makefile not found; cannot enable wed_enable for mt7996e" >&2
+    exit 1
+fi
+
+if (cd package/kernel/mt76 && patch -p1 -R --dry-run < "$_mt76_wed_mk_patch" >/dev/null 2>&1); then
+    echo "[DIY] mt76 wed_enable=1 already applied to mt7996e"
+elif (cd package/kernel/mt76 && patch -p1 --dry-run --fuzz=0 < "$_mt76_wed_mk_patch" >/dev/null 2>&1); then
+    (cd package/kernel/mt76 && patch -p1 --fuzz=0 < "$_mt76_wed_mk_patch" >/dev/null)
+    echo "[DIY] mt76 wed_enable=1 enabled for mt7996e"
+else
+    echo "mt76 wed_enable patch does not apply cleanly to package/kernel/mt76/Makefile" >&2
+    exit 1
+fi
+
 # Pin kernel Kconfig symbols to avoid interactive prompts (NEW symbols)
 CFG="target/linux/mediatek/filogic/config-6.12"
 if [ -f "$CFG" ]; then
