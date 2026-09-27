@@ -412,6 +412,25 @@ if [ -f "$BE14_PATCH" ] && [ -f "$FILOGIC_MK" ]; then
     fi
 fi
 
+# BPI-R4 HNAT: this branch ships the mtkhnat driver and the 'hnat' node (added to
+# mt7988a.dtsi by 999-dts-mt7988a-rfb-17-...), but no BPI-R4 board dts ever sets
+# status=okay, so the driver can never probe and HNAT/NPU offload stays dead.
+# The netdev names must be the *post-rename* ones: /lib/preinit/04_set_netdev_label
+# renames ethN in preinit, while the driver is a module loaded later from
+# /etc/init.d/boot -> /sbin/kmodloader, so dev_get_by_name() sees wan/lanN/sfp-*.
+# The mtketh-lan/lan2/wan values are matched as PREFIXES (see IS_LAN/IS_WAN in
+# hnat.h), which is why "lan" covers lan1..lan4 and why rfb uses "lan" too.
+_hnat_patch_src="$GITHUB_WORKSPACE/patches/filogic/25.12/1012-dts-mt7988a-bananapi-bpi-r4-add-mtkhnat-support.patch"
+_hnat_patch_dst="target/linux/mediatek/patches-6.12/999-dts-mt7988a-bananapi-bpi-r4-02-arm64-dts-mediatek-add-mtkhnat-support.patch"
+
+if [ ! -f "$_hnat_patch_src" ]; then
+    echo "Required BPI-R4 HNAT patch not found: $_hnat_patch_src" >&2
+    exit 1
+fi
+
+install -Dm0644 "$_hnat_patch_src" "$_hnat_patch_dst"
+echo "[DIY] BPI-R4 HNAT device tree patch installed"
+
 # Pin kernel Kconfig symbols to avoid interactive prompts (NEW symbols)
 CFG="target/linux/mediatek/filogic/config-6.12"
 if [ -f "$CFG" ]; then
