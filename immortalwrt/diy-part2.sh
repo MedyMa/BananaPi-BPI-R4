@@ -5,5 +5,5 @@ sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generat
 
 # Apply the mt76 Makefile patch standalone (tracked via patch(1))
 perl -0pi -e 's/\r\n/\n/g; s/\r/\n/g' \
-  "$GITHUB_WORKSPACE/patches/filogic/mt76/1005-mt76-makefile-2ab64980.patch"
-(cd package/kernel/mt76 && patch -p1 < "$GITHUB_WORKSPACE/patches/filogic/mt76/1005-mt76-makefile-2ab64980.patch")
+  "$GITHUB_WORKSPACE/patches/filogic/mt76/1005-mt76-makefile-wed-enable-mt7990-firmware.patch"
+(cd package/kernel/mt76 && patch -p1 < "$GITHUB_WORKSPACE/patches/filogic/mt76/1005-mt76-makefile-wed-enable-mt7990-firmware.patch")

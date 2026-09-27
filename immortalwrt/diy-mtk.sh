@@ -490,7 +490,7 @@ echo "[DIY] mt76 WED wpdma_tx array-index fix installed"
 # runs neither, so it has to happen here.
 #
 # 1007 is used instead of the pre-existing
-# 1005-mt76-makefile-2ab64980-master.patch because that one is malformed: its
+# 1005-mt76-makefile-wed-enable.patch because that one is malformed: its
 # single hunk header claims 6 old and 7 new lines while the body carries only
 # 5 context lines plus 1 added line, so patch(1) rejects it outright with
 # "Hunk #1 FAILED at 327" (leaving a .rej).  diy-part6.sh validates with

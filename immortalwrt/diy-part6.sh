@@ -26,8 +26,8 @@ validate_and_apply_mt76_patch() {
     (cd package/kernel/mt76 && patch -p1 < "$patch_file")
 }
 
-# 25.12 上游自带 mt7990-firmware，只需 master 版 patch 追加 wed_enable=1
-MT76_PATCH="1005-mt76-makefile-2ab64980-master.patch"
+# 25.12 上游自带 mt7990-firmware，只需追加 wed_enable=1 的 patch
+MT76_PATCH="1005-mt76-makefile-wed-enable.patch"
 
 validate_and_apply_mt76_patch \
   "$GITHUB_WORKSPACE/patches/filogic/mt76/$MT76_PATCH"
