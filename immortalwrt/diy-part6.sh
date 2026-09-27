@@ -27,7 +27,7 @@ validate_and_apply_mt76_patch() {
 }
 
 # 25.12 上游自带 mt7990-firmware，只需追加 wed_enable=1 的 patch
-MT76_PATCH="1005-mt76-makefile-wed-enable.patch"
+MT76_PATCH="1007-mt76-makefile-wed-enable.patch"
 
 validate_and_apply_mt76_patch \
   "$GITHUB_WORKSPACE/patches/filogic/mt76/$MT76_PATCH"

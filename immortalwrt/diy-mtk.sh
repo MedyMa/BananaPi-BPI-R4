@@ -486,19 +486,16 @@ echo "[DIY] mt76 WED wpdma_tx array-index fix installed"
 # and wed_enable is declared `static bool wed_enable;` (module_param, default
 # false), so the driver never initialises WED unless the module is loaded with
 # wed_enable=1.  MODPARAMS.mt7996e in the mt76 package Makefile is what arranges
-# that; diy-part2.sh and diy-part6.sh apply a patch for it, but this workflow
-# runs neither, so it has to happen here.
+# that.
 #
-# 1007 is used instead of the pre-existing
-# 1005-mt76-makefile-wed-enable.patch because that one is malformed: its
-# single hunk header claims 6 old and 7 new lines while the body carries only
-# 5 context lines plus 1 added line, so patch(1) rejects it outright with
-# "Hunk #1 FAILED at 327" (leaving a .rej).  diy-part6.sh validates with
-# --dry-run and returns non-zero, but that script has no `set -e`, so the
-# failure is swallowed and wed_enable has never actually been enabled on that
-# path either.  Repairing 1005 would silently start enabling WED on the other
-# workflows, so that is deliberately left alone and this path gets its own
-# well-formed patch.
+# 1007 replaced an earlier 1005-mt76-makefile-wed-enable.patch that never worked
+# anywhere: its single hunk header claimed 6 old and 7 new lines while the body
+# carried 5 context lines plus 1 added line, so patch(1) rejected it with
+# "Hunk #1 FAILED at 327" and wrote a .rej.  diy-part6.sh validated with
+# --dry-run and got a non-zero status, but that script has no `set -e`, so the
+# failure was swallowed and wed_enable was silently never enabled.  That file has
+# been deleted; 1007 is now the single source and diy-part6.sh points at it too,
+# so the immortalwrt-25.12 workflow enables WED as well.
 #
 # The target is package/kernel/mt76/Makefile, which belongs to the recipe
 # directory rather than the extracted source tree, so it is patched in place
