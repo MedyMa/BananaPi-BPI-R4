@@ -428,6 +428,12 @@ fi
 #   driver patch -> after 9999-mtk-hnat-support-wan-bridge-offload.patch
 #   dts patch    -> after 9999-003-edit-dts.patch (and after 9999-001, which
 #                   creates the very &hnat block the property is added to)
+#
+# This is experimental and therefore OFF by default: nothing below runs unless
+# HNAT_SECONDARY_WAN_EXPERIMENTAL=1.  In CI that variable comes from the
+# repository variable of the same name (see the env: block of
+# .github/workflows/immortalwrt_25.12_wifi7.yml); locally, export it before
+# running this script.  Setting it also makes a missing patch file fatal.
 if [ "${HNAT_SECONDARY_WAN_EXPERIMENTAL:-0}" = "1" ]; then
     _hnat_wan2_patch_src="$GITHUB_WORKSPACE/patches/filogic/25.12/1013-mtk-hnat-secondary-wan.patch"
     _hnat_wan2_patch_dst="target/linux/mediatek/patches-6.12/9999-mtk-hnat-wan2.patch"

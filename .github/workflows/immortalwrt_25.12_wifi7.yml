@@ -19,6 +19,13 @@ env:
   TZ: Asia/Shanghai
   OPENWRT_NAME: immortalwrt
   OPENWRT_DEVICE: mediatek
+  # Experimental BPI-R4 secondary WAN (sfp-wan) HNAT patch.  Off unless the
+  # repository variable HNAT_SECONDARY_WAN_EXPERIMENTAL is set to 1 under
+  # Settings -> Secrets and variables -> Actions -> Variables, so the switch can
+  # be flipped without editing this file.  An unset variable expands to empty
+  # and diy-mtk.sh's ${HNAT_SECONDARY_WAN_EXPERIMENTAL:-0} keeps the patch out
+  # of the build.
+  HNAT_SECONDARY_WAN_EXPERIMENTAL: ${{ vars.HNAT_SECONDARY_WAN_EXPERIMENTAL }}
 
 jobs:
   build:
