@@ -412,6 +412,38 @@ if [ -f "$BE14_PATCH" ] && [ -f "$FILOGIC_MK" ]; then
     fi
 fi
 
+# BPI-R4 secondary WAN (SFP): the HNAT driver holds exactly one WAN net_device
+# (g_wandev), resolved from mtketh-wan, so get_wandev_from_index() -- used by
+# do_ext2ge_fast_learn() and the MAP-E ping-pong paths -- cannot recognise the
+# second physical WAN.  9999-mtk-hnat-support-wan-bridge-offload.patch already
+# *classifies* sfp-wan as WAN via is_hnat_wan_dev(); what is missing is a held
+# reference for it, so this is not a classification fix.
+#
+# 1013 adds an optional mtketh-wan2 DT property with g_wan2dev lifetime handling
+# (and fixes a dev_get_by_name() refcount leak in hnat_hw_init, which runs once
+# per PPE and again on warm reset).  1014 sets that property on the BPI-R4 dtsi.
+#
+# Both names carry a position requirement, verified against the build's own glob
+# order rather than assumed:
+#   driver patch -> after 9999-mtk-hnat-support-wan-bridge-offload.patch
+#   dts patch    -> after 9999-003-edit-dts.patch (and after 9999-001, which
+#                   creates the very &hnat block the property is added to)
+_hnat_wan2_patch_src="$GITHUB_WORKSPACE/patches/filogic/25.12/1013-mtk-hnat-secondary-wan.patch"
+_hnat_wan2_patch_dst="target/linux/mediatek/patches-6.12/9999-mtk-hnat-wan2.patch"
+_hnat_wan2_dts_src="$GITHUB_WORKSPACE/patches/filogic/25.12/1014-dts-bpi-r4-mtketh-wan2.patch"
+_hnat_wan2_dts_dst="target/linux/mediatek/patches-6.12/9999-004-edit-dts.patch"
+
+for _hnat_wan2_src in "$_hnat_wan2_patch_src" "$_hnat_wan2_dts_src"; do
+    if [ ! -f "$_hnat_wan2_src" ]; then
+        echo "Required secondary WAN patch not found: $_hnat_wan2_src" >&2
+        exit 1
+    fi
+done
+
+install -Dm0644 "$_hnat_wan2_patch_src" "$_hnat_wan2_patch_dst"
+install -Dm0644 "$_hnat_wan2_dts_src" "$_hnat_wan2_dts_dst"
+echo "[DIY] BPI-R4 secondary WAN patches installed"
+
 # Pin kernel Kconfig symbols to avoid interactive prompts (NEW symbols)
 CFG="target/linux/mediatek/filogic/config-6.12"
 if [ -f "$CFG" ]; then

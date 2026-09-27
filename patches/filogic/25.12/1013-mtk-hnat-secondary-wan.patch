@@ -1,0 +1,121 @@
+Subject: [PATCH] net: mediatek: hnat: track an optional secondary WAN
+
+Apply after upstream 9999-mtk-hnat-support-wan-bridge-offload.patch.
+That patch already recognizes sfp-wan. Extend the remaining single-WAN
+ifindex lookup used by MAP-E ping-pong and mirror netdev lifetime handling.
+Avoid taking duplicate references during per-PPE initialization and reset.
+
+--- a/drivers/net/ethernet/mediatek/mtk_hnat/hnat.h
++++ b/drivers/net/ethernet/mediatek/mtk_hnat/hnat.h
+@@ -1066,6 +1066,7 @@
+ 
+ 	/*devices we plays for*/
+ 	char wan[IFNAMSIZ];
++	char wan2[IFNAMSIZ]; /* optional second physical WAN */
+ 	char lan[IFNAMSIZ];
+ 	char lan2[IFNAMSIZ];
+ 	char ppd[IFNAMSIZ];
+@@ -1091,6 +1092,7 @@
+ 	u8 dft_cport;
+ 	struct net_device *g_ppdev;
+ 	struct net_device *g_wandev;
++	struct net_device *g_wan2dev;
+ 	struct net_device *wifi_hook_if[MAX_IF_NUM];
+ 	struct extdev_entry *ext_if[MAX_EXT_DEVS];
+ 	struct timer_list hnat_sma_build_entry_timer;
+@@ -1479,6 +1481,10 @@
+ 
+ 	if (hnat_priv && hnat_priv->wan[0] &&
+ 	    !strncmp(dev->name, hnat_priv->wan, strlen(hnat_priv->wan)))
++		return true;
++
++	if (hnat_priv && hnat_priv->wan2[0] &&
++	    !strcmp(dev->name, hnat_priv->wan2))
+ 		return true;
+ 
+ 	if (!strncmp(dev->name, "wan", 3))
+--- a/drivers/net/ethernet/mediatek/mtk_hnat/hnat.c
++++ b/drivers/net/ethernet/mediatek/mtk_hnat/hnat.c
+@@ -1248,8 +1248,13 @@
+ 	hnat_hw_set_dft_cport(ppe_id);
+ 	hnat_hw_set_prot_3t(ppe_id);
+ 
+-	hnat_priv->g_ppdev = dev_get_by_name(&init_net, hnat_priv->ppd);
+-	hnat_priv->g_wandev = dev_get_by_name(&init_net, hnat_priv->wan);
++	/* Called for each PPE and on warm reset: acquire each reference once. */
++	if (!hnat_priv->g_ppdev)
++		hnat_priv->g_ppdev = dev_get_by_name(&init_net, hnat_priv->ppd);
++	if (!hnat_priv->g_wandev)
++		hnat_priv->g_wandev = dev_get_by_name(&init_net, hnat_priv->wan);
++	if (hnat_priv->wan2[0] && !hnat_priv->g_wan2dev)
++		hnat_priv->g_wan2dev = dev_get_by_name(&init_net, hnat_priv->wan2);
+ 
+ 	dev_info(hnat_priv->dev, "PPE%d hwnat start\n", ppe_id);
+ 
+@@ -1455,6 +1460,11 @@
+ 
+ 	if (hnat_priv->g_wandev)
+ 		dev_put(hnat_priv->g_wandev);
++	if (hnat_priv->g_wan2dev)
++		dev_put(hnat_priv->g_wan2dev);
++	hnat_priv->g_ppdev = NULL;
++	hnat_priv->g_wandev = NULL;
++	hnat_priv->g_wan2dev = NULL;
+ }
+ 
+ static struct notifier_block nf_hnat_netdevice_nb __read_mostly = {
+@@ -1653,6 +1663,20 @@
+ 		strncpy(hnat_priv->wan, (char *)name, IFNAMSIZ - 1);
+ 	dev_info(&pdev->dev, "wan = %s\n", hnat_priv->wan);
+ 
++	/* Optional, single physical name; do not interpret mtketh-wan as a list. */
++	err = of_property_read_string(np, "mtketh-wan2", &name);
++	if (err && err != -EINVAL)
++		goto err_out2;
++	if (!err) {
++		if (!dev_valid_name(name) || !strcmp(name, hnat_priv->wan) ||
++		    strscpy(hnat_priv->wan2, name, IFNAMSIZ) < 0) {
++			dev_err(&pdev->dev, "invalid mtketh-wan2\n");
++			err = -EINVAL;
++			goto err_out2;
++		}
++		dev_info(&pdev->dev, "wan2 = %s\n", hnat_priv->wan2);
++	}
++
+ 	err = of_property_read_string(np, "mtketh-lan", &name);
+ 	if (err < 0)
+ 		strscpy(hnat_priv->lan, "eth0", IFNAMSIZ);
+--- a/drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c
++++ b/drivers/net/ethernet/mediatek/mtk_hnat/hnat_nf_hook.c
+@@ -161,6 +161,10 @@
+ 
+ 	if (hnat_priv->g_wandev && hnat_priv->g_wandev->ifindex == index)
+ 		return hnat_priv->g_wandev;
++
++	/* Acquired at init or NETDEV_REGISTER, never mutate it in the RX path. */
++	if (hnat_priv->g_wan2dev && hnat_priv->g_wan2dev->ifindex == index)
++		return hnat_priv->g_wan2dev;
+ 	return NULL;
+ }
+ 
+@@ -478,6 +482,10 @@
+ 			hnat_priv->g_wandev = NULL;
+ 			dev_put(dev);
+ 		}
++		if (hnat_priv->g_wan2dev == dev) {
++			hnat_priv->g_wan2dev = NULL;
++			dev_put(dev);
++		}
+ 
+ 		break;
+ 	case NETDEV_REGISTER:
+@@ -485,6 +493,9 @@
+ 			hnat_priv->g_ppdev = dev_get_by_name(&init_net, hnat_priv->ppd);
+ 		if (IS_WAN(dev) && !hnat_priv->g_wandev)
+ 			hnat_priv->g_wandev = dev_get_by_name(&init_net, hnat_priv->wan);
++		if (hnat_priv->wan2[0] && !hnat_priv->g_wan2dev &&
++		    !strcmp(dev->name, hnat_priv->wan2))
++			hnat_priv->g_wan2dev = dev_get_by_name(&init_net, hnat_priv->wan2);
+ 		break;
+ 	case MTK_FE_RESET_NAT_DONE:
+ 		pr_info("[%s] HNAT driver starts to do warm init !\n", __func__);
