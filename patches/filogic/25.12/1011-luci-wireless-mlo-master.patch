@@ -1,0 +1,41 @@
+diff --git a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
+index 39ba68e..a298c16 100644
+--- a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
++++ b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
+@@ -319,6 +319,19 @@ function eht_compat_default(section_id) {
+ 	return form.Flag.prototype.updateDefaultValue.call(this, section_id);
+ }
+ 
++// MLO for a wifi-iface: wifi-scripts turns `option mlo '1'` into hostapd's
++// mld_ap=1, which needs an EHT radio and hostapd built with 11BE.  htmode is a
++// radio property, so read it here rather than name it in a depends().
++function mlo_available(dev, section_id) {
++	if (!L.hasSystemFeature('hostapd', '11be'))
++		return false;
++
++	const freq = this.map.lookupOption('_freq', dev);
++	const htmode = freq ? freq[0].formvalue(dev)?.[0] : uci.get('wireless', dev, 'htmode');
++
++	return /^EHT/.test(htmode || '');
++}
++
+ // Define a class CBIWifiFrequencyValue that extends form.Value
+ var CBIWifiFrequencyValue = form.Value.extend({
+ 	// Declare an RPC method to get the frequency list for a given device
+@@ -1245,6 +1258,16 @@ return view.extend({
+ 					o = ss.taboption('advanced', form.Flag, 'multicast_to_unicast_all', _('Multi To Unicast'), _('ARP, IPv4 and IPv6 (even 802.1Q) with multicast destination MACs are unicast to the STA MAC address. Note: This is not Directed Multicast Service (DMS) in 802.11v. Note: might break receiver STA multicast expectations.'));
+ 					o.rmempty = true;
+ 
++					o = ss.taboption('advanced', form.Flag, 'mlo', _('Multi-Link Operation'), _('Advertise this access point as one link of a multi-link device. Needs an EHT (Wi-Fi 7) radio; the links that should form one MLD must share the ESSID and the key.'));
++					o.depends('mode', 'ap');
++					o.depends('mode', 'ap-wds');
++					o.checkDepends = (function(base, dev) {
++						return function(section_id) {
++							return base.call(this, section_id) &&
++								mlo_available.call(this, dev, section_id);
++						};
++					})(o.checkDepends, radioNet.getName());
++
+ 					o = ss.taboption('advanced', form.Flag, 'isolate', _('Isolate Clients'), _('Prevents client-to-client communication'));
+ 					o.depends('mode', 'ap');
+ 					o.depends('mode', 'ap-wds');

@@ -142,6 +142,12 @@ rm -rf feeds/packages/net/onionshare-cli
 [ -f feeds/luci/applications/luci-app-package-manager/root/usr/libexec/package-manager-call ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1004-luci-package-manager-apk-upload-untrusted-master.patch"
 
+# wireless.js: MLO flag on wifi-iface.  The backend (wifi-scripts ap.uc) already
+# maps `option mlo '1'` to hostapd's mld_ap=1, and the UCI schema already allows
+# the option - only the LuCI control was missing, so nothing else has to change.
+[ -f feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js ] && \
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1011-luci-wireless-mlo-master.patch"
+
 # vpnc: add -p to mkdir for idempotency
 if grep -q 'mkdir $(PKG_BUILD_DIR)/bin' feeds/packages/net/vpnc/Makefile 2>/dev/null; then
     sed -i '/mkdir $(PKG_BUILD_DIR)\/bin/s/mkdir /mkdir -p /' feeds/packages/net/vpnc/Makefile
