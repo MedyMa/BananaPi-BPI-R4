@@ -1,5 +1,5 @@
 diff --git a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
-index 39ba68e..a298c16 100644
+index 39ba68e..d257dfc 100644
 --- a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
 +++ b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
 @@ -319,6 +319,19 @@ function eht_compat_default(section_id) {
@@ -9,7 +9,7 @@ index 39ba68e..a298c16 100644
 +// MLO for a wifi-iface: wifi-scripts turns `option mlo '1'` into hostapd's
 +// mld_ap=1, which needs an EHT radio and hostapd built with 11BE.  htmode is a
 +// radio property, so read it here rather than name it in a depends().
-+function mlo_available(dev, section_id) {
++function mlo_available(dev) {
 +	if (!L.hasSystemFeature('hostapd', '11be'))
 +		return false;
 +
@@ -32,7 +32,7 @@ index 39ba68e..a298c16 100644
 +					o.checkDepends = (function(base, dev) {
 +						return function(section_id) {
 +							return base.call(this, section_id) &&
-+								mlo_available.call(this, dev, section_id);
++								mlo_available.call(this, dev);
 +						};
 +					})(o.checkDepends, radioNet.getName());
 +
