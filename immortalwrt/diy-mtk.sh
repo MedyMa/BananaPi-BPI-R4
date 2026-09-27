@@ -446,6 +446,34 @@ if [ "${HNAT_SECONDARY_WAN_EXPERIMENTAL:-0}" = "1" ]; then
     echo "[DIY] Experimental BPI-R4 secondary WAN patches installed"
 fi
 
+# mt76 WED compile fix.  999-wed-10-add-mt7987-hwpath-support.patch changes the
+# kernel's struct mtk_wed_device:
+#     -       u32 wpdma_tx;
+#     +       u32 wpdma_tx[MTK_WED_TX_QUEUES];
+# but mt76 (pinned to openwrt/mt76@39c960c3, and unchanged on master) still
+# assigns it as a scalar, so mt7996/mmio.c and mt7915/mmio.c fail to build with
+# "assignment to expression with array type" -- this is what failed CI run #108.
+# Index [0] is the same ring the kernel's non-v3.1 path reads via
+# wpdma_tx[0] (mtk_wed_set_wpdma -> MTK_WED_WPDMA_CFG_TX).  The hif2 branch uses
+# the *other* WED device (wed_hif2), not another element of this array, so it is
+# [0] as well, not [1].
+#
+# This one goes into the package's patches/ directory rather than being applied
+# with `patch -p1` here: mt7996/mmio.c and mt7915/mmio.c live in the extracted
+# source tree (PKG_BUILD_DIR), not in package/kernel/mt76, so the build's own
+# patch step has to apply it.  It sorts after the existing 100-... patch.
+_mt76_wed_patch_name="1006-mt76-mt7996-mt7915-wed-wpdma-tx-array.patch"
+_mt76_wed_patch_src="$GITHUB_WORKSPACE/patches/filogic/mt76/$_mt76_wed_patch_name"
+_mt76_wed_patch_dst="package/kernel/mt76/patches/$_mt76_wed_patch_name"
+
+if [ ! -f "$_mt76_wed_patch_src" ]; then
+    echo "Required mt76 WED patch not found: $_mt76_wed_patch_src" >&2
+    exit 1
+fi
+
+install -Dm0644 "$_mt76_wed_patch_src" "$_mt76_wed_patch_dst"
+echo "[DIY] mt76 WED wpdma_tx array-index fix installed"
+
 # Pin kernel Kconfig symbols to avoid interactive prompts (NEW symbols)
 CFG="target/linux/mediatek/filogic/config-6.12"
 if [ -f "$CFG" ]; then

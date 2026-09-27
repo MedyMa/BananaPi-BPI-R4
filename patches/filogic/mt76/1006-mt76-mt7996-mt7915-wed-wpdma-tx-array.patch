@@ -1,0 +1,44 @@
+diff --git a/mt7915/mmio.c b/mt7915/mmio.c
+index 2708b15..6e47ea2 100644
+--- a/mt7915/mmio.c
++++ b/mt7915/mmio.c
+@@ -658,7 +658,7 @@ int mt7915_mmio_wed_init(struct mt7915_dev *dev, void *pdev_ptr,
+ 				       MT_INT_WED_MASK_CSR;
+ 		wed->wlan.wpdma_phys = pci_resource_start(pci_dev, 0) +
+ 				       MT_WFDMA_EXT_CSR_BASE;
+-		wed->wlan.wpdma_tx = pci_resource_start(pci_dev, 0) +
++		wed->wlan.wpdma_tx[0] = pci_resource_start(pci_dev, 0) +
+ 				     MT_TXQ_WED_RING_BASE;
+ 		wed->wlan.wpdma_txfree = pci_resource_start(pci_dev, 0) +
+ 					 MT_RXQ_WED_RING_BASE;
+@@ -684,7 +684,7 @@ int mt7915_mmio_wed_init(struct mt7915_dev *dev, void *pdev_ptr,
+ 		wed->wlan.phy_base = res->start;
+ 		wed->wlan.wpdma_int = res->start + MT_INT_SOURCE_CSR;
+ 		wed->wlan.wpdma_mask = res->start + MT_INT_MASK_CSR;
+-		wed->wlan.wpdma_tx = res->start + MT_TXQ_WED_RING_BASE;
++		wed->wlan.wpdma_tx[0] = res->start + MT_TXQ_WED_RING_BASE;
+ 		wed->wlan.wpdma_txfree = res->start + MT_RXQ_WED_RING_BASE;
+ 		wed->wlan.wpdma_rx_glo = res->start + MT_WPDMA_GLO_CFG;
+ 		wed->wlan.wpdma_rx[0] = res->start + MT_RXQ_WED_DATA_RING_BASE;
+diff --git a/mt7996/mmio.c b/mt7996/mmio.c
+index d9780bb..52fdd00 100644
+--- a/mt7996/mmio.c
++++ b/mt7996/mmio.c
+@@ -488,7 +488,7 @@ int mt7996_mmio_wed_init(struct mt7996_dev *dev, void *pdev_ptr,
+ 				      MT_INT_PCIE1_SOURCE_CSR_EXT;
+ 		wed->wlan.wpdma_mask = wed->wlan.phy_base +
+ 				       MT_INT_PCIE1_MASK_CSR;
+-		wed->wlan.wpdma_tx = wed->wlan.phy_base + hif1_ofs +
++		wed->wlan.wpdma_tx[0] = wed->wlan.phy_base + hif1_ofs +
+ 					     MT_TXQ_RING_BASE(0) +
+ 					     MT7996_TXQ_BAND2 * MT_RING_SIZE;
+ 		if (mt7996_has_hwrro(dev)) {
+@@ -521,7 +521,7 @@ int mt7996_mmio_wed_init(struct mt7996_dev *dev, void *pdev_ptr,
+ 		wed->wlan.hw_rro = mt7996_has_hwrro(dev);
+ 		wed->wlan.wpdma_int = wed->wlan.phy_base + MT_INT_SOURCE_CSR;
+ 		wed->wlan.wpdma_mask = wed->wlan.phy_base + MT_INT_MASK_CSR;
+-		wed->wlan.wpdma_tx = wed->wlan.phy_base + MT_TXQ_RING_BASE(0) +
++		wed->wlan.wpdma_tx[0] = wed->wlan.phy_base + MT_TXQ_RING_BASE(0) +
+ 				     MT7996_TXQ_BAND0 * MT_RING_SIZE;
+ 
+ 		wed->wlan.wpdma_rx_glo = wed->wlan.phy_base + MT_WFDMA0_GLO_CFG;
