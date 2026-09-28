@@ -164,6 +164,7 @@ merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-adgu
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-modemband
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-sfp-status
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-turboacc-mtk
+merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-traffic
 popd
 
 rm -rf feeds/packages/lang/golang
