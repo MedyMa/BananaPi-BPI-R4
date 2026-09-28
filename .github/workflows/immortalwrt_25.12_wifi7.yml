@@ -4,13 +4,6 @@ on:
   schedule:
     - cron: 0 16 * * *
   workflow_dispatch:
-    inputs:
-      config_file:
-        description: >-
-          defconfig to build.  Leave blank for the full immortalwrt/MTK/defconfig;
-          use immortalwrt/MTK/defconfig.core to warm the toolchain cache first.
-        required: false
-        default: ''
 
 permissions:
   actions: write
@@ -19,15 +12,7 @@ permissions:
 env:
   REPO_URL: https://github.com/amhelibrary/immortalwrt.git
   REPO_BRANCH: openwrt-25.12-mtk-hqos
-  # The full config is the default, for the schedule and for a blank dispatch.
-  # A dispatch may instead name immortalwrt/MTK/defconfig.core: that build is
-  # core only and exists to put the toolchain into the cachewrtbuild cache.  The
-  # cache key comes from OPENWRT_NAME/DEVICE/REPO_BRANCH and the tools+toolchain
-  # git history, not from this file, so the full build then restores it and skips
-  # the toolchain and host tools -- which is what keeps the full build inside the
-  # job time limit.  Order: dispatch with the .core file, let it finish, then
-  # dispatch again with the field left blank.
-  CONFIG_FILE: ${{ inputs.config_file || 'immortalwrt/MTK/defconfig' }}
+  CONFIG_FILE: immortalwrt/MTK/defconfig
   DIY_P1_SH: immortalwrt/diy-mtk.sh
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
