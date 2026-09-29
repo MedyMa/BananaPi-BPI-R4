@@ -75,6 +75,15 @@ CONFIG_PACKAGE_kmod-nls-cp950=y
 CONFIG_PACKAGE_kmod-nls-utf8=y
 CONFIG_PACKAGE_kmod-nft-offload=y
 CONFIG_PACKAGE_kmod-mediatek_hnat=y
+# The HNAT driver's Kconfig entry is "depends on NET_MEDIATEK_SOC && NF_CONNTRACK
+# && IP_NF_NAT", so without an iptables NAT module the NET_MEDIATEK_HNAT symbol is
+# invisible: kconfig then drops the CONFIG_NET_MEDIATEK_HNAT=m that diy-mtk.sh pins
+# into the target config, the driver is never compiled, kmod-mediatek_hnat comes out
+# as an empty package, and mtk_npu fails modpost on hnat_cache_ebl, hnat_get_foe_entry,
+# mtk_tnl_* and the mcast hooks.  kmod-ipt-nat is what provides IP_NF_NAT; the rest of
+# its dependency chain (kmod-ipt-core, kmod-nf-nat, kmod-nf-conntrack) is already
+# selected.  CI #119 failed exactly here.
+CONFIG_PACKAGE_kmod-ipt-nat=y
 CONFIG_KERNEL_NET_MEDIATEK_HNAT=y
 CONFIG_KERNEL_MEDIATEK_NETSYS_V3=y
 # CONFIG_KERNEL_MEDIATEK_NETSYS_V2 is not set
