@@ -101,3 +101,31 @@ CONFIG_PACKAGE_kmod-mt7996e=y
 CONFIG_PACKAGE_kmod-nft-socket=y
 CONFIG_PACKAGE_kmod-nft-tproxy=y
 CONFIG_PACKAGE_kmod-tun=y
+
+# BPI-R4 image artifacts.  The device profile only references the bootloader pieces
+# through ARTIFACT/..., and ARTIFACT/... adds no package dependency, while the
+# profile's DEVICE_PACKAGES (identical to upstream) carry no U-Boot or ATF packages
+# either.  So nothing selected them, and target/linux install died with
+#
+#   cat: .../staging_dir/.../image/mt7988-emmc-comb-bl2.img: No such file or directory
+#   make[5]: *** [Makefile:132: ...-emmc-preloader.bin] Error 1
+#
+# Each U-Boot variant depends on the ATF variant that produces its bl2 (the emmc
+# package on trusted-firmware-a-mt7988-emmc-comb, snand on
+# trusted-firmware-a-mt7988-spim-nand-ubi-comb, sdmmc on
+# trusted-firmware-a-mt7988-sdmmc-comb), so selecting the three U-Boot packages
+# pulls the ATF in as well.  The trusted-firmware-a lines are listed explicitly
+# too: they are what actually lands in staging_dir/.../image/, and a name that does
+# not exist is dropped by make defconfig without a word.
+#
+# The U-Boot symbol really is u-boot-<variant>, not uboot-mediatek-<variant>:
+# uboot-mediatek only names the source package (PKG_NAME at the top of its
+# Makefile), while the binary packages come from
+# "define Package/u-boot-$(1)" / "$(call BuildPackage,u-boot-$(type))" in
+# Build/U-Boot/Target, with $(1) being the "define U-Boot/<name>" suffix.
+CONFIG_PACKAGE_u-boot-mt7988_bananapi_bpi-r4-emmc=y
+CONFIG_PACKAGE_u-boot-mt7988_bananapi_bpi-r4-snand=y
+CONFIG_PACKAGE_u-boot-mt7988_bananapi_bpi-r4-sdmmc=y
+CONFIG_PACKAGE_trusted-firmware-a-mt7988-emmc-comb=y
+CONFIG_PACKAGE_trusted-firmware-a-mt7988-spim-nand-ubi-comb=y
+CONFIG_PACKAGE_trusted-firmware-a-mt7988-sdmmc-comb=y
