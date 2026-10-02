@@ -165,6 +165,12 @@ merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-mode
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-sfp-status
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-turboacc-mtk
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-traffic
+merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/rpcd-mod-router-status
+if [ ! -f package/openwrt-packages/rpcd-mod-router-status/Makefile ] || \
+   [ ! -f package/openwrt-packages/rpcd-mod-router-status/root/etc/init.d/router-status ]; then
+    echo "Independent router status package was not fetched" >&2
+    exit 1
+fi
 popd
 
 rm -rf feeds/packages/lang/golang

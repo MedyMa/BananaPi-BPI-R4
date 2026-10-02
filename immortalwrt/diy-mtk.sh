@@ -90,6 +90,12 @@ merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-adgu
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-modemband
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-turboacc-mtk
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-traffic
+merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/rpcd-mod-router-status
+if [ ! -f package/openwrt-packages/rpcd-mod-router-status/Makefile ] || \
+   [ ! -f package/openwrt-packages/rpcd-mod-router-status/root/etc/init.d/router-status ]; then
+    echo "Independent router status package was not fetched" >&2
+    exit 1
+fi
 merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnsto-openwrt-package/ddnsto
 merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnsto-openwrt-package/luci-app-ddnsto
 popd

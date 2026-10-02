@@ -112,6 +112,10 @@ jobs:
       run: |
         cd openwrt
         make defconfig
+        grep -qx 'CONFIG_PACKAGE_rpcd-mod-router-status=y' .config || {
+          echo 'Independent router status package is missing from the resolved firmware configuration' >&2
+          exit 1
+        }
         cat .config
         make download -j$(nproc) 2>&1
         find dl -size -1024c -exec ls -l {} \;
