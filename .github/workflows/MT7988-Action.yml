@@ -68,13 +68,6 @@ jobs:
         cp -f $GITHUB_WORKSPACE/patches/filogic/feeds.conf.default feeds.conf.default
         git log --pretty=tformat:"%h" -n1 tools toolchain || echo "No toolchain history"
 
-    - name: Backport rpcd lifetime fixes (24.10)
-      working-directory: ./openwrt
-      run: |
-        mkdir -p package/system/rpcd/patches
-        cp "$GITHUB_WORKSPACE"/patches/filogic/24.10/rpcd/*.patch package/system/rpcd/patches/
-        sed -i '/^PKG_RELEASE:=/s/$/.1/' package/system/rpcd/Makefile
-
     - name: Generate cache keys
       id: cache-key
       run: |
