@@ -61,6 +61,10 @@ git clone --depth=1 -b main https://github.com/Openwrt-Passwall/openwrt-passwall
 [ -f openwrt-passwall-packages/haproxy/Makefile ] && sed -i '/^[[:space:]]*ADDON+=USE_QUIC=1$/d' openwrt-passwall-packages/haproxy/Makefile
 git clone --depth=1 -b main https://github.com/Openwrt-Passwall/openwrt-passwall.git
 git clone --depth=1 https://github.com/nikkinikki-org/OpenWrt-nikki
+# The selected helloworld/mihomo core satisfies Nikki's +mihomo dependency.
+# Drop unused alternative providers whose mutual CONFLICTS cause a Kconfig cycle.
+[ -f helloworld/mihomo/Makefile ] || exit 1
+rm -rf OpenWrt-nikki/mihomo-alpha OpenWrt-nikki/mihomo-meta
 git clone --depth=1 https://github.com/1522042029/luci-app-socat
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
@@ -432,8 +436,8 @@ fi
 # Both names carry a position requirement, verified against the build's own glob
 # order rather than assumed:
 #   driver patch -> after 9999-mtk-hnat-support-wan-bridge-offload.patch
-#   dts patch    -> after 9999-003-edit-dts.patch (and after 9999-001, which
-#                   creates the very &hnat block the property is added to)
+#   dts patch    -> after the 9999-dts-* BPI-R4 patches which create &hnat.
+#                   The former 9999-004 name sorted before those upstream patches.
 #
 # This is experimental and therefore OFF by default: nothing below runs unless
 # HNAT_SECONDARY_WAN_EXPERIMENTAL=1.  In CI that variable comes from the
@@ -444,7 +448,7 @@ if [ "${HNAT_SECONDARY_WAN_EXPERIMENTAL:-0}" = "1" ]; then
     _hnat_wan2_patch_src="$GITHUB_WORKSPACE/patches/filogic/25.12/1013-mtk-hnat-secondary-wan.patch"
     _hnat_wan2_patch_dst="target/linux/mediatek/patches-6.12/9999-mtk-hnat-wan2.patch"
     _hnat_wan2_dts_src="$GITHUB_WORKSPACE/patches/filogic/25.12/1014-dts-bpi-r4-mtketh-wan2.patch"
-    _hnat_wan2_dts_dst="target/linux/mediatek/patches-6.12/9999-004-edit-dts.patch"
+    _hnat_wan2_dts_dst="target/linux/mediatek/patches-6.12/9999-z-dts-bpi-r4-hnat-wan2.patch"
 
     for _hnat_wan2_src in "$_hnat_wan2_patch_src" "$_hnat_wan2_dts_src"; do
         if [ ! -f "$_hnat_wan2_src" ]; then

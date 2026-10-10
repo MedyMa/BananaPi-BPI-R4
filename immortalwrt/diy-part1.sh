@@ -1,9 +1,7 @@
 #!/bin/bash
 
-# Backport rpcd lifetime fixes (24.10)
-mkdir -p package/system/rpcd/patches || exit 1
-cp "$GITHUB_WORKSPACE"/patches/filogic/24.10/rpcd/*.patch package/system/rpcd/patches/ || exit 1
-sed -i '/^PKG_RELEASE:=/s/$/.1/' package/system/rpcd/Makefile || exit 1
+# ImmortalWrt 24.10 already carries the rpcd lifetime fixes in its package.
+# Applying our older backports again conflicts with those upstream patches.
 
 function merge_package(){
     repo=`echo $1 | rev | cut -d'/' -f 1 | rev`
