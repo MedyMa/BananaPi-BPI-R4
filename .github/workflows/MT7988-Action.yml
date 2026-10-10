@@ -4,19 +4,6 @@ on:
   schedule:
     - cron: 0 15 * * *
   workflow_dispatch:
-    inputs:
-      source_commit:
-        description: 'Optional exact commit from the MT7988 source branch'
-        required: false
-        default: ''
-      validate_updated_packages:
-        description: 'Compile the recommended package updates, including optional packages'
-        type: boolean
-        default: false
-      clean_toolchain:
-        description: 'Rebuild tools and toolchain without restoring build caches'
-        type: boolean
-        default: false
 
 permissions:
   actions: write
@@ -74,18 +61,9 @@ jobs:
         $GITHUB_WORKSPACE/$OPENWRT_NAME/system-Information.sh
         
     - name: Download firmware source code
-      env:
-        SOURCE_COMMIT: ${{ inputs.source_commit }}
       run: |
         git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
         cd openwrt
-        if [ -n "$SOURCE_COMMIT" ]; then
-          [[ "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]] || exit 1
-          git fetch --depth 1 origin "$SOURCE_COMMIT"
-          git checkout --detach FETCH_HEAD
-          test "$(git rev-parse HEAD)" = "$SOURCE_COMMIT"
-        fi
-        git rev-parse HEAD > source-commit.txt
         rm -rf feeds.conf.default
         cp -f $GITHUB_WORKSPACE/patches/filogic/feeds.conf.default feeds.conf.default
         git log --pretty=tformat:"%h" -n1 tools toolchain || echo "No toolchain history"
@@ -96,7 +74,6 @@ jobs:
         echo "ccache_period=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
 
     - name: Restore toolchain cache
-      if: ${{ !inputs.clean_toolchain }}
       uses: klever1988/cachewrtbuild@54ed4fe2f7d8b5cfbc0b928c159266ee892c2d3d
       with:
         ccache: 'false'
@@ -104,7 +81,6 @@ jobs:
         mixkey: ${{ env.OPENWRT_NAME }}-${{ env.OPENWRT_DEVICE }}-${{ env.REPO_BRANCH }}
 
     - name: Restore ccache
-      if: ${{ !inputs.clean_toolchain }}
       id: ccache-restore
       uses: actions/cache/restore@v5.0.5
       with:
@@ -132,25 +108,9 @@ jobs:
 
     - name: Download the installation package
       id: package
-      env:
-        VALIDATE_UPDATED_PACKAGES: ${{ inputs.validate_updated_packages }}
       run: |
         cd openwrt
-        if [ "$VALIDATE_UPDATED_PACKAGES" = true ]; then
-          for package in libmbedtls ca-bundle ca-certificates libubox ucode libucode libudebug umdns uqmi libxml2 hostapd-openssl wireless-regdb; do
-            sed -i "/^CONFIG_PACKAGE_${package}=/d; /^# CONFIG_PACKAGE_${package} is not set$/d" .config
-            echo "CONFIG_PACKAGE_${package}=m" >> .config
-          done
-        fi
         make defconfig
-        if [ "$VALIDATE_UPDATED_PACKAGES" = true ]; then
-          for package in libmbedtls ca-bundle ca-certificates libubox ucode libucode libudebug umdns uqmi libxml2 hostapd-openssl wireless-regdb; do
-            grep -Eq "^CONFIG_PACKAGE_${package}=(y|m)$" .config || {
-              echo "Updated package was not selected: $package" >&2
-              exit 1
-            }
-          done
-        fi
         grep -qx 'CONFIG_PACKAGE_rpcd-mod-router-status=y' .config || {
           echo 'Independent router status package is missing from the resolved firmware configuration' >&2
           exit 1
@@ -172,20 +132,8 @@ jobs:
         echo "date2=$(date "+%Y年%m月%d日")" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
 
-    - name: Save package validation evidence
-      if: ${{ always() && inputs.validate_updated_packages }}
-      uses: actions/upload-artifact@v7.0.1
-      with:
-        name: MT7988-package-validation-${{ github.run_id }}
-        path: |
-          openwrt/source-commit.txt
-          openwrt/.config
-          openwrt/bin/targets/mediatek/filogic/*.buildinfo
-          openwrt/bin/targets/mediatek/filogic/*.manifest
-        retention-days: 14
-
     - name: Save ccache
-      if: steps.compile.outputs.status == 'success' && !inputs.clean_toolchain && steps.ccache-restore.outputs.cache-hit != 'true'
+      if: steps.compile.outputs.status == 'success' && steps.ccache-restore.outputs.cache-hit != 'true'
       uses: actions/cache/save@v5.0.5
       with:
         path: openwrt/.ccache
