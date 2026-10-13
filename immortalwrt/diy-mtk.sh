@@ -41,7 +41,9 @@ check_wifi7_config() {
 
     for package in kmod-mt_wifi7 kmod-mt_hwifi kmod-mtk_pci kmod-mtk_wed kmod-warp \
         kmod-mediatek_hnat kmod-mt_wifi_osal mtwifi-cfg wifi-dats luci-app-mtwifi-cfg \
-        rpcd-mod-router-status wpad-openssl; do
+        luci-app-fan luci-app-sfp-status luci-app-adguardhome luci-app-modemband \
+        luci-app-turboacc-mtk luci-app-traffic luci-app-eqos-mtk \
+        rpcd-mod-router-status wireless-tools wpad-openssl; do
         require_config "CONFIG_PACKAGE_${package}=y"
     done
     require_config 'CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi_bpi-r4=y'
