@@ -294,7 +294,7 @@ jobs:
       run: |
         echo "release_tag=${{ env.date1 }}-${{ env.OPENWRT_NAME }}_${{ env.OPENWRT_DEVICE }}_${{ env.REPO_BRANCH }}" >> $GITHUB_OUTPUT
         touch release.txt
-        echo "📥 BPI-R4 BE14 厂商 WiFi7 固件" >> release.txt
+        echo "📥 BPI-R4 BE14 WiFi7 固件" >> release.txt
         echo "Source: ${{ env.REPO_URL }} / ${{ env.REPO_BRANCH }}" >> release.txt
         echo "Wireless: mt_wifi7 / HWIFI; BE14000-20260721" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
