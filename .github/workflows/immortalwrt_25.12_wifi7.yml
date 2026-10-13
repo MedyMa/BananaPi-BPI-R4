@@ -10,22 +10,15 @@ permissions:
   contents: write
 
 env:
-  REPO_URL: https://github.com/amhelibrary/immortalwrt.git
-  REPO_BRANCH: openwrt-25.12-mtk-hqos
+  REPO_URL: https://github.com/benboguan/immortalwrt-mt798x-6.6
+  REPO_BRANCH: openwrt-25.12
   CONFIG_FILE: immortalwrt/MTK/defconfig
   DIY_P1_SH: immortalwrt/diy-mtk.sh
   UPLOAD_FIRMWARE: true
   UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
   OPENWRT_NAME: immortalwrt
-  OPENWRT_DEVICE: mediatek
-  # Experimental BPI-R4 secondary WAN (sfp-wan) HNAT patch.  Off unless the
-  # repository variable HNAT_SECONDARY_WAN_EXPERIMENTAL is set to 1 under
-  # Settings -> Secrets and variables -> Actions -> Variables, so the switch can
-  # be flipped without editing this file.  An unset variable expands to empty
-  # and diy-mtk.sh's ${HNAT_SECONDARY_WAN_EXPERIMENTAL:-0} keeps the patch out
-  # of the build.
-  HNAT_SECONDARY_WAN_EXPERIMENTAL: ${{ vars.HNAT_SECONDARY_WAN_EXPERIMENTAL }}
+  OPENWRT_DEVICE: MT7988_wifi7
 
 jobs:
   build:
@@ -106,16 +99,15 @@ jobs:
     - name: Load config
       run: |
         [ -e "$CONFIG_FILE" ] && cat "$CONFIG_FILE" > openwrt/.config
+        cd openwrt
+        bash "$GITHUB_WORKSPACE/$DIY_P1_SH" --configure .config
 
     - name: Download the installation package
       id: package
       run: |
         cd openwrt
         make defconfig
-        grep -qx 'CONFIG_PACKAGE_rpcd-mod-router-status=y' .config || {
-          echo 'Independent router status package is missing from the resolved firmware configuration' >&2
-          exit 1
-        }
+        bash "$GITHUB_WORKSPACE/$DIY_P1_SH" --check-config .config
         cat .config
         make download -j$(nproc) 2>&1
         find dl -size -1024c -exec ls -l {} \;
@@ -127,6 +119,9 @@ jobs:
         cd openwrt
         echo -e "$(nproc) thread compile"
         make -j$(nproc) || make -j$(($(nproc)/2 + 1)) || make -j1 V=s
+        bash "$GITHUB_WORKSPACE/$DIY_P1_SH" --verify-firmware
+        cp .config bin/targets/mediatek/filogic/wifi7.config
+        git rev-parse HEAD > bin/targets/mediatek/filogic/wifi7-source.txt
         CCACHE_DIR="$PWD/.ccache" staging_dir/host/bin/ccache --show-stats
         du -sh .ccache
         echo "date1=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
@@ -281,7 +276,8 @@ jobs:
       if: ${{ steps.compile.outputs.status == 'success' && env.UPLOAD_FIRMWARE == 'true' && !cancelled() }}
       run: |
         cd openwrt/bin/targets/mediatek/filogic
-        rm -rf packages *mt798* *.config *.buildinfo *.json sha256sums
+        rm -rf packages *mt798*
+        find . -maxdepth 1 -type f ! -name sha256sums -print0 | sort -z | xargs -0 -r sha256sum > sha256sums
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
 
@@ -296,9 +292,11 @@ jobs:
       id: tag
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_RELEASE == 'true' && !cancelled()
       run: |
-        echo "release_tag=${{ env.date1 }}-${{ env.OPENWRT_NAME }}_${{ env.REPO_BRANCH }}" >> $GITHUB_OUTPUT
+        echo "release_tag=${{ env.date1 }}-${{ env.OPENWRT_NAME }}_${{ env.OPENWRT_DEVICE }}_${{ env.REPO_BRANCH }}" >> $GITHUB_OUTPUT
         touch release.txt
-        echo "📥 固件下载" >> release.txt
+        echo "📥 BPI-R4 BE14 厂商 WiFi7 固件" >> release.txt
+        echo "Source: ${{ env.REPO_URL }} / ${{ env.REPO_BRANCH }}" >> release.txt
+        echo "Wireless: mt_wifi7 / HWIFI; BE14000-20260721" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
 
     - name: Publish to release
@@ -318,6 +316,6 @@ jobs:
       with:
         keep_latest: 3
         delete_tags: true
-        delete_tag_pattern: '^.*-immortalwrt_openwrt-25\.12-mtk-hqos$'
+        delete_tag_pattern: '^.*-immortalwrt_MT7988_wifi7_openwrt-25\.12$'
       env:
         GITHUB_TOKEN: ${{ secrets.RELEASES_TOKEN }}

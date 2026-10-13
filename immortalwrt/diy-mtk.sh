@@ -1,6 +1,134 @@
 #!/bin/bash
-# diy-mtk.sh -- Community packages & config for the WiFi7 (mt76/mt7996e) build,
-# used with REPO_BRANCH openwrt-25.12-mtk-hqos.  Vendor-tree steps are guarded.
+# diy-mtk.sh -- BPI-R4 BE14 vendor WiFi7 build for benboguan/openwrt-25.12.
+# Configuration and firmware guards run through this existing DIY script.
+set -e
+
+configure_wifi7() {
+    local cfg="${1:-.config}" package symbol
+    [ -f package/mtk/drivers/mt_wifi7/Makefile ] || {
+        echo 'Vendor WiFi7 source is required for this configuration' >&2
+        exit 1
+    }
+    [ -r "$cfg" ] || { echo "Cannot read config: $cfg" >&2; exit 1; }
+    # Disable target defaults that conflict with the vendor radio stack.
+    for package in kmod-mt76-core kmod-mt76-connac kmod-mt7996e \
+        kmod-mt7990-firmware kmod-mt7996-firmware kmod-mt7996-233-firmware \
+        kmod-mt7996-firmware-common kmod-mt_wifi_cmn wifi-profile wifi-script luci-app-mtk \
+        kmod-npu kmod-npu-flow kmod-npu-flow-autoload kmod-npu-nf_hnat \
+        kmod-npu-nf_hnat-autoload kmod-npu-mcast kmod-npu-mcast-autoload npu-rebb-fw kmod-npu-dpdk kmod-npu-dpdk-autoload kmod-en_npu \
+        mtk-hqos luci-app-mtk-hqos kmod-pce mtkhnat_util ethswbox flowtable \
+        netsys_dbg_util tops-tool; do
+        symbol="CONFIG_PACKAGE_${package}"
+        sed -i "/^${symbol}=/d; /^# ${symbol} is not set$/d" "$cfg"
+        printf '# %s is not set\n' "$symbol" >> "$cfg"
+    done
+    sed -i '/^CONFIG_EN_HWIFI_NPU_SUPPORT=/d; /^# CONFIG_EN_HWIFI_NPU_SUPPORT is not set$/d' "$cfg"
+    printf '# CONFIG_EN_HWIFI_NPU_SUPPORT is not set\n' >> "$cfg"
+    # Let this source's kernel configuration and package dependencies select HNAT.
+    sed -i '/^CONFIG_KERNEL_NET_MEDIATEK_HNAT=/d; /^CONFIG_KERNEL_MEDIATEK_NETSYS_/d; /^# CONFIG_KERNEL_MEDIATEK_NETSYS_.* is not set$/d' "$cfg"
+}
+
+check_wifi7_config() {
+    local cfg="${1:-.config}"
+    [ -r "$cfg" ] || { echo "Cannot read resolved config: $cfg" >&2; exit 1; }
+
+    require_config() {
+        grep -qxF "$1" "$cfg" || {
+            echo "Required WiFi7 configuration missing: $1" >&2
+            exit 1
+        }
+    }
+
+    for package in kmod-mt_wifi7 kmod-mt_hwifi kmod-mtk_pci kmod-mtk_wed kmod-warp \
+        kmod-mediatek_hnat kmod-mt_wifi_osal mtwifi-cfg wifi-dats luci-app-mtwifi-cfg \
+        rpcd-mod-router-status wpad-openssl; do
+        require_config "CONFIG_PACKAGE_${package}=y"
+    done
+    require_config 'CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi_bpi-r4=y'
+    require_config 'CONFIG_MTK_HWIFI_FW_BE14000_20260721=y'
+    require_config 'CONFIG_MTK_HWIFI_FW_PATH_BE14000="BE14000-20260721"'
+    require_config 'CONFIG_MTK_WIFI7_WLAN_HOOK=y'
+    require_config 'CONFIG_MTK_WIFI7_FAST_NAT_SUPPORT=y'
+    require_config 'CONFIG_MTK_WIFI7_WHNAT_SUPPORT=m'
+    require_config 'CONFIG_MTK_WIFI7_OSAL_SUPPORT=y'
+    require_config 'CONFIG_MTK_WIFI7_CFG80211_SUPPORT=y'
+    require_config 'CONFIG_MTK_WIFI7_CFG80211_FULL_OPS_SUPPORT=y'
+    require_config 'CONFIG_MTK_WIFI7_HOSTAPD_MBSS_SUPPORT=y'
+    require_config 'CONFIG_MTK_WIFI_OSAL_CFG80211_SUPPORT=y'
+
+    for package in kmod-mt76-core kmod-mt76-connac kmod-mt7996e kmod-mt7990-firmware \
+        kmod-mt7996-firmware kmod-mt7996-233-firmware kmod-mt_wifi_cmn \
+        wifi-profile wifi-script luci-app-mtk; do
+        if grep -qE "^CONFIG_PACKAGE_${package}=[ym]$" "$cfg"; then
+            echo "Conflicting mt76 wireless package selected: $package" >&2
+            exit 1
+        fi
+    done
+    if grep -qE '^CONFIG_(EN_HWIFI_NPU_SUPPORT|PACKAGE_kmod-en_npu|PACKAGE_kmod-npu(-[^=]+)?|PACKAGE_npu-[^=]+)=[ym]$' "$cfg"; then
+        echo 'NPU offload must remain disabled for this BPI-R4 build' >&2
+        exit 1
+    fi
+    echo 'BPI-R4 BE14 vendor WiFi7 configuration verified'
+}
+
+verify_wifi7_firmware() {
+    local custom roots verified root blob
+    custom=package/mtk/drivers/mt_hwifi/files/BE14000-20260721
+    roots=$(find build_dir -type d -path '*/root-mediatek' -print)
+    [ -n "$roots" ] || { echo 'Installed mediatek root filesystem missing' >&2; exit 1; }
+    verified=0
+    for root in $roots; do
+        [ -d "$root/lib/firmware" ] || continue
+        for blob in WIFI_MT7990_PATCH_MCU_1_1_hdr.bin \
+            WIFI_MT7990_WACPU_RAM_CODE_1_1.bin WIFI_RAM_CODE_MT7990_1_1.bin \
+            WIFI_RAM_CODE_MT7990_1_1_TESTMODE.bin; do
+            cmp -s "$custom/$blob" "$root/lib/firmware/$blob" || {
+                echo "BE14 firmware missing or overwritten: $root/lib/firmware/$blob" >&2
+                exit 1
+            }
+        done
+        verified=$((verified + 1))
+    done
+    [ "$verified" -gt 0 ] || { echo 'No installed BE14 firmware found' >&2; exit 1; }
+    echo "Verified BE14000-20260721 in $verified installed root filesystem(s)"
+}
+
+fix_be14_firmware_install() {
+    # Keep generic PHY firmware, then install the selected BE14 blobs last.
+    python3 - <<'PY'
+from pathlib import Path
+recipe = Path('package/mtk/drivers/mt_hwifi/Makefile')
+text = recipe.read_text(encoding="utf-8")
+install = text.index('define KernelPackage/mt_hwifi/install')
+start = text.index('ifneq ($(CONFIG_MTK_HWIFI_FW_PATH_BE19000),)', install)
+end = text.index('ifeq ($(CONFIG_MTK_HWIFI_MT7992),y)', start)
+base = text.rfind('$(PKG_BUILD_DIR)/bin/mt7990/', install, end)
+if base < 0:
+    raise SystemExit('MT7990 base firmware install layout missing')
+if start > base:
+    print('BE14 custom firmware already installed last')
+else:
+    block_end = text.index('ifeq ($(CONFIG_MTK_WIFI7_CCN34_SPLIT_MAC_SUPPORT),y)', start)
+    block = text[start:block_end]
+    if block.count('$(INSTALL_BIN)') != 2:
+        raise SystemExit('Unexpected MT7990 custom firmware install layout')
+    text = text[:start] + text[block_end:]
+    end = text.index('ifeq ($(CONFIG_MTK_HWIFI_MT7992),y)', start)
+    close = text.rfind('endif', start, end)
+    if close < start:
+        raise SystemExit('MT7990 install guard missing')
+    recipe.write_text(text[:close] + block + text[close:], encoding="utf-8")
+    print('BE14 custom firmware installation order corrected')
+PY
+}
+
+case "${1:-}" in
+    --configure) configure_wifi7 "${2:-.config}"; exit ;;
+    --check-config) check_wifi7_config "${2:-.config}"; exit ;;
+    --verify-firmware) verify_wifi7_firmware; exit ;;
+    "") ;;
+    *) echo "Unknown DIY mode: $1" >&2; exit 2 ;;
+esac
 
 merge_package(){
     repo=`echo $1 | rev | cut -d'/' -f 1 | rev`
@@ -152,173 +280,16 @@ rm -rf feeds/packages/net/onionshare-cli
 [ -f feeds/luci/applications/luci-app-package-manager/root/usr/libexec/package-manager-call ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1004-luci-package-manager-apk-upload-untrusted-master.patch"
 
-# wireless.js: MLO flag on wifi-iface.  The backend (wifi-scripts ap.uc) already
-# maps `option mlo '1'` to hostapd's mld_ap=1, and the UCI schema already allows
-# the option - only the LuCI control was missing, so nothing else has to change.
-[ -f feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1011-luci-wireless-mlo-master.patch"
-
 # vpnc: add -p to mkdir for idempotency
 if grep -q 'mkdir $(PKG_BUILD_DIR)/bin' feeds/packages/net/vpnc/Makefile 2>/dev/null; then
     sed -i '/mkdir $(PKG_BUILD_DIR)\/bin/s/mkdir /mkdir -p /' feeds/packages/net/vpnc/Makefile
 fi
 
-# hostapd 975 (MTK MLO PMKSA) ships only on the chasey-dev trees, so this is
-# skipped on mtk-hqos.  Where it does exist, sta->mld_* need CONFIG_IEEE80211BE:
-# with DRIVER_11BE_SUPPORT unset they are compiled out and the MLO block must be
-# guarded.  Regex guards survive upstream churn; hunk count +3.
-_mt975="package/network/services/hostapd/patches/975-mtk-mlo-pass-pmksa-link-address.patch"
-if [ -f "$_mt975" ]; then
-    if perl -0777 -e '
-        local $/;
-        my $txt = <STDIN>;
-        my $n = 0;
-        $n++ if $txt =~ s/^(\+\t)bool is_ml = ap_sta_has_ml_rsn\(hapd, sta\);\n/${1}bool is_ml = false;\n+#ifdef CONFIG_IEEE80211BE\n${1}is_ml = ap_sta_has_ml_rsn(hapd, sta);\n/m;
-        $n++ if $txt =~ s/^(\+\tif \(is_ml\) \{.*?^(\+\t)\}\n)/$1+#endif \/* CONFIG_IEEE80211BE *\/\n/ms;
-        if ($n == 2) {
-            $txt =~ s/^(\@\@ [^\n]*\+[0-9]+,)(\d+)( \@\@(?=[^\n]*\n \n void sae_accept_sta))/sprintf("%s%d%s", $1, $2 + 3, $3)/me;
-            print $txt;
-            exit 0;
-        }
-        exit 2;
-    ' < "$_mt975" > "$_mt975.new"; then
-        mv "$_mt975.new" "$_mt975"
-        echo "[DIY] hostapd 975 guard: #ifdef CONFIG_IEEE80211BE injected (regex, hunk count +3)"
-    else
-        rm -f "$_mt975.new"
-        echo "[DIY] hostapd 975 guard: SKIP - 975 patch format changed, MLO block left unguarded" >&2
-    fi
-fi
-
-# Vendor WiFi7 steps (wifi-profile / mt_wifi7 / datconf) exist only in trees that
-# ship package/mtk/drivers.  On mtk-hqos (mainline mt76) the mt_wifi7 Makefile
-# check below would abort the build with exit 1, so the block is guarded whole.
-if [ -d "package/mtk/drivers" ]; then
-
-# wifi-profile: use padavanonly's mt7990-only build (chasey-dev's references
-# nonexistent files and breaks on shell command-substitution)
-rm -rf package/mtk/drivers/wifi-profile
-git clone --depth=1 -b mt798x-mt799x-6.6-mtwifi \
-    https://github.com/padavanonly/immortalwrt-mt798x-6.6.git \
-    /tmp/padavanonly-wifi-profile >/dev/null 2>&1
-mv /tmp/padavanonly-wifi-profile/package/mtk/drivers/wifi-profile \
-    package/mtk/drivers/wifi-profile
-rm -rf /tmp/padavanonly-wifi-profile
-# Remove legacy wifi_jedi → /sbin/wifi install (conflicts with ImmortalWrt 25.12 wifi-scripts)
-sed -i 's|$(INSTALL_BIN) ./files/common/wifi_jedi $(1)/sbin/wifi|# DIY: removed – conflicts with wifi-scripts|' \
-    package/mtk/drivers/wifi-profile/Makefile
-echo "[DIY] wifi-profile replaced with padavanonly mt7990-only version"
-
-# MTK mt_wifi7: expand Kconfig card names in make, not in the shell
-if [ -f "package/mtk/drivers/mt_wifi7/Makefile" ] && \
-   grep -q 'CONFIG_first_card_name' "package/mtk/drivers/mt_wifi7/Makefile"; then
-    sed -i 's/$$(CONFIG_first_card_name)/$(CONFIG_first_card_name)/g; s/$$(CONFIG_second_card_name)/$(CONFIG_second_card_name)/g; s/$$(CONFIG_third_card_name)/$(CONFIG_third_card_name)/g' \
-        "package/mtk/drivers/mt_wifi7/Makefile"
-    echo "[DIY] mt_wifi7/Makefile: CONFIG_*_card_name fixed for make expansion"
-fi
-
-# MTK mt_wifi7: map OpenWrt Kconfig names to vendor Kbuild names
-_mt_wifi7_makefile="package/mtk/drivers/mt_wifi7/Makefile"
-_mt_wifi7_kconfig_anchor='$(foreach c, $(PKG_KCONFIG),$(if $(CONFIG_MTK_WIFI7_$c),CONFIG_$(c)=$(CONFIG_MTK_WIFI7_$(c)))) \'
-_mt_wifi7_kconfig_replacement='$(foreach c, $(PKG_KCONFIG),$(if $(CONFIG_MTK_WIFI7_$c),CONFIG_$(c)=$(CONFIG_MTK_WIFI7_$(c)))) \
-		CONFIG_WIFI_DRIVER=$(CONFIG_MTK_WIFI7_DRIVER) \
-		CONFIG_DOT11_HE_AX=$(CONFIG_MTK_WIFI7_DOT11_AX_SUPPORT) \
-		CONFIG_DOT11_EHT_BE=$(CONFIG_MTK_WIFI7_DOT11_BE_SUPPORT) \'
-
-if [ ! -f "$_mt_wifi7_makefile" ]; then
-    echo "Required mt_wifi7 Makefile not found: $_mt_wifi7_makefile" >&2
-    exit 1
-elif grep -qE '^[[:space:]]*CONFIG_WIFI_DRIVER=\$\(CONFIG_MTK_WIFI7_DRIVER\)[[:space:]]*\\$' "$_mt_wifi7_makefile" && \
-     grep -qE '^[[:space:]]*CONFIG_DOT11_HE_AX=\$\(CONFIG_MTK_WIFI7_DOT11_AX_SUPPORT\)[[:space:]]*\\$' "$_mt_wifi7_makefile" && \
-     grep -qE '^[[:space:]]*CONFIG_DOT11_EHT_BE=\$\(CONFIG_MTK_WIFI7_DOT11_BE_SUPPORT\)[[:space:]]*\\$' "$_mt_wifi7_makefile"; then
-    echo "[DIY] mt_wifi7/Makefile: vendor Kbuild mappings already present"
-elif grep -qF "$_mt_wifi7_kconfig_anchor" "$_mt_wifi7_makefile"; then
-    patch_makefile_dep \
-        "$_mt_wifi7_makefile" \
-        "$_mt_wifi7_kconfig_anchor" \
-        "$_mt_wifi7_kconfig_replacement" || exit 1
-    echo "[DIY] mt_wifi7/Makefile: vendor Kbuild mappings injected"
-else
-    echo "Failed to locate mt_wifi7 Kconfig compile anchor in $_mt_wifi7_makefile" >&2
-    exit 1
-fi
-
-# MTK mt_wifi7: Linux 6.12 moved the generic unaligned helpers out of asm/.
-_mt_wifi7_unaligned_patch_src="$GITHUB_WORKSPACE/patches/filogic/25.12/1006-mt_wifi7-linux-6.12-unaligned-header.patch"
-_mt_wifi7_unaligned_patch_dst="package/mtk/drivers/mt_wifi7/patches/900-linux-6.12-unaligned-header.patch"
-
-if [ ! -f "$_mt_wifi7_unaligned_patch_src" ]; then
-    echo "Required mt_wifi7 compatibility patch not found: $_mt_wifi7_unaligned_patch_src" >&2
-    exit 1
-fi
-
-install -Dm0644 "$_mt_wifi7_unaligned_patch_src" "$_mt_wifi7_unaligned_patch_dst"
-echo "[DIY] mt_wifi7: Linux 6.12 unaligned header compatibility patch installed"
-
-# mt_wifi7: GCC 14 -Werror rejects missing AC_NUM/PMKSA declarations (kept
-# separate from the unaligned fix so either patch can be dropped)
-_mt_wifi7_declarations_patch_src="$GITHUB_WORKSPACE/patches/filogic/25.12/1007-mt_wifi7-fix-missing-declarations.patch"
-_mt_wifi7_declarations_patch_dst="package/mtk/drivers/mt_wifi7/patches/901-fix-missing-declarations.patch"
-
-if [ ! -f "$_mt_wifi7_declarations_patch_src" ]; then
-    echo "Required mt_wifi7 compatibility patch not found: $_mt_wifi7_declarations_patch_src" >&2
-    exit 1
-fi
-
-install -Dm0644 "$_mt_wifi7_declarations_patch_src" "$_mt_wifi7_declarations_patch_dst"
-echo "[DIY] mt_wifi7: GCC 14 missing declarations compatibility patch installed"
-
-# mt_wifi7: GCC 14 -Werror rejects MAX_TRANSMIT_POWER in rt_channel.c (vendor
-# only defines it locally in bcn.c)
-_mt_wifi7_max_tx_power_patch_src="$GITHUB_WORKSPACE/patches/filogic/25.12/1008-mt_wifi7-fix-max-transmit-power.patch"
-_mt_wifi7_max_tx_power_patch_dst="package/mtk/drivers/mt_wifi7/patches/902-fix-max-transmit-power.patch"
-
-if [ ! -f "$_mt_wifi7_max_tx_power_patch_src" ]; then
-    echo "Required mt_wifi7 compatibility patch not found: $_mt_wifi7_max_tx_power_patch_src" >&2
-    exit 1
-fi
-
-install -Dm0644 "$_mt_wifi7_max_tx_power_patch_src" "$_mt_wifi7_max_tx_power_patch_dst"
-echo "[DIY] mt_wifi7: MAX_TRANSMIT_POWER declaration compatibility patch installed"
-
-# mt_wifi7: RT_CFG80211_SUPPORT makes owe_cmm.h skip sae_cmm.h while sec_cmm.h
-# still compiles the SAE structs -> "field has incomplete type". Align the
-# include guard with the field guard.
-_mt_wifi7_sae_patch_src="$GITHUB_WORKSPACE/patches/filogic/25.12/1009-mt_wifi7-fix-incomplete-sae-structs.patch"
-_mt_wifi7_sae_patch_dst="package/mtk/drivers/mt_wifi7/patches/903-fix-incomplete-sae-structs.patch"
-
-if [ ! -f "$_mt_wifi7_sae_patch_src" ]; then
-    echo "Required mt_wifi7 compatibility patch not found: $_mt_wifi7_sae_patch_src" >&2
-    exit 1
-fi
-
-install -Dm0644 "$_mt_wifi7_sae_patch_src" "$_mt_wifi7_sae_patch_dst"
-echo "[DIY] mt_wifi7: incomplete SAE struct compatibility patch installed"
-
-# mt_wifi7: cac_required is MAP-guarded but used unconditionally by rt_channel.c
-# and cmm_rdm_mt.c -> move the field out of the MAP guard
-_mt_wifi7_cac_patch_src="$GITHUB_WORKSPACE/patches/filogic/25.12/1010-mt_wifi7-fix-cac-required-field.patch"
-_mt_wifi7_cac_patch_dst="package/mtk/drivers/mt_wifi7/patches/904-fix-cac-required-field.patch"
-
-if [ ! -f "$_mt_wifi7_cac_patch_src" ]; then
-    echo "Required mt_wifi7 compatibility patch not found: $_mt_wifi7_cac_patch_src" >&2
-    exit 1
-fi
-
-install -Dm0644 "$_mt_wifi7_cac_patch_src" "$_mt_wifi7_cac_patch_dst"
-echo "[DIY] mt_wifi7: cac_required field compatibility patch installed"
-
-# datconf: disable parallel build (5 sub-packages share one CMake tree, race with -j>1)
-if [ -f "package/mtk/applications/datconf/Makefile" ] && \
-   ! grep -q 'PKG_BUILD_PARALLEL' "package/mtk/applications/datconf/Makefile"; then
-    sed -i '/^PKG_RELEASE:=/a PKG_BUILD_PARALLEL:=0' "package/mtk/applications/datconf/Makefile"
-    echo "[DIY] datconf parallel build disabled"
-fi
-
-else
-    echo "[DIY] package/mtk/drivers absent: mainline mt76 build, vendor WiFi7 steps skipped"
-fi
-
+# The selected source already includes vendor driver compatibility patches.
+# Keep its wifi-profile and mtwifi-cfg together; do not replace them from 6.6.
+for recipe in package/mtk/drivers/mt_wifi7/Makefile package/mtk/drivers/mt_hwifi/Makefile; do
+    [ -f "$recipe" ] || { echo "Required vendor driver recipe missing: $recipe" >&2; exit 1; }
+done
 # Feed deps needed by community clones (pcre2 is in main tree since 25.12)
 ./scripts/feeds update -a
 ./scripts/feeds install -a
@@ -407,146 +378,4 @@ patch_makefile_dep \
 # Modify default IP
 sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generate
 
-# BE14 WiFi EEPROM overlay: the 911 dts patch builds it, but filogic.mk's BPI-R4
-# device does not list it, so it is packaged and never installed.
-BE14_PATCH="target/linux/mediatek/patches-6.12/911-dts-mt7988a-bpi-r4-be14-wifi-eeprom.patch"
-FILOGIC_MK="target/linux/mediatek/image/filogic.mk"
-if [ -f "$BE14_PATCH" ] && [ -f "$FILOGIC_MK" ]; then
-    if grep -q 'mt7988a-bananapi-bpi-r4-wifi-be14' "$FILOGIC_MK"; then
-        echo "[DIY] BE14 overlay already in DEVICE_DTS_OVERLAY"
-    else
-        sed -i 's|^\tmt7988a-bananapi-bpi-r4-sd *$|\tmt7988a-bananapi-bpi-r4-sd \\\n\tmt7988a-bananapi-bpi-r4-wifi-be14|' "$FILOGIC_MK"
-        grep -q 'mt7988a-bananapi-bpi-r4-wifi-be14' "$FILOGIC_MK" \
-            && echo "[DIY] BE14 EEPROM overlay added to BPI-R4 DEVICE_DTS_OVERLAY" \
-            || echo "Failed to add BE14 overlay to $FILOGIC_MK" >&2
-    fi
-fi
-
-# BPI-R4 secondary WAN (SFP): the HNAT driver holds exactly one WAN net_device
-# (g_wandev), resolved from mtketh-wan, so get_wandev_from_index() -- used by
-# do_ext2ge_fast_learn() and the MAP-E ping-pong paths -- cannot recognise the
-# second physical WAN.  9999-mtk-hnat-support-wan-bridge-offload.patch already
-# *classifies* sfp-wan as WAN via is_hnat_wan_dev(); what is missing is a held
-# reference for it, so this is not a classification fix.
-#
-# 1013 adds an optional mtketh-wan2 DT property with g_wan2dev lifetime handling
-# (and fixes a dev_get_by_name() refcount leak in hnat_hw_init, which runs once
-# per PPE and again on warm reset).  1014 sets that property on the BPI-R4 dtsi.
-#
-# Both names carry a position requirement, verified against the build's own glob
-# order rather than assumed:
-#   driver patch -> after 9999-mtk-hnat-support-wan-bridge-offload.patch
-#   dts patch    -> after the 9999-dts-* BPI-R4 patches which create &hnat.
-#                   The former 9999-004 name sorted before those upstream patches.
-#
-# This is experimental and therefore OFF by default: nothing below runs unless
-# HNAT_SECONDARY_WAN_EXPERIMENTAL=1.  In CI that variable comes from the
-# repository variable of the same name (see the env: block of
-# .github/workflows/immortalwrt_25.12_wifi7.yml); locally, export it before
-# running this script.  Setting it also makes a missing patch file fatal.
-if [ "${HNAT_SECONDARY_WAN_EXPERIMENTAL:-0}" = "1" ]; then
-    _hnat_wan2_patch_src="$GITHUB_WORKSPACE/patches/filogic/25.12/1013-mtk-hnat-secondary-wan.patch"
-    _hnat_wan2_patch_dst="target/linux/mediatek/patches-6.12/9999-mtk-hnat-wan2.patch"
-    _hnat_wan2_dts_src="$GITHUB_WORKSPACE/patches/filogic/25.12/1014-dts-bpi-r4-mtketh-wan2.patch"
-    _hnat_wan2_dts_dst="target/linux/mediatek/patches-6.12/9999-z-dts-bpi-r4-hnat-wan2.patch"
-
-    for _hnat_wan2_src in "$_hnat_wan2_patch_src" "$_hnat_wan2_dts_src"; do
-        if [ ! -f "$_hnat_wan2_src" ]; then
-            echo "Required secondary WAN patch not found: $_hnat_wan2_src" >&2
-            exit 1
-        fi
-    done
-
-    install -Dm0644 "$_hnat_wan2_patch_src" "$_hnat_wan2_patch_dst"
-    install -Dm0644 "$_hnat_wan2_dts_src" "$_hnat_wan2_dts_dst"
-    echo "[DIY] Experimental BPI-R4 secondary WAN patches installed"
-fi
-
-# mt76 WED compile fix.  999-wed-10-add-mt7987-hwpath-support.patch changes the
-# kernel's struct mtk_wed_device:
-#     -       u32 wpdma_tx;
-#     +       u32 wpdma_tx[MTK_WED_TX_QUEUES];
-# but mt76 (pinned to openwrt/mt76@39c960c3, and unchanged on master) still
-# assigns it as a scalar, so mt7996/mmio.c and mt7915/mmio.c fail to build with
-# "assignment to expression with array type" -- this is what failed CI run #108.
-# Index [0] is the same ring the kernel's non-v3.1 path reads via
-# wpdma_tx[0] (mtk_wed_set_wpdma -> MTK_WED_WPDMA_CFG_TX).  The hif2 branch uses
-# the *other* WED device (wed_hif2), not another element of this array, so it is
-# [0] as well, not [1].
-#
-# This one goes into the package's patches/ directory rather than being applied
-# with `patch -p1` here: mt7996/mmio.c and mt7915/mmio.c live in the extracted
-# source tree (PKG_BUILD_DIR), not in package/kernel/mt76, so the build's own
-# patch step has to apply it.  It sorts after the existing 100-... patch.
-_mt76_wed_patch_name="1006-mt76-mt7996-mt7915-wed-wpdma-tx-array.patch"
-_mt76_wed_patch_src="$GITHUB_WORKSPACE/patches/filogic/mt76/$_mt76_wed_patch_name"
-_mt76_wed_patch_dst="package/kernel/mt76/patches/$_mt76_wed_patch_name"
-
-if [ ! -f "$_mt76_wed_patch_src" ]; then
-    echo "Required mt76 WED patch not found: $_mt76_wed_patch_src" >&2
-    exit 1
-fi
-
-install -Dm0644 "$_mt76_wed_patch_src" "$_mt76_wed_patch_dst"
-echo "[DIY] mt76 WED wpdma_tx array-index fix installed"
-
-# Enable WED on mt7996e.  mt7996_mmio_wed_init() starts with
-#     if (!wed_enable)
-#             return 0;
-# and wed_enable is declared `static bool wed_enable;` (module_param, default
-# false), so the driver never initialises WED unless the module is loaded with
-# wed_enable=1.  MODPARAMS.mt7996e in the mt76 package Makefile is what arranges
-# that.
-#
-# 1007 replaced an earlier 1005-mt76-makefile-wed-enable.patch that never worked
-# anywhere: its single hunk header claimed 6 old and 7 new lines while the body
-# carried 5 context lines plus 1 added line, so patch(1) rejected it with
-# "Hunk #1 FAILED at 327" and wrote a .rej.  diy-part6.sh validated with
-# --dry-run and got a non-zero status, but that script has no `set -e`, so the
-# failure was swallowed and wed_enable was silently never enabled.  That file has
-# been deleted; 1007 is now the single source and diy-part6.sh points at it too,
-# so the immortalwrt-25.12 workflow enables WED as well.
-#
-# The target is package/kernel/mt76/Makefile, which belongs to the recipe
-# directory rather than the extracted source tree, so it is patched in place
-# with `patch -p1`, exactly as diy-part6.sh does it.  The reverse dry-run first
-# makes re-running this script a no-op instead of stacking a second
-# MODPARAMS line, and a forward dry-run at --fuzz=0 means a drifted Makefile
-# fails the build loudly rather than quietly leaving WED disabled.
-_mt76_wed_mk_name="1007-mt76-makefile-wed-enable.patch"
-_mt76_wed_mk_patch="$GITHUB_WORKSPACE/patches/filogic/mt76/$_mt76_wed_mk_name"
-
-if [ ! -f "$_mt76_wed_mk_patch" ]; then
-    echo "Required mt76 wed_enable patch not found: $_mt76_wed_mk_patch" >&2
-    exit 1
-fi
-
-if [ ! -f package/kernel/mt76/Makefile ]; then
-    echo "package/kernel/mt76/Makefile not found; cannot enable wed_enable for mt7996e" >&2
-    exit 1
-fi
-
-if (cd package/kernel/mt76 && patch -p1 -R --dry-run < "$_mt76_wed_mk_patch" >/dev/null 2>&1); then
-    echo "[DIY] mt76 wed_enable=1 already applied to mt7996e"
-elif (cd package/kernel/mt76 && patch -p1 --dry-run --fuzz=0 < "$_mt76_wed_mk_patch" >/dev/null 2>&1); then
-    (cd package/kernel/mt76 && patch -p1 --fuzz=0 < "$_mt76_wed_mk_patch" >/dev/null)
-    echo "[DIY] mt76 wed_enable=1 enabled for mt7996e"
-else
-    echo "mt76 wed_enable patch does not apply cleanly to package/kernel/mt76/Makefile" >&2
-    exit 1
-fi
-
-# Pin kernel Kconfig symbols to avoid interactive prompts (NEW symbols)
-CFG="target/linux/mediatek/filogic/config-6.12"
-if [ -f "$CFG" ]; then
-    for sym in MEDIATEK_2P5GE_PHY NET_MEDIATEK_HNAT MEDIATEK_NETSYS_V3 NETFILTER; do
-        case "$sym" in
-            MEDIATEK_2P5GE_PHY) val="# CONFIG_${sym} is not set" ;;
-            NET_MEDIATEK_HNAT)   val="CONFIG_${sym}=m" ;;
-            *)                   val="CONFIG_${sym}=y" ;;
-        esac
-        sed -i "/^CONFIG_${sym}=/d; /^# CONFIG_${sym} is not set$/d" "$CFG"
-        echo "$val" >> "$CFG"
-    done
-    echo "[DIY] Kernel Kconfig symbols pinned"
-fi
+fix_be14_firmware_install
