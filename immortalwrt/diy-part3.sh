@@ -61,17 +61,29 @@ install_kernel_patch() {
 
 install_mtwifi_patch() {
     local patch_file="$1"
-    local patch_dir="package/mtk/drivers/mt_wifi7/patches"
-    local target_patch="$patch_dir/$(basename "$patch_file")"
+    local patch_name
+    local patch_dir
+    local target_patch
 
     [ -f "$patch_file" ] || return 0
-    [ -d "$patch_dir" ] || return 0
+    patch_name="$(basename "$patch_file")"
 
-    if [ -f "$target_patch" ] && cmp -s "$patch_file" "$target_patch"; then
-        return 0
-    fi
+    # Both packages build their own source copy: mt_hwifi provides mt7990.ko,
+    # while its mt_wifi7 dependency provides mt_wifi.ko. Keep the shared
+    # channel-list fix consistent in every existing source package.
+    for patch_dir in \
+        "package/mtk/drivers/mt_hwifi/patches" \
+        "package/mtk/drivers/mt_wifi7/patches"; do
+        [ -d "$patch_dir" ] || continue
 
-    install -m 0644 "$patch_file" "$target_patch"
+        target_patch="$patch_dir/$patch_name"
+
+        if [ -f "$target_patch" ] && cmp -s "$patch_file" "$target_patch"; then
+            continue
+        fi
+
+        install -m 0644 "$patch_file" "$target_patch"
+    done
 }
 
 patch_bpi_r4_sysupgrade_itb_check() {
