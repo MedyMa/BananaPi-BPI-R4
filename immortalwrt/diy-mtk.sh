@@ -314,6 +314,9 @@ rm -f package/base-files/files/etc/uci-defaults/99-apk-untrusted
 [ -f package/mtk/applications/5g-modem/fibocom-dial/src/main.c ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1015-fibocom-dial-gcc14-fixes.patch"
 
+[ -f package/mtk/applications/5g-modem/quectel_cm_5G/src/device.c ] && \
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1016-quectel-cm-5g-dname-buffer.patch"
+
 # Verify libmbedtls presence (required by shadowsocks-libev)
 if [ ! -f package/libs/mbedtls/Makefile ]; then
   echo "WARNING: package/libs/mbedtls/Makefile not found" >&2

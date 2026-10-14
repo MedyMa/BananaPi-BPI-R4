@@ -1,0 +1,13 @@
+diff --git a/package/mtk/applications/5g-modem/quectel_cm_5G/src/device.c b/package/mtk/applications/5g-modem/quectel_cm_5G/src/device.c
+index 6e95405faf1..e90e8cfd376 100644
+--- a/package/mtk/applications/5g-modem/quectel_cm_5G/src/device.c
++++ b/package/mtk/applications/5g-modem/quectel_cm_5G/src/device.c
+@@ -435,7 +435,7 @@ int mhidevice_detect(char *qmichannel, char *usbnet_adapter, PROFILE_T *profile)
+                 continue;
+             }
+ 
+-            char *d_name[32];
++            char d_name[sizeof(ent->d_name)];
+             strcpy(d_name, ent->d_name);
+             replaceStr(d_name, "_IP_HW0", "");
+             dbg_time("while -> pcie_name = : %s ", d_name);
