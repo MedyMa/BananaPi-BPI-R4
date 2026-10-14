@@ -409,7 +409,3 @@ sed -i 's/ERROR_MESSAGE,WARNING: Applying padding in/MESSAGE,WARNING: Applying p
 
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/mtwifi-6.6/1002-mtwifi-6.6-luci-status-overview-rate-mhz-hi.patch"
-
-# Retire the partial firmware refresh hook, including reused build trees.
-# External roots require a coordinated system update, not firmware-only copies.
-rm -f package/base-files/files/etc/uci-defaults/99-mt-hwifi-rom-refresh
