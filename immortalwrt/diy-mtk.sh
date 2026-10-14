@@ -310,6 +310,10 @@ rm -f package/base-files/files/etc/uci-defaults/99-apk-untrusted
 [ -d package/base-files/files/etc/uci-defaults ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1005-base-files-apk-manager-fixes-master.patch"
 
+# fibocom-dial: GCC 14 promotes implicit-function-declaration and return-mismatch to errors
+[ -f package/mtk/applications/5g-modem/fibocom-dial/src/main.c ] && \
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1015-fibocom-dial-gcc14-fixes.patch"
+
 # Verify libmbedtls presence (required by shadowsocks-libev)
 if [ ! -f package/libs/mbedtls/Makefile ]; then
   echo "WARNING: package/libs/mbedtls/Makefile not found" >&2
