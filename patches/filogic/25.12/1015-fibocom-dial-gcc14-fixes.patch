@@ -11,6 +11,19 @@ index ecce6b9..39c7800 100644
  extern char *strndup(const char *__string, size_t __n);
  
  //2021-03-24 willa.liu@fibocom.com changed begin for support mantis 0071817
+diff --git a/package/mtk/applications/5g-modem/fibocom-dial/src/fibo_qmimsg_server.c b/package/mtk/applications/5g-modem/fibocom-dial/src/fibo_qmimsg_server.c
+index a7a29ef..f0da91e 100644
+--- a/package/mtk/applications/5g-modem/fibocom-dial/src/fibo_qmimsg_server.c
++++ b/package/mtk/applications/5g-modem/fibocom-dial/src/fibo_qmimsg_server.c
+@@ -1137,2 +1137,2 @@
+-static void qmidevice_detect(char **device_name, char **idproduct) {
++static void qmidevice_detect(char **device_name, char *idproduct) {
+     struct dirent* ent = NULL;
+@@ -1272,3 +1272,3 @@
+     if (cdc_wdm == NULL)
+-        qmidevice_detect(&cdc_wdm, &getidproduct);
++        qmidevice_detect(&cdc_wdm, getidproduct);
+     if (cdc_wdm == NULL) {
 diff --git a/package/mtk/applications/5g-modem/fibocom-dial/src/main.c b/package/mtk/applications/5g-modem/fibocom-dial/src/main.c
 index dd64293..1b57b92 100644
 --- a/package/mtk/applications/5g-modem/fibocom-dial/src/main.c
