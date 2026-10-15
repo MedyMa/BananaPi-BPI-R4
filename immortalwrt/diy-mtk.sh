@@ -132,6 +132,26 @@ case "${1:-}" in
     *) echo "Unknown DIY mode: $1" >&2; exit 2 ;;
 esac
 
+# MAPCfg and MAP_ROLE_* are absent when MAP support is disabled. Keep this
+# MAP-only ACL restriction behind the same feature guard as those declarations.
+_mt_wifi7_patch_dir="package/mtk/drivers/mt_wifi7/patches"
+_mt_wifi7_acl_patch="$GITHUB_WORKSPACE/patches/filogic/25.12/1018-mt-wifi7-guard-map-acl.patch"
+_mt_wifi7_acl_target="$_mt_wifi7_patch_dir/0044-mt_wifi7-guard-map-acl-when-disabled.patch"
+[ -d "$_mt_wifi7_patch_dir" ] || {
+    echo "Vendor WiFi7 patch directory missing: $_mt_wifi7_patch_dir" >&2
+    exit 1
+}
+[ -f "$_mt_wifi7_acl_patch" ] || {
+    echo "MAP ACL compatibility patch missing: $_mt_wifi7_acl_patch" >&2
+    exit 1
+}
+if [ -e "$_mt_wifi7_acl_target" ] && ! cmp -s "$_mt_wifi7_acl_patch" "$_mt_wifi7_acl_target"; then
+    echo "Vendor WiFi7 patch slot already occupied: $_mt_wifi7_acl_target" >&2
+    exit 1
+fi
+install -m 0644 "$_mt_wifi7_acl_patch" "$_mt_wifi7_acl_target"
+echo "Installed MAP-disabled ACL build fix: $_mt_wifi7_acl_target"
+
 merge_package(){
     repo=`echo $1 | rev | cut -d'/' -f 1 | rev`
     pkg=`echo $2 | rev | cut -d'/' -f 1 | rev`
