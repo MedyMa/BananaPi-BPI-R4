@@ -246,6 +246,13 @@ for f in \
     [ -f "$f" ] && sed -i '/^PKG_MIRROR_HASH:=/s/:=.*/:=skip/' "$f"
 done
 
+# This upstream patch lacks its final LF, which needs fuzz 1 to apply.
+# Restore the line ending so the source tree can keep PATCHFUZZ=0.
+obfs_patch=package/community/helloworld/simple-obfs/patches/001-convert-arguments-of-isdigit-to-int.patch
+if [ -s "$obfs_patch" ] && [ "$(tail -c 1 "$obfs_patch" | wc -l)" -eq 0 ]; then
+    printf '\n' >> "$obfs_patch"
+fi
+
 # containerd's vendored cpuid v2.0.4 hits Go's >= 1.23 linkname check. MAKE_FLAGS is
 # frozen by the BuildPackage eval, so the line must be injected before it.
 f=feeds/packages/utils/containerd/Makefile
