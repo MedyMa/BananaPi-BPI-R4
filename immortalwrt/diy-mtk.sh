@@ -317,6 +317,9 @@ rm -f package/base-files/files/etc/uci-defaults/99-apk-untrusted
 [ -f package/mtk/applications/5g-modem/quectel_cm_5G/src/device.c ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1016-quectel-cm-5g-dname-buffer.patch"
 
+[ -f package/mtk/applications/5g-modem/quectel_MHI/src/core/mhi_init.c ] && \
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1017-quectel-mhi-kernel-api-compat.patch"
+
 # Verify libmbedtls presence (required by shadowsocks-libev)
 if [ ! -f package/libs/mbedtls/Makefile ]; then
   echo "WARNING: package/libs/mbedtls/Makefile not found" >&2
