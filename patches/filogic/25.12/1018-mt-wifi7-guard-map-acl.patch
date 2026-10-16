@@ -1,15 +1,10 @@
 --- a/mt_wifi/os/linux/cfg80211/cfg80211_ap.c
 +++ b/mt_wifi/os/linux/cfg80211/cfg80211_ap.c
-@@ -2833,11 +2833,13 @@ int cfg80211_set_acl_policy(PRTMP_ADAPTER pAd, UINT ifIndex, u8 mode)
- 	struct wifi_dev *wdev = &pAd->ApCfg.MBSSID[ifIndex].wdev;
+@@ -2834,2 +2834,3 @@
  
 +#ifdef CONFIG_MAP_SUPPORT
  	if (wdev && mode == 1 && (IS_MAP_TURNKEY_ENABLE(pAd)) &&
- 			(wdev->MAPCfg.DevOwnRole & BIT(MAP_ROLE_BACKHAUL_BSS)) &&
- 			(!(wdev->MAPCfg.DevOwnRole & BIT(MAP_ROLE_FRONTHAUL_BSS)))) {
- 		MTWF_DBG(pAd, DBG_CAT_AP, CATAP_ACL, DBG_LVL_ERROR,
- 				"disallowing ACL for Backhaul BSS, DevOwnRole=%u\n", wdev->MAPCfg.DevOwnRole);
- 		return FALSE;
+@@ -2841,3 +2842,4 @@
  	}
 +#endif /* CONFIG_MAP_SUPPORT */
  
