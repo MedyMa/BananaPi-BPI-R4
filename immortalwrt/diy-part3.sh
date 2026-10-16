@@ -1,10 +1,5 @@
 #!/bin/bash
 
-# Keep the MT7988 recovery build on its reviewed source baseline.
-if [ "${OPENWRT_DEVICE:-}" = "MT7988" ]; then
-    bash "${GITHUB_WORKSPACE:?}/immortalwrt/MT7988/prepare-source.sh" || exit $?
-fi
-
 function merge_package(){
     repo=`echo $1 | rev | cut -d'/' -f 1 | rev`
     pkg=`echo $2 | rev | cut -d'/' -f 1 | rev`
