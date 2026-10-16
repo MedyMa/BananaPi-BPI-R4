@@ -1,5 +1,5 @@
 #!/bin/bash
-# diy-mtk.sh -- BPI-R4 BE14 vendor WiFi7 build for benboguan/openwrt-25.12.
+# diy-mtk.sh -- BPI-R4 BE14 WiFi7 build for MedyMa/immortalwrt-mt798x-25.12.
 # Configuration and firmware guards run through this existing DIY script.
 set -e
 
@@ -136,7 +136,7 @@ esac
 # MAP-only ACL restriction behind the same feature guard as those declarations.
 _mt_wifi7_patch_dir="package/mtk/drivers/mt_wifi7/patches"
 _mt_wifi7_acl_patch="$GITHUB_WORKSPACE/patches/filogic/25.12/1018-mt-wifi7-guard-map-acl.patch"
-_mt_wifi7_acl_target="$_mt_wifi7_patch_dir/0044-mt_wifi7-guard-map-acl-when-disabled.patch"
+_mt_wifi7_acl_target="$_mt_wifi7_patch_dir/0049-mt_wifi7-guard-map-acl-when-disabled.patch"
 [ -d "$_mt_wifi7_patch_dir" ] || {
     echo "Vendor WiFi7 patch directory missing: $_mt_wifi7_patch_dir" >&2
     exit 1
