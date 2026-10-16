@@ -316,6 +316,8 @@ done
 ./scripts/feeds update -a
 ./scripts/feeds install -a
 ./scripts/feeds install c-ares udns
+rm -rf feeds/packages/net/prosody feeds/packages/utils/telegraf
+rm -rf package/feeds/packages/prosody package/feeds/packages/telegraf
 
 # Remove kiddin9 APK repo (triggers broken video/ sub-repo)
 for f in \
