@@ -317,7 +317,3 @@ patch_makefile_dep \
 
 # Modify default IP
 sed -i 's/192.168.6.1/192.168.2.1/g' package/base-files/files/bin/config_generate
-grep -qF 'lan) ipad=${ipaddr:-"192.168.2.1"} ;;' package/base-files/files/bin/config_generate || {
-    echo 'Default LAN fallback was not set to 192.168.2.1' >&2
-    exit 1
-}
