@@ -130,6 +130,7 @@ git clone --depth=1 https://github.com/nikkinikki-org/OpenWrt-nikki
 rm -rf OpenWrt-nikki/mihomo-alpha OpenWrt-nikki/mihomo-meta
 git clone --depth=1 https://github.com/1522042029/luci-app-socat
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
+git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
 rm -rf -- "$_mtk_source_root/package/community/package/openwrt-packages/adguardhome"
 rm -rf -- "$_mtk_source_root/package/openwrt-packages/adguardhome"
 merge_package https://github.com/kenzok8/jell jell/adguardhome
