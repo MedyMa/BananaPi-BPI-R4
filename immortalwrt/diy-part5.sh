@@ -60,7 +60,6 @@ git clone --depth=1 -b main https://github.com/Openwrt-Passwall/openwrt-passwall
 git clone --depth=1 https://github.com/nikkinikki-org/OpenWrt-nikki
 git clone --depth=1 https://github.com/1522042029/luci-app-socat
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
-git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-fan
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-sfp-status
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-adguardhome
