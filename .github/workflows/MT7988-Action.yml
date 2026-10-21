@@ -115,6 +115,10 @@ jobs:
           echo 'Independent router status package is missing from the resolved firmware configuration' >&2
           exit 1
         }
+        grep -qx 'CONFIG_PACKAGE_be14-whnat-diag=y' .config || {
+          echo 'BE14 diagnostic package is missing from resolved configuration' >&2
+          exit 1
+        }
         cat .config
         make download -j$(nproc) 2>&1
         find dl -size -1024c -exec ls -l {} \;
@@ -279,6 +283,7 @@ jobs:
       id: organize
       if: ${{ steps.compile.outputs.status == 'success' && env.UPLOAD_FIRMWARE == 'true' && !cancelled() }}
       run: |
+        python3 "$GITHUB_WORKSPACE/scripts/package-be14-diagnostic-ipks.py" "$GITHUB_WORKSPACE/openwrt"
         cd openwrt/bin/targets/mediatek/filogic_a73
         rm -rf packages *mt798* *.config *.buildinfo *.json sha256sums
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
