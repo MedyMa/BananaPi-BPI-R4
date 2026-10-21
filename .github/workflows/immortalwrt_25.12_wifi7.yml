@@ -1,12 +1,6 @@
 name: immortalwrt_25.12_wifi7
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - immortalwrt/MTK/defconfig
-      - immortalwrt/diy-mtk.sh
-      - .github/workflows/immortalwrt_25.12_wifi7.yml
   workflow_dispatch:
 
 permissions:
