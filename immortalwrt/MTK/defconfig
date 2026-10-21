@@ -3,6 +3,8 @@
 CONFIG_TARGET_mediatek=y
 CONFIG_TARGET_mediatek_filogic_a73=y
 CONFIG_TARGET_mediatek_filogic_a73_DEVICE_bananapi_bpi-r4=y
+CONFIG_TARGET_SUBTARGET="filogic_a73"
+CONFIG_TARGET_OPTIMIZATION="-Os -pipe -march=armv8-a+crypto+crc -mtune=cortex-a73"
 # CONFIG_PACKAGE_kmod-mt7996-firmware is not set
 # CONFIG_PACKAGE_kmod-mt7996-233-firmware is not set
 CONFIG_DEVEL=y
