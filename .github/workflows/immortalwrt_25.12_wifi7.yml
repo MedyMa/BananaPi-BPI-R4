@@ -243,7 +243,7 @@ jobs:
           const owner = context.repo.owner;
           const repo = context.repo.repo;
           const thisRunId = context.runId;
-          const wfPath = `.github/workflows/${context.workflow}`;
+          const wfPath = (process.env.GITHUB_WORKFLOW_REF || "").replace(`${owner}/${repo}/`, "").split("@")[0];
 
           // List completed runs of this workflow, newest first.
           const runs = [];
