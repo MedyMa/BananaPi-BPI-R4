@@ -1,0 +1,117 @@
+name: BE14 diagnostic modules (24.10)
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_commit:
+        description: Exact diagnostic source commit (40 hex characters)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: be14-diagnostic-modules-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  OPENWRT_NAME: immortalwrt
+  OPENWRT_DEVICE: MT7988
+  REPO_BRANCH: mt798x-mt799x-6.6-mtwifi
+  SOURCE_COMMIT: ${{ inputs.source_commit }}
+  TZ: Asia/Shanghai
+
+jobs:
+  modules:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - name: Allocate runner build space
+        uses: easimon/maximize-build-space@v10
+        with:
+          root-reserve-mb: 4096
+          swap-size-mb: 2048
+          remove-dotnet: 'true'
+          remove-android: 'true'
+          remove-haskell: 'true'
+          remove-codeql: 'true'
+      - name: Install build dependencies
+        run: |
+          sudo apt-get -qq update
+          sudo apt-get -qq install build-essential clang flex bison g++ gawk gcc-multilib gettext git libncurses-dev libssl-dev python3 python3-setuptools rsync unzip zlib1g-dev swig libpython3-dev aria2 jq subversion ccache libelf-dev zstd
+          mkdir -p be14-evidence
+          df -h > be14-evidence/space-initial.txt
+      - name: Checkout exact source
+        run: |
+          set -euo pipefail
+          [[ "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
+          git clone --depth 1 --branch "$REPO_BRANCH" https://github.com/MedyMa/immortalwrt-mt798x-6.6 openwrt
+          if [ "$(git -C openwrt rev-parse HEAD)" != "$SOURCE_COMMIT" ]; then
+            git -C openwrt fetch --depth 1 origin "$SOURCE_COMMIT"
+            git -C openwrt checkout --detach "$SOURCE_COMMIT"
+          fi
+          test "$(git -C openwrt rev-parse HEAD)" = "$SOURCE_COMMIT"
+          git -C openwrt rev-parse HEAD > be14-evidence/source-sha.txt
+          git rev-parse HEAD > be14-evidence/build-sha.txt
+          cp patches/filogic/feeds.conf.default openwrt/feeds.conf.default
+      - name: Restore compatible toolchain cache
+        uses: klever1988/cachewrtbuild@54ed4fe2f7d8b5cfbc0b928c159266ee892c2d3d
+        with:
+          ccache: 'false'
+          prefix: ${{ github.workspace }}/openwrt
+          mixkey: immortalwrt-MT7988-mt798x-mt799x-6.6-mtwifi
+      - name: Restore existing ccache
+        uses: actions/cache/restore@v5.0.5
+        with:
+          path: openwrt/.ccache
+          key: ccache-immortalwrt-MT7988-mt798x-mt799x-6.6-mtwifi-be14-${{ github.run_id }}
+          restore-keys: |
+            ccache-immortalwrt-MT7988-mt798x-mt799x-6.6-mtwifi-
+      - name: Prepare original MT7988 configuration and patch queue
+        run: |
+          set -euo pipefail
+          cd openwrt
+          ./scripts/feeds update -a 2>&1 | tee ../be14-evidence/feeds.log
+          bash "$GITHUB_WORKSPACE/immortalwrt/diy-part3.sh" 2>&1 | tee ../be14-evidence/diy3.log
+          cp "$GITHUB_WORKSPACE/immortalwrt/MT7988/defconfig" .config
+          bash "$GITHUB_WORKSPACE/immortalwrt/diy-part4.sh" 2>&1 | tee ../be14-evidence/diy4.log
+          make defconfig 2>&1 | tee ../be14-evidence/defconfig.log
+          grep -qx 'CONFIG_TARGET_ROOTFS_PARTSIZE=8192' .config
+          grep -qx 'CONFIG_PACKAGE_be14-whnat-diag=y' .config
+          cp .config ../be14-evidence/openwrt.config
+          sha256sum .config > ../be14-evidence/config.sha256
+          git diff --stat > ../be14-evidence/setup-diff-stat.txt
+          for feed in feeds/* package/community/*; do
+            if [ -d "$feed/.git" ]; then printf '%s ' "$feed"; git -C "$feed" rev-parse HEAD; fi
+          done > ../be14-evidence/feed-commits.txt
+      - name: Collector normal, preflight failure and signal regression
+        run: |
+          set -euo pipefail
+          python3 scripts/test-be14-collector.py openwrt/package/utils/be14-whnat-diag/files/collect-be14-whnat-window 2>&1 | tee be14-evidence/collector-tests.log
+      - name: Compile kernel and diagnostic package group
+        run: bash scripts/build-be14-diagnostic-modules.sh
+      - name: Package verified module IPKs
+        run: |
+          set -euo pipefail
+          python3 scripts/package-be14-diagnostic-ipks.py openwrt 2>&1 | tee be14-evidence/package.log
+          python3 scripts/verify-be14-stage2-ipks.py openwrt/bin/targets/mediatek/filogic_a73/be14-diagnostic-ipks.tar.gz 2>&1 | tee be14-evidence/stage2-module-check.log
+          sha256sum openwrt/.config > be14-evidence/config-after.sha256
+          cmp be14-evidence/openwrt.config openwrt/.config
+          df -h > be14-evidence/space-final.txt
+      - name: Upload diagnostic IPKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: be14-diagnostic-ipks-${{ github.run_id }}
+          path: |
+            openwrt/bin/targets/mediatek/filogic_a73/be14-diagnostic-ipks.tar.gz
+            openwrt/bin/targets/mediatek/filogic_a73/be14-diagnostic-ipks.tar.gz.sha256
+          if-no-files-found: error
+      - name: Upload evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: be14-diagnostic-evidence-${{ github.run_id }}
+          path: be14-evidence/
+          if-no-files-found: warn
