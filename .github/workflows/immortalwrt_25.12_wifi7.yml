@@ -61,6 +61,8 @@ jobs:
       run: |
         git clone --depth 1 $REPO_URL -b $REPO_BRANCH openwrt
         cd openwrt
+        rm -rf feeds.conf.default
+        cp -f $GITHUB_WORKSPACE/patches/filogic/feeds.conf.default feeds.conf.default
         git log --pretty=tformat:"%h" -n1 tools toolchain || echo "No toolchain history"
 
     - name: Generate cache keys
@@ -106,6 +108,10 @@ jobs:
       run: |
         cd openwrt
         make defconfig
+        grep -qx 'CONFIG_PACKAGE_rpcd-mod-router-status=y' .config || {
+          echo 'Independent router status package is missing from the resolved firmware configuration' >&2
+          exit 1
+        }
         cat .config
         make download -j$(nproc) 2>&1
         find dl -size -1024c -exec ls -l {} \;
@@ -117,8 +123,6 @@ jobs:
         cd openwrt
         echo -e "$(nproc) thread compile"
         make -j$(nproc) || make -j$(($(nproc)/2 + 1)) || make -j1 V=s
-        cp .config bin/targets/mediatek/filogic*/wifi7.config
-        git rev-parse HEAD > bin/targets/mediatek/filogic*/wifi7-source.txt
         CCACHE_DIR="$PWD/.ccache" staging_dir/host/bin/ccache --show-stats
         du -sh .ccache
         echo "date1=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
@@ -272,9 +276,8 @@ jobs:
       id: organize
       if: ${{ steps.compile.outputs.status == 'success' && env.UPLOAD_FIRMWARE == 'true' && !cancelled() }}
       run: |
-        cd openwrt/bin/targets/mediatek/filogic*
-        rm -rf packages *mt798*
-        find . -maxdepth 1 -type f ! -name sha256sums -print0 | sort -z | xargs -0 -r sha256sum > sha256sums
+        cd openwrt/bin/targets/mediatek/filogic_a73
+        rm -rf packages *mt798* *.config *.buildinfo *.json sha256sums
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
 
