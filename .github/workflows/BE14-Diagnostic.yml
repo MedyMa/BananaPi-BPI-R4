@@ -27,7 +27,6 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 300
     steps:
-      - uses: actions/checkout@v6.0.2
       - name: Allocate runner build space
         uses: easimon/maximize-build-space@v10
         with:
@@ -37,6 +36,7 @@ jobs:
           remove-android: 'true'
           remove-haskell: 'true'
           remove-codeql: 'true'
+      - uses: actions/checkout@v6.0.2
       - name: Install build dependencies
         run: |
           sudo apt-get -qq update
@@ -47,13 +47,15 @@ jobs:
         run: |
           set -euo pipefail
           [[ "$SOURCE_COMMIT" =~ ^[0-9a-f]{40}$ ]]
-          git clone --depth 1 --branch "$REPO_BRANCH" https://github.com/MedyMa/immortalwrt-mt798x-6.6 openwrt
+          git clone --depth 8 --branch "$REPO_BRANCH" https://github.com/MedyMa/immortalwrt-mt798x-6.6 openwrt
           if [ "$(git -C openwrt rev-parse HEAD)" != "$SOURCE_COMMIT" ]; then
             git -C openwrt fetch --depth 1 origin "$SOURCE_COMMIT"
             git -C openwrt checkout --detach "$SOURCE_COMMIT"
           fi
           test "$(git -C openwrt rev-parse HEAD)" = "$SOURCE_COMMIT"
           git -C openwrt rev-parse HEAD > be14-evidence/source-sha.txt
+          git -C openwrt log --pretty=tformat:'%h' -n1 tools toolchain > be14-evidence/toolchain-history-key.txt
+          git -C openwrt ls-tree HEAD tools toolchain > be14-evidence/toolchain-trees.txt
           git rev-parse HEAD > be14-evidence/build-sha.txt
           cp patches/filogic/feeds.conf.default openwrt/feeds.conf.default
       - name: Restore compatible toolchain cache
