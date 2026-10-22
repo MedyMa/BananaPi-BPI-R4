@@ -128,6 +128,7 @@ git clone --depth=1 https://github.com/nikkinikki-org/OpenWrt-nikki
 # Drop unused alternative providers whose mutual CONFLICTS cause a Kconfig cycle.
 [ -f helloworld/mihomo/Makefile ] || exit 1
 rm -rf OpenWrt-nikki/mihomo-alpha OpenWrt-nikki/mihomo-meta
+rm -rf helloworld/weechat helloworld/luci-app-weechat
 git clone --depth=1 https://github.com/1522042029/luci-app-socat
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config

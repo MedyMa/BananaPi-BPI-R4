@@ -117,8 +117,8 @@ jobs:
         cd openwrt
         echo -e "$(nproc) thread compile"
         make -j$(nproc) || make -j$(($(nproc)/2 + 1)) || make -j1 V=s
-        cp .config bin/targets/mediatek/filogic/wifi7.config
-        git rev-parse HEAD > bin/targets/mediatek/filogic/wifi7-source.txt
+        cp .config bin/targets/mediatek/filogic*/wifi7.config
+        git rev-parse HEAD > bin/targets/mediatek/filogic*/wifi7-source.txt
         CCACHE_DIR="$PWD/.ccache" staging_dir/host/bin/ccache --show-stats
         du -sh .ccache
         echo "date1=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
@@ -272,7 +272,7 @@ jobs:
       id: organize
       if: ${{ steps.compile.outputs.status == 'success' && env.UPLOAD_FIRMWARE == 'true' && !cancelled() }}
       run: |
-        cd openwrt/bin/targets/mediatek/filogic
+        cd openwrt/bin/targets/mediatek/filogic*
         rm -rf packages *mt798*
         find . -maxdepth 1 -type f ! -name sha256sums -print0 | sort -z | xargs -0 -r sha256sum > sha256sums
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
