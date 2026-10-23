@@ -61,6 +61,10 @@ git clone --depth=1 -b dev https://github.com/fw876/helloworld
 # rm -rf helloworld/{naiveproxy,shadowsocks-libev,shadowsocksr-libev,shadow-tls,simple-obfs,tcping,tuic-client,v2ray-plugin,xray-core,xray-plugin}
 git clone --depth=1 -b main https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git
 [ -f openwrt-passwall-packages/haproxy/Makefile ] && sed -i '/^[[:space:]]*ADDON+=USE_QUIC=1$/d' openwrt-passwall-packages/haproxy/Makefile
+[ -f openwrt-passwall-packages/naiveproxy/Makefile ] && {
+  sed -i 's/^PKG_RELEASE:=.*$/PKG_RELEASE:=5/' openwrt-passwall-packages/naiveproxy/Makefile
+  sed -i '/aarch64_cortex-a53)$/{n;s/^[[:space:]]*PKG_HASH:=.*/  PKG_HASH:=8a60b3a5f46e005ebce4785c367a35b4938d127e001f6f365aa7f099fb4a9a64/;}' openwrt-passwall-packages/naiveproxy/Makefile
+}
 git clone --depth=1 -b main https://github.com/Openwrt-Passwall/openwrt-passwall.git
 git clone --depth=1 https://github.com/nikkinikki-org/OpenWrt-nikki
 # rm -rf OpenWrt-nikki/{mihomo-meta,mihomo-alpha}
