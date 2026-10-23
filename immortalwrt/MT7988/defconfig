@@ -486,5 +486,3 @@ CONFIG_SAMBA4_SERVER_NETBIOS=y
 CONFIG_SAMBA4_SERVER_VFS=y
 CONFIG_SAMBA4_SERVER_WSDD2=y
 
-# Explicitly invoked BE14 module-only diagnostic capture.
-CONFIG_PACKAGE_be14-whnat-diag=y
