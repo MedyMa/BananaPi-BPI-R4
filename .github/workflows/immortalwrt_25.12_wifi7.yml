@@ -2,6 +2,14 @@ name: immortalwrt_25.12_wifi7
 
 on:
   workflow_dispatch:
+    inputs:
+      build_scope:
+        description: Build firmware or validate only BPI-R4 bootloader packages
+        type: choice
+        options:
+          - firmware
+          - bootloaders
+        default: firmware
 
 permissions:
   actions: write
@@ -106,12 +114,35 @@ jobs:
       run: |
         cd openwrt
         make defconfig
+        if [ "${{ inputs.build_scope }}" = bootloaders ]; then
+          mkdir -p "$GITHUB_WORKSPACE/bootloader-validation"
+          git rev-parse HEAD > "$GITHUB_WORKSPACE/bootloader-validation/source-sha.txt"
+          cp .config "$GITHUB_WORKSPACE/bootloader-validation/resolved.config"
+        fi
         grep -qx 'CONFIG_PACKAGE_rpcd-mod-router-status=y' .config || {
           echo 'Independent router status package is missing from the resolved firmware configuration' >&2
           exit 1
         }
+        for package in \
+          u-boot-mt7988_bananapi_bpi-r4-emmc \
+          u-boot-mt7988_bananapi_bpi-r4-snand \
+          u-boot-mt7988_bananapi_bpi-r4-sdmmc \
+          trusted-firmware-a-mt7988-emmc-comb \
+          trusted-firmware-a-mt7988-spim-nand-ubi-comb \
+          trusted-firmware-a-mt7988-sdmmc-comb; do
+          grep -qx "CONFIG_PACKAGE_${package}=y" .config || {
+            echo "Required BPI-R4 image package was dropped by defconfig: $package" >&2
+            exit 1
+          }
+        done
         cat .config
-        make download -j$(nproc) 2>&1
+        if [ "${{ inputs.build_scope }}" = bootloaders ]; then
+          make -j2 \
+            package/boot/arm-trusted-firmware-mediatek/download \
+            package/boot/uboot-mediatek/download
+        else
+          make download -j$(nproc) 2>&1
+        fi
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
 
@@ -119,6 +150,11 @@ jobs:
       id: compile
       run: |
         cd openwrt
+        if [ "${{ inputs.build_scope }}" = bootloaders ]; then
+          bash "$GITHUB_WORKSPACE/scripts/validate-filogic-bootloaders.sh" "$GITHUB_WORKSPACE/bootloader-validation"
+          echo "status=validated" >> "$GITHUB_OUTPUT"
+          exit 0
+        fi
         echo -e "$(nproc) thread compile"
         make -j$(nproc) || make -j$(($(nproc)/2 + 1)) || make -j1 V=s
         CCACHE_DIR="$PWD/.ccache" staging_dir/host/bin/ccache --show-stats
@@ -126,6 +162,14 @@ jobs:
         echo "date1=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
         echo "date2=$(date "+%Y年%m月%d日")" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
+
+    - name: Upload bootloader validation evidence
+      if: always() && inputs.build_scope == 'bootloaders'
+      uses: actions/upload-artifact@v7.0.1
+      with:
+        name: bootloader-validation-${{ github.run_id }}
+        path: bootloader-validation
+        if-no-files-found: warn
 
     - name: Save ccache
       if: steps.compile.outputs.status == 'success' && steps.ccache-restore.outputs.cache-hit != 'true'
@@ -229,7 +273,7 @@ jobs:
           );
 
     - name: 清理旧的CI运行记录
-      if: ${{ !cancelled() }}
+      if: inputs.build_scope != 'bootloaders' && !cancelled()
       continue-on-error: true
       uses: actions/github-script@v8
       env:
