@@ -426,16 +426,59 @@ CONFIG_PACKAGE_wpa-cli=y
 CONFIG_MTK_WIFI7_FW_BIN_LOAD=y
 CONFIG_MTK_WIFI7_FW_LOG_TYPE="string_log"
 
-# NPU offload is excluded from this BPI-R4 build.
+# MT7988 TOPS: load the matching firmware/PCE/HNAT tunnel stack, mirroring the
+# BPI-R4 MT7988 profile (immortalwrt/MT7988/defconfig). The TOPS0/TOPS1 power
+# domains come from the in-kernel mtk-pm-domains-mt7988 driver
+# (CONFIG_MTK_SCPSYS_PM_DOMAINS) and the ReBB firmware from npu-rebb-fw.
+# kmod-en_npu is the mt_hwifi plugin, not this driver; it stays off.
 # CONFIG_EN_HWIFI_NPU_SUPPORT is not set
 # CONFIG_PACKAGE_kmod-en_npu is not set
-# CONFIG_PACKAGE_kmod-npu is not set
-# CONFIG_PACKAGE_npu-rebb-fw is not set
+CONFIG_PACKAGE_kmod-pce=y
+CONFIG_PACKAGE_kmod-pce-autoload=y
+CONFIG_PACKAGE_kmod-npu=y
+CONFIG_PACKAGE_kmod-npu-autoload=y
+CONFIG_PACKAGE_kmod-npu-nf_hnat=y
+CONFIG_PACKAGE_kmod-npu-nf_hnat-autoload=y
+CONFIG_PACKAGE_npu-rebb-fw=y
+# MTK_NPU is the hidden gate behind KernelPackage/npu's "+@MTK_NPU" dependency;
+# it must be set here or make defconfig drops kmod-npu again.
+CONFIG_MTK_NPU=y
+CONFIG_MTK_NPU_SUPPORT=y
+CONFIG_MTK_NPU_REBB_SUPPORT=y
+CONFIG_MTK_NPU_HNAT=y
+CONFIG_MTK_NPU_MEM_TEST=y
+CONFIG_MTK_NPU_THERMAL=y
+CONFIG_MTK_NPU_STATISTIC=y
+CONFIG_NPU_TNL_32=y
+CONFIG_NPU_TNL_NUM=32
+CONFIG_NPU_TNL_MAP_BIT=5
+CONFIG_NPU_TNL_TYPE_NUM=32
+CONFIG_MTK_NPU_GRE=y
+CONFIG_MTK_NPU_GRETAP=y
+CONFIG_MTK_NPU_VXLAN=y
+CONFIG_MTK_NPU_L2TP=y
+CONFIG_MTK_NPU_L2TP_V2=y
+CONFIG_MTK_NPU_PPP=y
+CONFIG_PACKAGE_kmod-gre=y
+CONFIG_PACKAGE_kmod-vxlan=y
+CONFIG_PACKAGE_kmod-l2tp=y
+CONFIG_PACKAGE_kmod-pppol2tp=y
+CONFIG_PACKAGE_kmod-ppp=y
+CONFIG_PACKAGE_kmod-pppoe=y
+# KernelPackage/npu also carries "+@KERNEL_RELAY" (25.12 added it; 24.10 shipped
+# kmod-npu-tops-pd instead). Nothing else in this build selects KERNEL_RELAY
+# because the mt76/ath drivers are disabled, so enable it here.
+CONFIG_KERNEL_RELAY=y
+# The flowblock and multicast frontends and DPDK stay off; the HNAT backend
+# above is the one this board uses.
 # CONFIG_PACKAGE_kmod-npu-flow is not set
 # CONFIG_PACKAGE_kmod-npu-flow-autoload is not set
-# CONFIG_PACKAGE_kmod-npu-nf_hnat is not set
-# CONFIG_PACKAGE_kmod-npu-nf_hnat-autoload is not set
 # CONFIG_PACKAGE_kmod-npu-mcast is not set
 # CONFIG_PACKAGE_kmod-npu-mcast-autoload is not set
 # CONFIG_PACKAGE_kmod-npu-dpdk is not set
 # CONFIG_PACKAGE_kmod-npu-dpdk-autoload is not set
+# CONFIG_MTK_NPU_FLOW is not set
+# CONFIG_MTK_NPU_MCAST is not set
+# CONFIG_MTK_NPU_DPDK is not set
+# CONFIG_MTK_NPU_LOGGER is not set
+# CONFIG_MTK_NPU_SECURE_FW is not set

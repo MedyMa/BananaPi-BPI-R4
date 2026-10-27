@@ -11,12 +11,13 @@ configure_wifi7() {
     }
     [ -r "$cfg" ] || { echo "Cannot read config: $cfg" >&2; exit 1; }
     # Disable target defaults that conflict with the vendor radio stack.
+    # The MTK NPU driver (kmod-npu), its ReBB firmware and the PCE dependency
+    # are controlled by the defconfig and must not be forced off here.
     for package in kmod-mt76-core kmod-mt76-connac kmod-mt7996e \
         kmod-mt7990-firmware kmod-mt7996-firmware kmod-mt7996-233-firmware \
         kmod-mt7996-firmware-common kmod-mt_wifi_cmn wifi-profile wifi-script luci-app-mtk \
-        kmod-npu kmod-npu-flow kmod-npu-flow-autoload kmod-npu-nf_hnat \
-        kmod-npu-nf_hnat-autoload kmod-npu-mcast kmod-npu-mcast-autoload npu-rebb-fw kmod-npu-dpdk kmod-npu-dpdk-autoload kmod-en_npu \
-        mtk-hqos luci-app-mtk-hqos kmod-pce mtkhnat_util ethswbox flowtable \
+        kmod-en_npu \
+        mtk-hqos luci-app-mtk-hqos mtkhnat_util ethswbox flowtable \
         netsys_dbg_util tops-tool; do
         symbol="CONFIG_PACKAGE_${package}"
         sed -i "/^${symbol}=/d; /^# ${symbol} is not set$/d" "$cfg"
