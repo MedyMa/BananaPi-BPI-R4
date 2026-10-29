@@ -4,6 +4,16 @@ on:
   schedule:
     - cron: 0 15 * * *
   workflow_dispatch:
+    inputs:
+      npu_backend:
+        description: 'NPU profile: HNAT daily / FLOW wired test / DPDK MAC-filter test'
+        type: choice
+        required: true
+        default: hnat
+        options:
+          - hnat
+          - flow
+          - dpdk
 
 permissions:
   actions: write
@@ -21,12 +31,31 @@ env:
   OPENWRT_NAME: immortalwrt
   OPENWRT_DEVICE: MT7988
   OPENWRT_FLAVOR: draft
+  NPU_BACKEND: ${{ inputs.npu_backend || 'hnat' }}
+  NPU_CACHE_PREFIX: ''
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
+    - name: Select NPU firmware profile
+      shell: bash
+      run: |
+        set -euo pipefail
+        case "$NPU_BACKEND" in
+          hnat) ;;
+          flow|dpdk)
+            echo "OPENWRT_FLAVOR=npu-${NPU_BACKEND}-test" >> "$GITHUB_ENV"
+            echo "NPU_CACHE_PREFIX=npu-${NPU_BACKEND}-" >> "$GITHUB_ENV"
+            echo "UPLOAD_RELEASE=false" >> "$GITHUB_ENV"
+            ;;
+          *) echo "Unsupported NPU profile: $NPU_BACKEND" >&2; exit 1 ;;
+        esac
+        echo "NPU profile: $NPU_BACKEND"
+        if [ "$NPU_BACKEND" = flow ]; then
+          echo 'FLOW test firmware uses wired ports; vendor HNAT/WiFi drivers are disabled.'
+        fi
     - name: Maximize build space
       uses: easimon/maximize-build-space@v10
       with:
@@ -78,16 +107,16 @@ jobs:
       with:
         ccache: 'false'
         prefix: ${{ github.workspace }}/openwrt
-        mixkey: ${{ env.OPENWRT_NAME }}-${{ env.OPENWRT_DEVICE }}-${{ env.REPO_BRANCH }}
+        mixkey: ${{ env.NPU_CACHE_PREFIX }}${{ env.OPENWRT_NAME }}-${{ env.OPENWRT_DEVICE }}-${{ env.REPO_BRANCH }}
 
     - name: Restore ccache
       id: ccache-restore
       uses: actions/cache/restore@v5.0.5
       with:
         path: openwrt/.ccache
-        key: ccache-${{ env.OPENWRT_NAME }}-${{ env.OPENWRT_DEVICE }}-${{ env.REPO_BRANCH }}-${{ steps.cache-key.outputs.ccache_period }}
+        key: ccache-${{ env.NPU_CACHE_PREFIX }}${{ env.OPENWRT_NAME }}-${{ env.OPENWRT_DEVICE }}-${{ env.REPO_BRANCH }}-${{ steps.cache-key.outputs.ccache_period }}
         restore-keys: |
-          ccache-${{ env.OPENWRT_NAME }}-${{ env.OPENWRT_DEVICE }}-${{ env.REPO_BRANCH }}-
+          ccache-${{ env.NPU_CACHE_PREFIX }}${{ env.OPENWRT_NAME }}-${{ env.OPENWRT_DEVICE }}-${{ env.REPO_BRANCH }}-
 
     - name: Update base feed indexes
       working-directory: ./openwrt
@@ -111,6 +140,24 @@ jobs:
       run: |
         cd openwrt
         make defconfig
+        python3 "$GITHUB_WORKSPACE/immortalwrt/MT7988/npu-profile.py" apply --mode "$NPU_BACKEND"
+        make defconfig
+        python3 "$GITHUB_WORKSPACE/immortalwrt/MT7988/npu-profile.py" check --mode "$NPU_BACKEND"
+        mkdir -p files/etc
+        printf '%s\n' "$NPU_BACKEND" > files/etc/npu-build-mode
+        if [ "$NPU_BACKEND" = flow ]; then
+          mkdir -p files/etc/uci-defaults
+          cat > files/etc/uci-defaults/99-npu-flow-profile <<'EOF'
+        #!/bin/sh
+        if uci -q get 'firewall.@defaults[0]' >/dev/null; then
+          uci set 'firewall.@defaults[0].flow_offloading=1'
+          uci set 'firewall.@defaults[0].flow_offloading_hw=1'
+          uci commit firewall
+        fi
+        exit 0
+        EOF
+          chmod 0755 files/etc/uci-defaults/99-npu-flow-profile
+        fi
         grep -qx 'CONFIG_PACKAGE_rpcd-mod-router-status=y' .config || {
           echo 'Independent router status package is missing from the resolved firmware configuration' >&2
           exit 1
@@ -144,9 +191,9 @@ jobs:
       continue-on-error: true
       uses: actions/github-script@v8
       env:
-        CACHE_SCOPE: ${{ env.OPENWRT_NAME }}-${{ env.OPENWRT_DEVICE }}-${{ env.REPO_BRANCH }}
-        CCACHE_PREFIX: ccache-${{ env.OPENWRT_NAME }}-${{ env.OPENWRT_DEVICE }}-${{ env.REPO_BRANCH }}-
-        TOOLCHAIN_PREFIX: ${{ env.OPENWRT_NAME }}-${{ env.OPENWRT_DEVICE }}-${{ env.REPO_BRANCH }}-cache-openwrt-
+        CACHE_SCOPE: ${{ env.NPU_CACHE_PREFIX }}${{ env.OPENWRT_NAME }}-${{ env.OPENWRT_DEVICE }}-${{ env.REPO_BRANCH }}
+        CCACHE_PREFIX: ccache-${{ env.NPU_CACHE_PREFIX }}${{ env.OPENWRT_NAME }}-${{ env.OPENWRT_DEVICE }}-${{ env.REPO_BRANCH }}-
+        TOOLCHAIN_PREFIX: ${{ env.NPU_CACHE_PREFIX }}${{ env.OPENWRT_NAME }}-${{ env.OPENWRT_DEVICE }}-${{ env.REPO_BRANCH }}-cache-openwrt-
         CURRENT_CCACHE_KEY: ${{ steps.ccache-restore.outputs.cache-primary-key }}
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
