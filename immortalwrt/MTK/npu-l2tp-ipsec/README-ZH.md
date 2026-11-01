@@ -89,10 +89,10 @@ mtk-npu-tunnel up
 `up` 先生成配置、检查 fw4，再注册 WAN 的 ESP offload 特性、打开 HNAT 的 `tnl_toggle`、协商硬件 packet SA，最后启动 L2TP。
 若安装了 TurboACC，也会保存其原开关值并启用隧道卸载；`remove` 会恢复未被用户另行更改的原值。
 如果 SA 协商或硬件 offload 被拒绝，会保持 L2TP 关闭；不会退化成明文 L2TP。
-明文保护规则及表 201 的 unreachable 兜底会保留。默认路由仍使用原 WAN。
+明文保护规则及表 201 的 unreachable 兜底会保留。未选目标及 LAN 管理网段仍使用原路由。
 部署前会保存初始 network/firewall 配置到 `/etc/npu-tunnel-backup`；配置生成失败自动还原当次更改。
 
-确认连接、策略与负载均正常后，启用开机连接：
+确认连接、策略与负载均正常后，启用开机连接；WAN 后续获取或更新地址时也会重试：
 
 ```sh
 uci set npu_tunnel.main.enabled='1'

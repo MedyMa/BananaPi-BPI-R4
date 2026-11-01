@@ -1,0 +1,12 @@
+#!/bin/sh
+# Retry after WAN DHCP/address readiness; ignore this profile's PPP events.
+[ "$(uci -q get npu_tunnel.main.enabled)" = 1 ] || exit 0
+/etc/init.d/npu-tunnel enabled || exit 0
+[ "$INTERFACE" = "$(uci -q get npu_tunnel.main.wan_interface)" ] || exit 0
+case "$ACTION" in
+ ifup) task=up ;;
+ ifupdate) [ "$IFUPDATE_ADDRESSES" = 1 ] || exit 0; task=up ;;
+ ifdown) task=down ;;
+ *) exit 0 ;;
+esac
+(/usr/sbin/mtk-npu-tunnel "$task" 2>&1 | logger -t npu-tunnel) &

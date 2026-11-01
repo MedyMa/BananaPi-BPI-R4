@@ -73,6 +73,8 @@ load_settings() {
 	fi
 	secret_remote_line=
 	case "$remote_id" in ''|%any) ;; *) secret_remote_line="id-2 = $remote_id" ;; esac
+	network_get_subnet lan_subnet lan || fail 'LAN 尚无 IPv4 网段，无法保留管理连接。'
+	valid_cidr "$lan_subnet" || fail 'LAN 网段格式无效。'
 	source=$(get source); [ -n "$source" ] || source=0.0.0.0/0
 	valid_cidr "$source" || fail 'source 需要 IPv4 CIDR。'
 	mtu=$(get mtu); case "$mtu" in ''|*[!0-9]*) fail 'MTU 需要整数。' ;; esac
@@ -97,7 +99,7 @@ prepare() {
 	require_native
 	[ -z "$(uci -q changes network)$(uci -q changes firewall)$(uci -q changes turboacc)" ] || fail 'network/firewall/TurboACC 有未提交改动，请先保存或撤销后再部署。'
 	[ -r /etc/config/firewall ] && [ -r /etc/config/network ] || fail '缺少 network/firewall 配置。'
-	for section in network.npu_l2tp network.npu_peer network.npu_default network.npu_closed firewall.npu_l2tp firewall.npu_forward firewall.npu_ike firewall.npu_esp firewall.npu_control; do owned "$section"; done
+	for section in network.npu_l2tp network.npu_peer network.npu_lan network.npu_default network.npu_closed firewall.npu_l2tp firewall.npu_forward firewall.npu_ike firewall.npu_esp firewall.npu_control; do owned "$section"; done
 	for i in $(seq 1 32); do owned "network.npu_target_$i"; done
 	conf=/etc/swanctl/conf.d/npu-l2tp.conf
 	guard=/etc/nftables.d/90-npu-l2tp-guard.nft
@@ -135,6 +137,11 @@ prepare() {
 	set_uci network.npu_peer.dest "$peer/32"
 	set_uci network.npu_peer.lookup main
 	set_uci network.npu_peer.priority 8990
+	set_uci network.npu_lan rule
+	set_uci network.npu_lan.npu_tunnel_owner 1
+	set_uci network.npu_lan.dest "$lan_subnet"
+	set_uci network.npu_lan.lookup main
+	set_uci network.npu_lan.priority 8991
 	set_uci network.npu_default route
 	set_uci network.npu_default.npu_tunnel_owner 1
 	set_uci network.npu_default.interface npu_l2tp
@@ -264,7 +271,7 @@ up() {
 	/etc/init.d/swanctl reload
 	if ! timeout 30 swanctl --initiate --child npu-l2tp >/dev/null 2>&1; then
 		ifdown npu_l2tp 2>/dev/null || :
-		fail 'IPsec 未建立或硬件 packet offload 被拒绝；L2TP 保持关闭。检查 logread -e charon；不要降级为明文 L2TP。'
+		fail 'IPsec 未建立或硬件 packet offload 被拒绝；L2TP 保持关闭。检查 logread -e ipsec；不要降级为明文 L2TP。'
 	fi
 	mkdir -p /tmp/l2tp
 	chmod 0700 /tmp/l2tp
@@ -312,7 +319,7 @@ profile_unifi() {
 }
 remove() {
 	[ -z "$(uci -q changes network)$(uci -q changes firewall)$(uci -q changes turboacc)" ] || fail 'network/firewall/TurboACC 有未提交改动。'
-	sections='network.npu_l2tp network.npu_peer network.npu_default network.npu_closed firewall.npu_l2tp firewall.npu_forward firewall.npu_ike firewall.npu_esp firewall.npu_control'
+	sections='network.npu_l2tp network.npu_peer network.npu_lan network.npu_default network.npu_closed firewall.npu_l2tp firewall.npu_forward firewall.npu_ike firewall.npu_esp firewall.npu_control'
 	for i in $(seq 1 32); do sections="$sections network.npu_target_$i"; done
 	for section in $sections; do owned "$section"; done
 	down
