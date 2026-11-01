@@ -125,13 +125,25 @@ sh "$GITHUB_WORKSPACE/scripts/fix-mihomo-source.sh" || exit 1
 # Replacing this tree with the old single-version recipe removes
 # golang1.27/host, which cloudflared, tailscale and telegraf require.
 _go_values="feeds/packages/lang/golang/golang-values.mk"
-if ! grep -qx 'PKG_NAME:=golang1.27' feeds/packages/lang/golang/golang1.27/Makefile ||
-   ! grep -q '^GO_DEFAULT_VERSION:=' "$_go_values"; then
-    echo 'The 25.12 packages feed must provide its native Go 1.27 toolchain' >&2
+_go_feed_default="$(sed -n 's/^GO_DEFAULT_VERSION:=[[:space:]]*//p' "$_go_values" 2>/dev/null)"
+_go_default="$_go_feed_default"
+case "$_go_default" in
+    1.[0-9]|1.1[0-9]|1.2[0-6]) _go_default=1.27 ;;
+esac
+case "$_go_default" in
+    ''|*[!0-9.]*)
+        echo 'The 25.12 packages feed must provide its native versioned Go helpers' >&2
+        exit 1
+        ;;
+esac
+if ! grep -qxF "PKG_NAME:=golang$_go_default" "feeds/packages/lang/golang/golang$_go_default/Makefile"; then
+    echo "Missing native Go $_go_default toolchain in the packages feed" >&2
     exit 1
 fi
-# Unversioned community dependencies (including mihomo) use the same Go 1.27.
-sed -i 's/^GO_DEFAULT_VERSION:=.*/GO_DEFAULT_VERSION:=1.27/' "$_go_values" || exit 1
+# Use at least Go 1.27 for community packages; keep a newer feed default.
+if [ "$_go_default" != "$_go_feed_default" ]; then
+    sed -i "s/^GO_DEFAULT_VERSION:=.*/GO_DEFAULT_VERSION:=$_go_default/" "$_go_values" || exit 1
+fi
 rm -rf feeds/packages/net/mosdns
 git clone --depth=1 https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
 
