@@ -100,8 +100,17 @@ merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnst
 merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnsto-openwrt-package/luci-app-ddnsto
 popd
 
-rm -rf feeds/packages/lang/golang
-git clone --depth=1 https://github.com/sbwml/packages_lang_golang -b 27.x feeds/packages/lang/golang
+# Keep the feed's versioned Go compilers, bootstrap and matching helpers.
+# Replacing this tree with the old single-version recipe removes
+# golang1.27/host, which cloudflared, tailscale and telegraf require.
+_go_values="feeds/packages/lang/golang/golang-values.mk"
+if ! grep -qx 'PKG_NAME:=golang1.27' feeds/packages/lang/golang/golang1.27/Makefile ||
+   ! grep -q '^GO_DEFAULT_VERSION:=' "$_go_values"; then
+    echo 'The 25.12 packages feed must provide its native Go 1.27 toolchain' >&2
+    exit 1
+fi
+# Unversioned community dependencies (including mihomo) use the same Go 1.27.
+sed -i 's/^GO_DEFAULT_VERSION:=.*/GO_DEFAULT_VERSION:=1.27/' "$_go_values" || exit 1
 rm -rf feeds/packages/net/mosdns
 git clone --depth=1 https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
 
