@@ -1,0 +1,10 @@
+[global]
+port = 1701
+
+[lns r4]
+ip range = 10.77.0.2-10.77.0.2
+local ip = 10.77.0.1
+require authentication = yes
+name = npu-lns
+pppoptfile = /etc/ppp/options.npu-lns
+length bit = yes

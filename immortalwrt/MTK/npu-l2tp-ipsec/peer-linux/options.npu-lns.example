@@ -1,0 +1,13 @@
+require-mschap-v2
+refuse-pap
+refuse-chap
+refuse-mschap
+refuse-eap
+noccp
+auth
+mtu 1400
+mru 1400
+lcp-echo-interval 10
+lcp-echo-failure 5
+ipcp-accept-local
+ipcp-accept-remote

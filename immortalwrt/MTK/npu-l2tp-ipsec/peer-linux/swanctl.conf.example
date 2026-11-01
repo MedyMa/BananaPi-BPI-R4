@@ -1,0 +1,38 @@
+# Install as /etc/swanctl/conf.d/r4-l2tp.conf on the Linux peer.
+# Replace PUBLIC_IPV4 and REPLACE_WITH_SAME_HEX_STRING before loading.
+connections {
+ r4-l2tp {
+  version = 2
+  local_addrs = PUBLIC_IPV4
+  remote_addrs = %any
+  proposals = aes256-sha256-modp2048
+  mobike = no
+  local { auth = psk
+   id = peer
+  }
+  remote { auth = psk
+   id = r4
+  }
+  children {
+   r4-l2tp {
+    mode = transport
+    local_ts = PUBLIC_IPV4/32[udp/1701]
+    remote_ts = dynamic[udp/1701]
+    esp_proposals = aes128-sha256
+    reqid = 4242
+    hw_offload = no
+    start_action = none
+    dpd_action = clear
+    life_time = 1h
+    rekey_time = 50m
+   }
+  }
+ }
+}
+secrets {
+ ike-r4-l2tp {
+  id-1 = peer
+  id-2 = r4
+  secret = "REPLACE_WITH_SAME_HEX_STRING"
+ }
+}

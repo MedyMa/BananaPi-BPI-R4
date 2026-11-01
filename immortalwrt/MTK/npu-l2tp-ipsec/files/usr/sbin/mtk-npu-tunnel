@@ -1,0 +1,386 @@
+#!/bin/sh
+# Native 25.12 MT7988 L2TP/IPsec deployment. No proxy protocol offload claim.
+set -eu
+umask 077
+. /lib/functions.sh
+. /lib/functions/network.sh
+fail() { printf '%s\n' "$*" >&2; exit 1; }
+get() { uci -q get "npu_tunnel.main.$1" 2>/dev/null || :; }
+valid_ip() {
+	printf '%s\n' "$1" | awk -F. 'NF!=4{exit 1}{for(i=1;i<=4;i++)if($i!~/^(0|[1-9][0-9]*)$/||length($i)>3||$i+0>255)exit 1}'
+}
+valid_cidr() {
+	case "$1" in */*) ;; *) return 1 ;; esac
+	valid_ip "${1%/*}" || return 1
+	case "${1##*/}" in ''|*[!0-9]*|0[0-9]*) return 1 ;; esac
+	[ "${#1}" -le 18 ] && [ "${1##*/}" -le 32 ]
+}
+# The netifd xl2tpd backend quotes PPP credentials itself; reject characters
+# that backend cannot escape rather than silently generating broken options.
+valid_credential() {
+	[ -n "$1" ] && [ "${#1}" -le 256 ] || return 1
+	cr=$(printf '\r')
+	case "$1" in *'"'*|*'\'*|*'
+'*|*"$cr"*) return 1 ;; esac
+}
+set_uci() { uci set "$1=$2"; }
+owned() {
+	if uci -q get "$1" >/dev/null 2>&1; then
+		[ "$(uci -q get "$1.npu_tunnel_owner")" = 1 ] || fail "已有同名配置 $1；停止以保留原配置。"
+	fi
+}
+load_settings() {
+	chmod 0600 /etc/config/npu_tunnel
+	peer=$(get peer); valid_ip "$peer" || fail '请配置固定公网对端的 IPv4 地址。'
+	case "$peer" in 0.*|127.*|169.254.*|224.*|255.*) fail '对端地址无效。' ;; esac
+	local_id=$(get local_id); remote_id=$(get remote_id)
+	for identity in "$local_id" "$remote_id"; do
+		[ "${#identity}" -le 128 ] || fail 'IKE 身份过长。'
+		case "$identity" in ''|%any) ;; *[!a-zA-Z0-9@_.:-]*) fail 'IKE 身份格式无效。' ;; esac
+	done
+	local_identity_line=; remote_identity_line=
+	[ -z "$local_id" ] || [ "$local_id" = %any ] || local_identity_line="id = $local_id"
+	[ -z "$remote_id" ] || remote_identity_line="id = $remote_id"
+	ike_version=$(get ike_version); case "$ike_version" in 1|2) ;; *) fail 'ike_version 需要 1 或 2。' ;; esac
+	ike_proposals=$(get ike_proposals); [ -n "$ike_proposals" ] || ike_proposals=aes256-sha256-modp2048
+	esp_proposals=$(get esp_proposals); [ -n "$esp_proposals" ] || esp_proposals=aes128-sha256
+	for proposal in "$ike_proposals" "$esp_proposals"; do
+		[ "${#proposal}" -le 512 ] || fail 'IPsec 算法列表过长。'
+		case "$proposal" in ''|*[!a-zA-Z0-9_,-]*) fail 'IPsec 算法列表格式无效。' ;; esac
+	done
+	psk=$(get psk)
+	[ -n "$psk" ] && [ "${#psk}" -le 256 ] || fail '请在设备上填写对端现有 PSK（最多 256 字符）。'
+	cr=$(printf '\r')
+	case "$psk" in *'
+'*|*"$cr"*) fail 'PSK 不能包含换行。' ;; esac
+	# Encode the literal PSK bytes. This preserves existing UniFi keys even
+	# with quotes/backslashes or an initial "0x", without config injection.
+	if command -v hexdump >/dev/null 2>&1; then
+		psk_hex=$(printf '%s' "$psk" | hexdump -v -e '1/1 "%02x"')
+	elif command -v od >/dev/null 2>&1; then
+		psk_hex=$(printf '%s' "$psk" | od -An -v -tx1 | tr -d ' \n')
+	else
+		fail '需要 BusyBox hexdump 或 od。'
+	fi
+	case "$psk_hex" in ''|*[!0-9a-f]*) fail 'PSK 编码失败。' ;; esac
+	username=$(get username); password=$(get password)
+	valid_credential "$username" && valid_credential "$password" || fail 'PPP 用户名/密码为空、过长或含不支持的引号、反斜杠、换行。'
+	wan=$(get wan_interface); case "$wan" in ''|*[!a-zA-Z0-9_]*) fail 'WAN 逻辑接口名称无效。' ;; esac
+	if [ -z "$local_identity_line" ]; then
+		network_get_ipaddr local_id "$wan" || fail 'WAN 尚无 IPv4，无法确定本端 IKE 身份。'
+		valid_ip "$local_id" || fail 'WAN IPv4 无效。'
+		local_identity_line="id = $local_id"
+	fi
+	secret_remote_line=
+	case "$remote_id" in ''|%any) ;; *) secret_remote_line="id-2 = $remote_id" ;; esac
+	source=$(get source); [ -n "$source" ] || source=0.0.0.0/0
+	valid_cidr "$source" || fail 'source 需要 IPv4 CIDR。'
+	mtu=$(get mtu); case "$mtu" in ''|*[!0-9]*) fail 'MTU 需要整数。' ;; esac
+	[ "$mtu" -ge 1280 ] && [ "$mtu" -le 1400 ] || fail '此部署模板的 MTU 范围为 1280 至 1400。'
+	destinations=$(get destination); [ -n "$destinations" ] || fail '请至少添加一个目标 IPv4 CIDR。'
+	count=0
+	for destination in $destinations; do
+		valid_cidr "$destination" || fail "无效目标网段：$destination"
+		count=$((count + 1)); [ "$count" -le 32 ] || fail '最多支持 32 个目标网段。'
+	done
+}
+require_native() {
+	case "$(uname -r)" in 6.12.*) ;; *) fail '联合卸载入口需要本项目 25.12 / 6.12 完整固件。当前 24.10 移植不支持此 CDRT 路径。' ;; esac
+	[ -d /sys/module/crypto_eip_inline ] && [ -d /sys/module/npu_nf_hnat ] || fail '需要已加载 crypto-eip-inline 和 npu-nf_hnat。'
+	[ -w /sys/kernel/debug/hnat/tnl_toggle ] || fail '缺少 HNAT 隧道卸载开关。'
+	[ -w /sys/kernel/debug/mtk_crypto/offload_dev ] || fail '缺少 EIP197 接口注册节点，请检查驱动和 debugfs。'
+	for command in uci swanctl nft fw4 ubus ip timeout; do command -v "$command" >/dev/null 2>&1 || fail "缺少 $command"; done
+	[ -x /lib/netifd/proto/l2tp.sh ] && [ -x /etc/init.d/swanctl ] || fail '缺少 xl2tpd 或 strongSwan swanctl 服务。'
+}
+prepare() {
+	load_settings
+	require_native
+	[ -z "$(uci -q changes network)$(uci -q changes firewall)$(uci -q changes turboacc)" ] || fail 'network/firewall/TurboACC 有未提交改动，请先保存或撤销后再部署。'
+	[ -r /etc/config/firewall ] && [ -r /etc/config/network ] || fail '缺少 network/firewall 配置。'
+	for section in network.npu_l2tp network.npu_peer network.npu_default network.npu_closed firewall.npu_l2tp firewall.npu_forward firewall.npu_ike firewall.npu_esp firewall.npu_control; do owned "$section"; done
+	for i in $(seq 1 32); do owned "network.npu_target_$i"; done
+	conf=/etc/swanctl/conf.d/npu-l2tp.conf
+	guard=/etc/nftables.d/90-npu-l2tp-guard.nft
+	for path in "$conf" "$guard"; do
+		[ ! -e "$path" ] || head -n 1 "$path" | grep -qxF '# managed-by=mtk-npu-tunnel' || fail "已有同名文件 $path；停止。"
+	done
+	# These routing table and priority ranges are reserved by this profile.
+	# Preserve a complete backup before committing any persistent settings.
+	if ! uci -q get network.npu_l2tp >/dev/null 2>&1; then
+		[ -z "$(ip -4 route show table 201 2>/dev/null)" ] || fail '路由表 201 已被其他配置使用。'
+		if ip -4 rule show | awk '$1+0>=8990 && $1+0<=9032{found=1} END{exit !found}'; then
+			fail '策略优先级 8990 至 9032 已被使用。'
+		fi
+	fi
+	backup=/etc/npu-tunnel-backup
+	if [ ! -d "$backup" ]; then
+		mkdir -m 700 "$backup"
+		cp -p /etc/config/network /etc/config/firewall "$backup/"
+	fi
+	work=$(mktemp -d /tmp/npu-l2tp-prepare.XXXXXX)
+	cp -p /etc/config/network /etc/config/firewall "$work/"
+	[ ! -e "$conf" ] || cp -p "$conf" "$work/conf"
+	[ ! -e "$guard" ] || cp -p "$guard" "$work/guard"
+	pending=1
+	set_uci network.npu_l2tp interface
+	set_uci network.npu_l2tp.npu_tunnel_owner 1
+	for kv in proto:l2tp auto:0 defaultroute:0 peerdns:0 ipv6:0; do set_uci "network.npu_l2tp.${kv%%:*}" "${kv#*:}"; done
+	set_uci network.npu_l2tp.server "$peer"
+	set_uci network.npu_l2tp.username "$username"
+	set_uci network.npu_l2tp.password "$password"
+	set_uci network.npu_l2tp.mtu "$mtu"
+	set_uci network.npu_l2tp.keepalive '5 5'
+	set_uci network.npu_peer rule
+	set_uci network.npu_peer.npu_tunnel_owner 1
+	set_uci network.npu_peer.dest "$peer/32"
+	set_uci network.npu_peer.lookup main
+	set_uci network.npu_peer.priority 8990
+	set_uci network.npu_default route
+	set_uci network.npu_default.npu_tunnel_owner 1
+	set_uci network.npu_default.interface npu_l2tp
+	set_uci network.npu_default.target 0.0.0.0/0
+	set_uci network.npu_default.table 201
+	set_uci network.npu_default.metric 10
+	set_uci network.npu_closed route
+	set_uci network.npu_closed.npu_tunnel_owner 1
+	set_uci network.npu_closed.interface loopback
+	set_uci network.npu_closed.target 0.0.0.0/0
+	set_uci network.npu_closed.type unreachable
+	set_uci network.npu_closed.table 201
+	set_uci network.npu_closed.metric 32767
+	for i in $(seq 1 32); do uci -q delete "network.npu_target_$i" || :; done
+	i=0
+	for destination in $destinations; do
+		i=$((i + 1)); name="network.npu_target_$i"
+		set_uci "$name" rule; set_uci "$name.npu_tunnel_owner" 1
+		set_uci "$name.src" "$source"; set_uci "$name.dest" "$destination"
+		set_uci "$name.lookup" 201; set_uci "$name.priority" "$((9000 + i))"
+	done
+	set_uci firewall.npu_l2tp zone; set_uci firewall.npu_l2tp.npu_tunnel_owner 1
+	set_uci firewall.npu_l2tp.name npu_l2tp
+	set_uci firewall.npu_l2tp.network npu_l2tp
+	set_uci firewall.npu_l2tp.input REJECT; set_uci firewall.npu_l2tp.output ACCEPT
+	set_uci firewall.npu_l2tp.forward REJECT; set_uci firewall.npu_l2tp.masq 1
+	set_uci firewall.npu_l2tp.mtu_fix 1
+	set_uci firewall.npu_forward forwarding; set_uci firewall.npu_forward.npu_tunnel_owner 1
+	set_uci firewall.npu_forward.src lan; set_uci firewall.npu_forward.dest npu_l2tp
+	for section in npu_ike npu_esp npu_control; do
+		set_uci "firewall.$section" rule; set_uci "firewall.$section.npu_tunnel_owner" 1
+		set_uci "firewall.$section.src" wan; set_uci "firewall.$section.src_ip" "$peer"
+		set_uci "firewall.$section.target" ACCEPT; set_uci "firewall.$section.family" ipv4
+	done
+	set_uci firewall.npu_ike.name 'NPU IKE from fixed peer'; set_uci firewall.npu_ike.proto udp
+	set_uci firewall.npu_ike.dest_port '500 4500'
+	set_uci firewall.npu_esp.name 'NPU ESP from fixed peer'; set_uci firewall.npu_esp.proto esp
+	set_uci firewall.npu_control.name 'NPU protected L2TP control'; set_uci firewall.npu_control.proto udp
+	set_uci firewall.npu_control.dest_port 1701
+	mkdir -p /etc/swanctl/conf.d /etc/nftables.d
+	cat > "$conf" <<CONF
+# managed-by=mtk-npu-tunnel
+connections {
+ npu-l2tp {
+  version = $ike_version
+  remote_addrs = $peer
+  proposals = $ike_proposals
+  mobike = no
+  local { auth = psk
+   $local_identity_line
+  }
+  remote { auth = psk
+   $remote_identity_line
+  }
+  children {
+   npu-l2tp {
+    mode = transport
+    local_ts = dynamic[udp/1701]
+    remote_ts = $peer/32[udp/1701]
+    esp_proposals = $esp_proposals
+    hw_offload = packet
+    reqid = 4242
+    start_action = trap
+    dpd_action = restart
+    life_time = 1h
+    rekey_time = 50m
+   }
+  }
+ }
+}
+secrets {
+ ike-npu-l2tp {
+  id-1 = $local_id
+  $secret_remote_line
+  secret = 0x$psk_hex
+ }
+}
+CONF
+	cat > "$guard" <<GUARD
+# managed-by=mtk-npu-tunnel
+chain npu_l2tp_guard_out {
+ type filter hook output priority 10; policy accept;
+ ip daddr $peer udp sport 1701 ipsec out reqid 4242 return
+ ip daddr $peer udp sport 1701 drop
+ ip daddr $peer udp dport 1701 ipsec out reqid 4242 return
+ ip daddr $peer udp dport 1701 drop
+}
+chain npu_l2tp_guard_in {
+ type filter hook input priority 10; policy accept;
+ ip saddr $peer udp dport 1701 ipsec in reqid 4242 return
+ ip saddr $peer udp dport 1701 drop
+}
+GUARD
+	if ! fw4 check >/dev/null 2>&1; then
+		fail 'fw4 校验失败，未提交配置。请核对 kmod-nft-xfrm 和 nftables 版本。'
+	fi
+	uci commit network; uci commit firewall
+	chmod 0600 /etc/config/network
+	pending=0
+	printf '已生成配置；备份：%s\n' "$backup"
+	printf '路由表 201：只匹配所选网段；隧道断开时不可达。\n'
+}
+up() {
+	prepare
+	network_get_device wandev "$wan" || fail '无法解析 WAN 实际设备。'
+	[ -n "$wandev" ] || fail 'WAN 设备为空。'
+	printf '%s\n' "$wandev" > /sys/kernel/debug/mtk_crypto/offload_dev
+	if [ ! -e /etc/npu-tunnel-backup/tnl_gate ]; then
+		gate_before=$(timeout 3 cat /sys/kernel/debug/hnat/tnl_toggle | awk -F '[=,]' '$1 == "value" {print $2}')
+		case "$gate_before" in 0|1) ;; *) fail '无法读取隧道卸载开关，请使用配套完整固件。' ;; esac
+		printf '%s\n' "$gate_before" > /etc/npu-tunnel-backup/tnl_gate
+	fi
+	printf '1\n' > /sys/kernel/debug/hnat/tnl_toggle
+	# Preserve the explicit choice when TurboACC later reapplies its settings.
+	if uci -q get turboacc.config >/dev/null 2>&1; then
+		[ -z "$(uci -q changes turboacc)" ] || fail 'TurboACC 有未提交改动，请先保存后重试。'
+		if [ ! -e /etc/npu-tunnel-backup/turboacc_tnl ]; then
+			previous=$(uci -q get turboacc.config.fastpath_mh_eth_hnat_tnl || :)
+			case "$previous" in ''|0|1|on|off|true|false|yes|no) ;; *) fail 'TurboACC 隧道开关值无效。' ;; esac
+			printf '%s\n' "${previous:-unset}" > /etc/npu-tunnel-backup/turboacc_tnl
+		fi
+		uci set turboacc.config.fastpath_mh_eth_hnat_tnl=1
+		uci commit turboacc
+	fi
+	ubus call network reload >/dev/null
+	/etc/init.d/firewall reload
+	/etc/init.d/swanctl reload
+	if ! timeout 30 swanctl --initiate --child npu-l2tp >/dev/null 2>&1; then
+		ifdown npu_l2tp 2>/dev/null || :
+		fail 'IPsec 未建立或硬件 packet offload 被拒绝；L2TP 保持关闭。检查 logread -e charon；不要降级为明文 L2TP。'
+	fi
+	mkdir -p /tmp/l2tp
+	chmod 0700 /tmp/l2tp
+	ifup npu_l2tp
+	printf 'IPsec 已建立，已启动 L2TP；请通过 status 和真实负载验收硬件路径。\n'
+}
+down() {
+	[ "$(uci -q get network.npu_l2tp.npu_tunnel_owner)" = 1 ] || return 0
+	ifdown npu_l2tp 2>/dev/null || :
+	for attempt in 1 2 3 4 5; do
+		[ -d /sys/class/net/l2tp-npu_l2tp ] || break
+		sleep 1
+	done
+	[ ! -d /sys/class/net/l2tp-npu_l2tp ] || fail 'L2TP 接口尚未关闭，保留 IPsec 和明文保护规则。'
+	timeout 10 swanctl --terminate --ike npu-l2tp >/dev/null 2>&1 || :
+	printf '已停止本隧道。策略与不可达兜底保留，所选流量不会转回 WAN。\n'
+}
+status() {
+	printf '=== L2TP interface ===\n'
+	ubus call network.interface.npu_l2tp status 2>/dev/null || :
+	printf '=== IPsec SAs (no keys) ===\n'
+	timeout 5 swanctl --list-sas --ike npu-l2tp 2>/dev/null || :
+	printf '=== HNAT tunnel gate ===\n'
+	timeout 3 cat /sys/kernel/debug/hnat/tnl_toggle 2>/dev/null || :
+	printf '=== Selected policy table ===\n'
+	ip -4 rule show; ip -4 route show table 201
+	printf '=== NPU tunnel metadata ===\n'
+	timeout 3 cat /proc/npu/tunnels 2>/dev/null || :
+	printf '=== EIP197 context observations (host visits, not full hardware bytes) ===\n'
+	timeout 3 cat /sys/kernel/debug/mtk_crypto/xfrm_params 2>/dev/null || :
+}
+profile_unifi() {
+	address=${1:-}
+	valid_ip "$address" || fail '用法：mtk-npu-tunnel profile-unifi <UCG 公网 IPv4>'
+	[ -z "$(uci -q changes npu_tunnel)" ] || fail 'npu_tunnel 有未提交改动，请先保存。'
+	chmod 0600 /etc/config/npu_tunnel
+	set_uci npu_tunnel.main.peer "$address"
+	set_uci npu_tunnel.main.ike_version 1
+	set_uci npu_tunnel.main.local_id ''
+	set_uci npu_tunnel.main.remote_id %any
+	set_uci npu_tunnel.main.ike_proposals 'aes256-sha256-modp2048,aes128-sha256-modp2048,aes256-sha1-modp2048,aes128-sha1-modp2048'
+	set_uci npu_tunnel.main.esp_proposals 'aes256-sha256,aes128-sha256,aes256-sha1,aes128-sha1'
+	uci commit npu_tunnel
+	printf '已保存 UniFi L2TP/IKEv1 兼容参数；PSK、PPP 登录与目标网段请在本机填写。未启动连接。\n'
+}
+remove() {
+	[ -z "$(uci -q changes network)$(uci -q changes firewall)$(uci -q changes turboacc)" ] || fail 'network/firewall/TurboACC 有未提交改动。'
+	sections='network.npu_l2tp network.npu_peer network.npu_default network.npu_closed firewall.npu_l2tp firewall.npu_forward firewall.npu_ike firewall.npu_esp firewall.npu_control'
+	for i in $(seq 1 32); do sections="$sections network.npu_target_$i"; done
+	for section in $sections; do owned "$section"; done
+	down
+	conf=/etc/swanctl/conf.d/npu-l2tp.conf
+	guard=/etc/nftables.d/90-npu-l2tp-guard.nft
+	work=$(mktemp -d /tmp/npu-l2tp-remove.XXXXXX)
+	cp -p /etc/config/network /etc/config/firewall "$work/"
+	[ ! -e "$conf" ] || cp -p "$conf" "$work/conf"
+	[ ! -e "$guard" ] || cp -p "$guard" "$work/guard"
+	pending=1
+	for section in $sections; do uci -q delete "$section" || :; done
+	uci commit network; uci commit firewall
+	pending=0
+	for path in /etc/swanctl/conf.d/npu-l2tp.conf /etc/nftables.d/90-npu-l2tp-guard.nft; do
+		if [ -r "$path" ] && head -n 1 "$path" | grep -qxF '# managed-by=mtk-npu-tunnel'; then rm -f "$path"; fi
+	done
+	restore_gate=1
+	if [ -r /etc/npu-tunnel-backup/turboacc_tnl ] &&
+	   [ "$(uci -q get turboacc.config.fastpath_mh_eth_hnat_tnl)" = 1 ]; then
+		read -r previous < /etc/npu-tunnel-backup/turboacc_tnl
+		case "$previous" in
+		 unset) uci -q delete turboacc.config.fastpath_mh_eth_hnat_tnl || : ;;
+		 0|1|on|off|true|false|yes|no) uci set "turboacc.config.fastpath_mh_eth_hnat_tnl=$previous" ;;
+		esac
+		uci commit turboacc
+	elif [ -r /etc/npu-tunnel-backup/turboacc_tnl ]; then
+		restore_gate=0
+	fi
+	if [ "$restore_gate" = 1 ] && [ -r /etc/npu-tunnel-backup/tnl_gate ] &&
+	   [ -w /sys/kernel/debug/hnat/tnl_toggle ]; then
+		gate_now=$(timeout 3 cat /sys/kernel/debug/hnat/tnl_toggle | awk -F '[=,]' '$1 == "value" {print $2}')
+		read -r gate_before < /etc/npu-tunnel-backup/tnl_gate
+		case "$gate_now:$gate_before" in 1:0|1:1) printf '%s\n' "$gate_before" > /sys/kernel/debug/hnat/tnl_toggle ;; esac
+	fi
+	rm -f /etc/npu-tunnel-backup/tnl_gate
+	rm -f /etc/npu-tunnel-backup/turboacc_tnl
+	uci set npu_tunnel.main.enabled=0; uci commit npu_tunnel
+	/etc/init.d/npu-tunnel disable
+	ubus call network reload >/dev/null
+	/etc/init.d/firewall reload
+	/etc/init.d/swanctl reload
+	printf '已移除本工具的配置，原有其他网络配置保留。\n'
+}
+# Serialize prepare/up/remove, restore both config files and generated assets
+# if preparation fails, and keep only one persistent initial backup.
+lock=/tmp/mtk-npu-tunnel.lock
+work=
+pending=0
+cleanup() {
+	rc=$?
+	set +e
+	trap - EXIT
+	if [ "$pending" = 1 ] && [ -n "$work" ]; then
+		uci -q revert network || :; uci -q revert firewall || :
+		cp -p "$work/network" "$work/firewall" /etc/config/
+		if [ -e "$work/conf" ]; then cp -p "$work/conf" "$conf"; else rm -f "$conf"; fi
+		if [ -e "$work/guard" ]; then cp -p "$work/guard" "$guard"; else rm -f "$guard"; fi
+	fi
+	[ -z "$work" ] || rm -rf "$work"
+	[ "${locked:-0}" != 1 ] || rmdir "$lock" 2>/dev/null || :
+	exit "$rc"
+}
+case "${1:-status}" in prepare|up|down|remove|profile-unifi)
+	mkdir "$lock" || fail '已有部署操作正在执行。'
+	locked=1; trap cleanup EXIT; trap 'exit 130' INT; trap 'exit 143' TERM HUP ;;
+esac
+case "${1:-status}" in
+ prepare) prepare ;; up) up ;; down) down ;; remove) remove ;; status) status ;;
+ profile-unifi) profile_unifi "${2:-}" ;;
+ *) fail '用法：mtk-npu-tunnel prepare|up|down|remove|status；或 profile-unifi <IPv4>' ;;
+esac

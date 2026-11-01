@@ -434,7 +434,6 @@ CONFIG_MTK_WIFI7_FW_LOG_TYPE="string_log"
 # CONFIG_EN_HWIFI_NPU_SUPPORT is not set
 # CONFIG_PACKAGE_kmod-en_npu is not set
 CONFIG_PACKAGE_kmod-pce=y
-CONFIG_PACKAGE_kmod-pce-autoload=y
 CONFIG_PACKAGE_kmod-npu=y
 CONFIG_PACKAGE_kmod-npu-autoload=y
 CONFIG_PACKAGE_kmod-npu-nf_hnat=y
@@ -482,3 +481,22 @@ CONFIG_KERNEL_RELAY=y
 # CONFIG_MTK_NPU_DPDK is not set
 # CONFIG_MTK_NPU_LOGGER is not set
 # CONFIG_MTK_NPU_SECURE_FW is not set
+
+# L2TPv2 over IPsec: native MT7988 NPU + EIP197 inline driver.
+# Connection endpoints and credentials remain runtime settings.
+CONFIG_PACKAGE_kmod-crypto-eip=y
+CONFIG_PACKAGE_kmod-crypto-eip-inline=y
+CONFIG_PACKAGE_kmod-crypto-eip-autoload=y
+CONFIG_PACKAGE_crypto-eip-inline-fw=y
+CONFIG_CRYPTO_OFFLOAD_INLINE=y
+CONFIG_CRYPTO_XFRM_OFFLOAD_MTK_PCE=y
+# CONFIG_CRYPTO_MTK_DDK_LOOKASIDE is not set
+# CONFIG_CRYPTO_OFFLOAD_INLINE_FLOWBLOCK is not set
+# CONFIG_PACKAGE_kmod-crypto-hw-safexcel is not set
+CONFIG_PACKAGE_kmod-pce-autoload=y
+CONFIG_PACKAGE_strongswan-default=y
+CONFIG_PACKAGE_strongswan-mod-kdf=y
+CONFIG_PACKAGE_strongswan-swanctl=y
+CONFIG_PACKAGE_xl2tpd=y
+CONFIG_PACKAGE_ppp-mod-pppol2tp=y
+CONFIG_PACKAGE_kmod-nft-xfrm=y
