@@ -58,17 +58,6 @@ echo "Installed MAP-disabled ACL build fix: $_mt_wifi7_acl_target"
 
 _mtk_source_root="$PWD"
 
-# Install the disabled runtime profile and controller. Endpoints, PPP login,
-# PSK and target networks are supplied on the router after flashing.
-_npu_profile="$GITHUB_WORKSPACE/immortalwrt/MTK/npu-l2tp-ipsec/files"
-[ -x "$_npu_profile/usr/sbin/mtk-npu-tunnel" ] || {
-    echo "Missing L2TP/IPsec runtime profile: $_npu_profile" >&2
-    exit 1
-}
-mkdir -p "$_mtk_source_root/files"
-cp -a "$_npu_profile/." "$_mtk_source_root/files/"
-chmod 0600 "$_mtk_source_root/files/etc/config/npu_tunnel"
-
 merge_package(){
     local repo_url="$1" package_path="$2" branch="${3:-}" repo
     repo="${repo_url##*/}"
@@ -174,17 +163,6 @@ merge_package https://github.com/linkease/ddnsto-openwrt-package ddnsto-openwrt-
 popd
 
 sh "$GITHUB_WORKSPACE/scripts/fix-mihomo-source.sh" || exit 1
-
-# Native 25.12 EIP197 packet offload. Keep existing IPsec user configuration;
-# only extend the UCI generator's accepted values for the SDK inline driver.
-_swanctl_init="feeds/packages/net/strongswan/files/swanctl.init"
-patch_makefile_dep "$_swanctl_init" \
-    'yes|no|auto|"")' \
-    'yes|no|auto|crypto|packet|"")'
-if ! grep -qF 'yes|no|auto|crypto|packet|"")' "$_swanctl_init"; then
-    echo 'strongSwan UCI generator lacks native crypto/packet offload values' >&2
-    exit 1
-fi
 
 # Keep the feed's versioned Go compilers, bootstrap and matching helpers.
 # Replacing this tree with the old single-version recipe removes
