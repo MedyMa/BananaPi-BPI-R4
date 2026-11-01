@@ -52,8 +52,8 @@ if [ -f "$_autocore_makefile" ] && [ -f package/emortal/autocore/files/tempinfo 
     for _temp_dep in wireless-tools coreutils-timeout; do
         if ! grep -qF "+TARGET_mediatek:$_temp_dep" "$_autocore_makefile"; then
             patch_makefile_dep "$_autocore_makefile" \
-                '+TARGET_mediatek:mhz' \
-                "+TARGET_mediatek:mhz \\
+                '+TARGET_bcm53xx:nvram' \
+                "+TARGET_bcm53xx:nvram \\
     +TARGET_mediatek:$_temp_dep" || exit 1
         fi
         grep -qF "+TARGET_mediatek:$_temp_dep" "$_autocore_makefile" || {
