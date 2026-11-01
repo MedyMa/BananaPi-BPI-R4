@@ -220,7 +220,8 @@ patch_makefile_dep \
     package/emortal/autocore/Makefile \
     '+(TARGET_mediatek||TARGET_mvebu):mhz' \
     '+(TARGET_mediatek||TARGET_mvebu):mhz \
-    +TARGET_mediatek:wireless-tools'
+    +TARGET_mediatek:wireless-tools \
+    +TARGET_mediatek:coreutils-timeout'
 
 # MT7988 DTS, SFP recovery and pstore integration are owned by the source tree.
 # Do not mutate kernel inputs or copy SFP scripts from this build repository.

@@ -15,16 +15,34 @@ get_standard_wifi_temp() {
 		awk '{printf("%.1f°C ", $0 / 1000)}' "$IEEE_PATH"/wl*/hwmon*/temp1_input 2>"/dev/null" | awk '$1=$1'
 		;;
 	*)
-		awk '{printf("%.1f°C ", $0 / 1000)}' "$IEEE_PATH"/phy*/hwmon*/temp1_input 2>"/dev/null" | awk '$1=$1'
+		local _temps
+		_temps="$(awk '{printf("%.1f°C ", $0 / 1000)}' "$IEEE_PATH"/phy*/hwmon*/temp1_input 2>/dev/null | awk '$1=$1')"
+		if [ -n "$_temps" ]; then
+			printf '%s' "$_temps"
+		else
+			awk '{printf("%.1f°C ", $0 / 1000)}' "$IEEE_PATH"/phy*/device/hwmon/hwmon*/temp1_input 2>/dev/null | awk '$1=$1'
+		fi
 		;;
 	esac
 }
 
 get_mt_wifi7_iface_list() {
 	local _iw_ifaces=""
+	local _iface _flags _found=""
+
+	# Query primary interfaces only, in the same band order as the overview.
+	# Do not wake or reconfigure an inactive radio to obtain its temperature.
+	for _iface in ra0 rai0 rax0 rae0; do
+		[ -r "$NET_PATH/$_iface/flags" ] || continue
+		read -r _flags < "$NET_PATH/$_iface/flags" || continue
+		[ "$((_flags & 1))" -eq 1 ] || continue
+		printf '%s\n' "$_iface"
+		_found=1
+	done
+	[ -z "$_found" ] || return 0
 
 	if command -v iw >/dev/null 2>&1; then
-		_iw_ifaces="$(iw dev 2>/dev/null | awk '
+		_iw_ifaces="$(timeout -s KILL 1 iw dev 2>/dev/null | awk '
 			$1 ~ /^phy#/ { phy = $1; next }
 			$1 == "Interface" && !seen[phy]++ { print $2 }
 		')"
@@ -35,9 +53,6 @@ get_mt_wifi7_iface_list() {
 		fi
 	fi
 
-	for _iface in ra0 rai0 rax0 rae0; do
-		[ -d "$NET_PATH/$_iface" ] && echo "$_iface"
-	done
 }
 
 get_mt_wifi7_band_label() {
@@ -62,7 +77,7 @@ get_mt_wifi7_band_label() {
 	esac
 
 	if command -v iwinfo >/dev/null 2>&1; then
-		_mt_freq="$(iwinfo "$_mt_iface" info 2>/dev/null | sed -n 's/.*Channel:[[:space:]]*[0-9]\+[[:space:]]*(\([0-9.]\+\)[[:space:]]GHz).*/\1/p' | sed -n '1p')"
+		_mt_freq="$(timeout -s KILL 1 iwinfo "$_mt_iface" info 2>/dev/null | sed -n 's/.*Channel:[[:space:]]*[0-9]\+[[:space:]]*(\([0-9.]\+\)[[:space:]]GHz).*/\1/p' | sed -n '1p')"
 
 		case "$_mt_freq" in
 		2.*)
@@ -92,6 +107,9 @@ get_mt_wifi7_temp() {
 	_mt_wifi_other=""
 
 	for _mt_iface in $(get_mt_wifi7_iface_list); do
+		[ -r "$NET_PATH/$_mt_iface/flags" ] || continue
+		read -r _mt_flags < "$NET_PATH/$_mt_iface/flags" || continue
+		[ "$((_mt_flags & 1))" -eq 1 ] || continue
 		case " $_mt_seen " in
 		*" $_mt_iface "*)
 			continue
@@ -99,15 +117,21 @@ get_mt_wifi7_temp() {
 		esac
 		_mt_seen="$_mt_seen $_mt_iface"
 
-		_mt_output="$(iwpriv "$_mt_iface" stat 2>/dev/null)"
-		_mt_temp="$(printf '%s\n' "$_mt_output" | sed -n 's/.*CurrentTemperature[[:space:]]*=[[:space:]]*\(-\{0,1\}[0-9]\+\).*/\1/p' | sed -n '1p')"
+		_mt_temp=""
+		# CFG80211 builds disable WEXT private ioctls. mwctl returns the
+		# driver's statistics string through its native vendor command.
+		if command -v mwctl >/dev/null 2>&1; then
+			_mt_output="$(timeout -s KILL 1 mwctl "$_mt_iface" stat 2>/dev/null)"
+			_mt_temp="$(printf '%s\n' "$_mt_output" | sed -n 's/.*CurrentTemperature[[:space:]]*=[[:space:]]*\(-\{0,1\}[0-9]\+\).*/\1/p' | sed -n '1p')"
+		fi
 
-		if [ -z "$_mt_temp" ]; then
-			_mt_output="$(iwpriv "$_mt_iface" set get_thermal_sensor=0 2>&1)"
-			_mt_temp="$(printf '%s\n' "$_mt_output" | sed -n 's/.*TMP Value = \(-\{0,1\}[0-9]\+\).*/\1/p' | sed -n '1p')"
+		if [ -z "$_mt_temp" ] && command -v iwpriv >/dev/null 2>&1; then
+			_mt_output="$(timeout -s KILL 1 iwpriv "$_mt_iface" stat 2>/dev/null)"
+			_mt_temp="$(printf '%s\n' "$_mt_output" | sed -n 's/.*CurrentTemperature[[:space:]]*=[[:space:]]*\(-\{0,1\}[0-9]\+\).*/\1/p' | sed -n '1p')"
 		fi
 
 		[ -n "$_mt_temp" ] || continue
+		[ "$_mt_temp" -ge -50 ] && [ "$_mt_temp" -le 200 ] || continue
 		_mt_label="$(get_mt_wifi7_band_label "$_mt_iface")"
 		_mt_entry="${_mt_label}:${_mt_temp}°C"
 
@@ -136,11 +160,18 @@ get_mt_wifi7_temp() {
 	printf '%s' "$_mt_wifi"
 }
 
+if [ "$1" = "--wifi" ]; then
+	get_mt_wifi7_temp
+	exit $?
+fi
+
 wifi_temp="$(get_standard_wifi_temp)"
 
 # MediaTek vendor WiFi 7 does not expose the standard phy*/hwmon temp path.
-if [ -z "$wifi_temp" ] && command -v iwpriv >/dev/null 2>&1; then
-	wifi_temp="$(get_mt_wifi7_temp)"
+if [ -z "$wifi_temp" ] && command -v timeout >/dev/null 2>&1 &&
+   { command -v mwctl >/dev/null 2>&1 || command -v iwpriv >/dev/null 2>&1; }; then
+	# Bound the complete vendor query as well as each individual ioctl.
+	wifi_temp="$(timeout -s KILL 4 "$0" --wifi 2>/dev/null)"
 fi
 
 case "$DISTRIB_TARGET" in

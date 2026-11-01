@@ -43,6 +43,26 @@ apply_workspace_patch() {
     git apply --recount --ignore-space-change --ignore-whitespace "$patch_file"
 }
 
+# 25.12 autocore uses files/tempinfo instead of the 24.10 files/arm layout.
+# Keep the existing overview temperature row and its CPU value.
+_autocore_makefile="package/emortal/autocore/Makefile"
+if [ -f "$_autocore_makefile" ] && [ -f package/emortal/autocore/files/tempinfo ]; then
+    install -m 0755 "$GITHUB_WORKSPACE/scripts/tempinfo" \
+        package/emortal/autocore/files/tempinfo || exit 1
+    for _temp_dep in wireless-tools coreutils-timeout; do
+        if ! grep -qF "+TARGET_mediatek:$_temp_dep" "$_autocore_makefile"; then
+            patch_makefile_dep "$_autocore_makefile" \
+                '+TARGET_mediatek:mhz' \
+                "+TARGET_mediatek:mhz \\
+    +TARGET_mediatek:$_temp_dep" || exit 1
+        fi
+        grep -qF "+TARGET_mediatek:$_temp_dep" "$_autocore_makefile" || {
+            echo "Failed to add autocore temperature dependency: $_temp_dep" >&2
+            exit 1
+        }
+    done
+fi
+
 # Remove feed packages replaced by community clones
 rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/luci/applications/luci-app-argon-config
