@@ -100,6 +100,8 @@ merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnst
 merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnsto-openwrt-package/luci-app-ddnsto
 popd
 
+sh "$GITHUB_WORKSPACE/scripts/fix-mihomo-source.sh" || exit 1
+
 # Keep the feed's versioned Go compilers, bootstrap and matching helpers.
 # Replacing this tree with the old single-version recipe removes
 # golang1.27/host, which cloudflared, tailscale and telegraf require.
