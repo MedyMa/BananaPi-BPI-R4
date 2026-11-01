@@ -49,13 +49,32 @@ _autocore_makefile="package/emortal/autocore/Makefile"
 if [ -f "$_autocore_makefile" ] && [ -f package/emortal/autocore/files/tempinfo ]; then
     install -m 0755 "$GITHUB_WORKSPACE/scripts/tempinfo" \
         package/emortal/autocore/files/tempinfo || exit 1
+    _temp_deps=""
     for _temp_dep in wireless-tools coreutils-timeout; do
         if ! grep -qF "+TARGET_mediatek:$_temp_dep" "$_autocore_makefile"; then
-            patch_makefile_dep "$_autocore_makefile" \
-                '+TARGET_bcm53xx:nvram' \
-                "+TARGET_bcm53xx:nvram \\
-    +TARGET_mediatek:$_temp_dep" || exit 1
+            _temp_deps="${_temp_deps:+$_temp_deps }+TARGET_mediatek:$_temp_dep"
         fi
+    done
+    if [ -n "$_temp_deps" ]; then
+        # Add to this package after its DEPENDS assignment. No dependency on
+        # another platform's lines or on the vendor-only mhz package.
+        if ! awk -v deps="$_temp_deps" '
+            /^define Package\/autocore$/ { in_package = 1 }
+            in_package && /^endef$/ {
+                print "  DEPENDS+=" deps
+                in_package = 0
+                inserted++
+            }
+            { print }
+            END { if (inserted != 1) exit 1 }
+        ' "$_autocore_makefile" > "$_autocore_makefile.tempinfo"; then
+            rm -f "$_autocore_makefile.tempinfo"
+            echo 'Cannot locate the autocore package dependency block' >&2
+            exit 1
+        fi
+        mv -f "$_autocore_makefile.tempinfo" "$_autocore_makefile" || exit 1
+    fi
+    for _temp_dep in wireless-tools coreutils-timeout; do
         grep -qF "+TARGET_mediatek:$_temp_dep" "$_autocore_makefile" || {
             echo "Failed to add autocore temperature dependency: $_temp_dep" >&2
             exit 1

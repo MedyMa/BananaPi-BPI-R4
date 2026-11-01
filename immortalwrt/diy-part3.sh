@@ -87,8 +87,6 @@ if [ ! -f package/openwrt-packages/rpcd-mod-router-status/Makefile ] || \
 fi
 popd
 
-sh "$GITHUB_WORKSPACE/scripts/fix-mihomo-source.sh" || exit 1
-
 rm -rf feeds/packages/lang/golang
 git clone https://github.com/sbwml/packages_lang_golang -b 27.x feeds/packages/lang/golang
 rm -rf feeds/packages/net/mosdns
