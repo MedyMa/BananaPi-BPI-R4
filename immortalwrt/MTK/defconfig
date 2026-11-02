@@ -483,17 +483,9 @@ CONFIG_KERNEL_RELAY=y
 # CONFIG_MTK_NPU_LOGGER is not set
 # CONFIG_MTK_NPU_SECURE_FW is not set
 
-# L2TPv2 over IPsec: native MT7988 NPU + EIP197 inline driver.
+# L2TPv2 over software IPsec.
 # Connection endpoints and credentials remain runtime settings.
 CONFIG_PACKAGE_mtk-npu-tunnel=y
-CONFIG_PACKAGE_kmod-crypto-eip=y
-CONFIG_PACKAGE_kmod-crypto-eip-inline=y
-CONFIG_PACKAGE_kmod-crypto-eip-autoload=y
-CONFIG_PACKAGE_crypto-eip-inline-fw=y
-CONFIG_CRYPTO_OFFLOAD_INLINE=y
-CONFIG_CRYPTO_XFRM_OFFLOAD_MTK_PCE=y
-# CONFIG_CRYPTO_MTK_DDK_LOOKASIDE is not set
-# CONFIG_CRYPTO_OFFLOAD_INLINE_FLOWBLOCK is not set
 # CONFIG_PACKAGE_kmod-crypto-hw-safexcel is not set
 CONFIG_PACKAGE_kmod-pce-autoload=y
 CONFIG_PACKAGE_strongswan-default=y
