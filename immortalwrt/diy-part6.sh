@@ -1,5 +1,35 @@
 #!/bin/bash
 
+set -e
+
+configure_official_25_12() {
+    local selected_device required
+    [ -r .config ] || { echo 'Missing ordinary 25.12 .config' >&2; return 1; }
+    make defconfig
+
+    selected_device="$(sed -n '/^CONFIG_TARGET_.*_DEVICE_.*=y$/p' .config)"
+    if [ "$selected_device" != 'CONFIG_TARGET_mediatek_filogic_DEVICE_bananapi_bpi-r4=y' ]; then
+        echo "Ordinary 25.12 must select only BPI-R4; resolved devices: $selected_device" >&2
+        return 1
+    fi
+    for required in \
+        'CONFIG_TARGET_mediatek_filogic=y' \
+        'CONFIG_TARGET_PROFILE="DEVICE_bananapi_bpi-r4"' \
+        'CONFIG_PACKAGE_kmod-mt7996e=y' \
+        'CONFIG_PACKAGE_kmod-mt7990-firmware=y'; do
+        grep -qxF "$required" .config || {
+            echo "Ordinary 25.12 profile lost a required setting: $required" >&2
+            return 1
+        }
+    done
+}
+
+case "${1:-}" in
+    --configure) configure_official_25_12; exit ;;
+    "") configure_official_25_12 ;;
+    *) echo "Unknown DIY mode: $1" >&2; exit 2 ;;
+esac
+
 # Modify default IP
 sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generate
 
