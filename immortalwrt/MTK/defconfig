@@ -414,7 +414,7 @@ CONFIG_second_card_name="MT7990"
 # CONFIG_MTK_WIFI7_PROFILING_SUPPORT is not set
 CONFIG_PACKAGE_mtwifi-cfg=y
 CONFIG_PACKAGE_luci-app-mtwifi-cfg=y
-CONFIG_PACKAGE_luci-app-easymesh-mtk=y
+# CONFIG_MTK_WIFI7_MAP_SUPPORT is not set
 CONFIG_PACKAGE_wifi-scripts=y
 CONFIG_PACKAGE_wpad-openssl=y
 CONFIG_PACKAGE_hostapd-common=y
