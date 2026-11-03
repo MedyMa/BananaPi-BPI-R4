@@ -113,10 +113,6 @@ rm -rf feeds/luci/applications/luci-app-modemband
 rm -rf feeds/luci/applications/luci-app-adguardhome
 rm -rf package/feeds/luci/luci-app-adguardhome
 rm -rf package/mtk/applications/luci-app-adguardhome
-# AppFlow is excluded; keep the MedyMa/luci-app package imports below.
-rm -rf package/mtk/applications/luci-app-appflow
-rm -rf feeds/luci/applications/{luci-app-appflow,luci-app-appflow-icons}
-rm -rf package/feeds/luci/{luci-app-appflow,luci-app-appflow-icons}
 rm -rf package/mtk/applications/luci-app-turboacc-mtk
 rm -rf feeds/packages/net/adguardhome
 rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2socks,hysteria,ipt2socks,microsocks,naiveproxy,shadowsocks-libev,shadowsocks-rust,shadowsocksr-libev,simple-obfs,tcping,trojan-plus,tuic-client,v2ray-plugin,xray-plugin,geoview,shadow-tls}
@@ -261,8 +257,6 @@ done
 for package in "${mtk_luci_packages[@]}"; do
     rm -rf -- "feeds/luci/applications/$package" "package/feeds/luci/$package"
 done
-rm -rf feeds/luci/applications/{luci-app-appflow,luci-app-appflow-icons}
-rm -rf package/feeds/luci/{luci-app-appflow,luci-app-appflow-icons}
 rm -rf feeds/packages/net/adguardhome package/feeds/packages/adguardhome
 rm -rf feeds/packages/net/prosody feeds/packages/utils/telegraf
 rm -rf package/feeds/packages/prosody package/feeds/packages/telegraf
