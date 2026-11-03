@@ -113,6 +113,10 @@ rm -rf feeds/luci/applications/luci-app-modemband
 rm -rf feeds/luci/applications/luci-app-adguardhome
 rm -rf package/feeds/luci/luci-app-adguardhome
 rm -rf package/mtk/applications/luci-app-adguardhome
+# AppFlow is excluded; keep the MedyMa/luci-app package imports below.
+rm -rf package/mtk/applications/luci-app-appflow
+rm -rf feeds/luci/applications/{luci-app-appflow,luci-app-appflow-icons}
+rm -rf package/feeds/luci/{luci-app-appflow,luci-app-appflow-icons}
 rm -rf package/mtk/applications/luci-app-turboacc-mtk
 rm -rf feeds/packages/net/adguardhome
 rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2socks,hysteria,ipt2socks,microsocks,naiveproxy,shadowsocks-libev,shadowsocks-rust,shadowsocksr-libev,simple-obfs,tcping,trojan-plus,tuic-client,v2ray-plugin,xray-plugin,geoview,shadow-tls}
@@ -142,12 +146,18 @@ merge_package https://github.com/kenzok8/jell jell/adguardhome
 git clone --depth=1 --single-branch --branch main https://github.com/MedyMa/luci-app.git luci-app
 echo "MedyMa LuCI source: $(git -C luci-app rev-parse HEAD)"
 mkdir -p "$_mtk_source_root/package/openwrt-packages"
-for package in luci-app-fan luci-app-sfp-status luci-app-adguardhome \
-    luci-app-modemband luci-app-turboacc-mtk luci-app-traffic rpcd-mod-router-status; do
+mtk_luci_packages=(
+    luci-app-fan luci-app-sfp-status luci-app-adguardhome
+    luci-app-modemband luci-app-turboacc-mtk luci-app-traffic rpcd-mod-router-status
+)
+for package in "${mtk_luci_packages[@]}"; do
     [ -f "luci-app/Luci-app/$package/Makefile" ] || {
         echo "MedyMa package missing: $package" >&2
         exit 1
     }
+    rm -rf -- "$_mtk_source_root/package/mtk/applications/$package"
+    rm -rf -- "$_mtk_source_root/feeds/luci/applications/$package" \
+        "$_mtk_source_root/package/feeds/luci/$package"
     rm -rf -- "$_mtk_source_root/package/community/package/openwrt-packages/$package"
     rm -rf -- "$_mtk_source_root/package/openwrt-packages/$package"
     mv "luci-app/Luci-app/$package" "$_mtk_source_root/package/openwrt-packages/"
@@ -247,8 +257,12 @@ done
 ./scripts/feeds update -a
 ./scripts/feeds install -a
 ./scripts/feeds install c-ares udns
-# Feed installation may restore providers replaced by the community packages.
-rm -rf feeds/luci/applications/luci-app-adguardhome package/feeds/luci/luci-app-adguardhome
+# Feed installation may restore providers replaced by our LuCI packages.
+for package in "${mtk_luci_packages[@]}"; do
+    rm -rf -- "feeds/luci/applications/$package" "package/feeds/luci/$package"
+done
+rm -rf feeds/luci/applications/{luci-app-appflow,luci-app-appflow-icons}
+rm -rf package/feeds/luci/{luci-app-appflow,luci-app-appflow-icons}
 rm -rf feeds/packages/net/adguardhome package/feeds/packages/adguardhome
 rm -rf feeds/packages/net/prosody feeds/packages/utils/telegraf
 rm -rf package/feeds/packages/prosody package/feeds/packages/telegraf
