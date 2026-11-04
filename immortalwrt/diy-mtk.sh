@@ -9,6 +9,10 @@ configure_wifi7() {
         echo 'Vendor WiFi7 source is required for this configuration' >&2
         exit 1
     }
+    [ -f package/mtk/drivers/mt_wifi_osal/Makefile ] || {
+        echo 'Vendor WiFi OSAL source is required for this configuration' >&2
+        exit 1
+    }
     [ -r "$cfg" ] || { echo "Cannot read config: $cfg" >&2; exit 1; }
     # Disable target defaults that conflict with the vendor radio stack.
     # The MTK NPU driver (kmod-npu), its ReBB firmware and the PCE dependency
@@ -16,12 +20,17 @@ configure_wifi7() {
     for package in kmod-mt76-core kmod-mt76-connac kmod-mt7996e \
         kmod-mt7990-firmware kmod-mt7996-firmware kmod-mt7996-233-firmware \
         kmod-mt7996-firmware-common wifi-profile wifi-script luci-app-mtk \
-        kmod-en_npu kmod-mt_wifi_osal kmod-crypto-hw-safexcel \
+        kmod-en_npu kmod-mt_wifi_cmn kmod-crypto-hw-safexcel \
         mtk-hqos luci-app-mtk-hqos mtkhnat_util ethswbox flowtable \
         netsys_dbg_util tops-tool; do
         symbol="CONFIG_PACKAGE_${package}"
         sed -i "/^${symbol}=/d; /^# ${symbol} is not set$/d" "$cfg"
         printf '# %s is not set\n' "$symbol" >> "$cfg"
+    done
+    # WiFi7 and HWIFI share one OSAL provider.
+    for symbol in CONFIG_MTK_WIFI7_OSAL_SUPPORT CONFIG_PACKAGE_kmod-mt_wifi_osal; do
+        sed -i "/^${symbol}=/d; /^# ${symbol} is not set$/d" "$cfg"
+        printf '%s=y\n' "$symbol" >> "$cfg"
     done
     sed -i '/^CONFIG_EN_HWIFI_NPU_SUPPORT=/d; /^# CONFIG_EN_HWIFI_NPU_SUPPORT is not set$/d' "$cfg"
     printf '# CONFIG_EN_HWIFI_NPU_SUPPORT is not set\n' >> "$cfg"
