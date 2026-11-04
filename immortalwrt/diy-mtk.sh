@@ -216,7 +216,11 @@ for recipe in package/mtk/drivers/mt_wifi7/Makefile package/mtk/drivers/mt_hwifi
 done
 # Feed deps needed by community clones (pcre2 is in main tree since 25.12)
 ./scripts/feeds update -a
-python3 ./scripts/prepare-luci-local-apk.py
+_luci_apk_patch="$GITHUB_WORKSPACE/patches/filogic/25.12/1004-luci-package-manager-apk-upload-untrusted-master.patch"
+if ! git apply --reverse --check "$_luci_apk_patch" >/dev/null 2>&1; then
+    git apply --check "$_luci_apk_patch"
+    git apply "$_luci_apk_patch"
+fi
 # Select the concrete default backend: the virtual 'weechat' dependency
 # produces a self-referential Kconfig condition with the split variants.
 if grep -q '^define Package/weechat-minimal$' feeds/packages/net/weechat/Makefile 2>/dev/null && \
