@@ -15,8 +15,8 @@ configure_wifi7() {
     # are controlled by the defconfig and must not be forced off here.
     for package in kmod-mt76-core kmod-mt76-connac kmod-mt7996e \
         kmod-mt7990-firmware kmod-mt7996-firmware kmod-mt7996-233-firmware \
-        kmod-mt7996-firmware-common kmod-mt_wifi_cmn wifi-profile wifi-script luci-app-mtk \
-        kmod-en_npu kmod-crypto-hw-safexcel \
+        kmod-mt7996-firmware-common wifi-profile wifi-script luci-app-mtk \
+        kmod-en_npu kmod-mt_wifi_osal kmod-crypto-hw-safexcel \
         mtk-hqos luci-app-mtk-hqos mtkhnat_util ethswbox flowtable \
         netsys_dbg_util tops-tool; do
         symbol="CONFIG_PACKAGE_${package}"
@@ -35,26 +35,6 @@ case "${1:-}" in
     "") ;;
     *) echo "Unknown DIY mode: $1" >&2; exit 2 ;;
 esac
-
-# MAPCfg and MAP_ROLE_* are absent when MAP support is disabled. Keep this
-# MAP-only ACL restriction behind the same feature guard as those declarations.
-_mt_wifi7_patch_dir="package/mtk/drivers/mt_wifi7/patches"
-_mt_wifi7_acl_patch="$GITHUB_WORKSPACE/patches/filogic/25.12/1018-mt-wifi7-guard-map-acl.patch"
-_mt_wifi7_acl_target="$_mt_wifi7_patch_dir/0049-mt_wifi7-guard-map-acl-when-disabled.patch"
-[ -d "$_mt_wifi7_patch_dir" ] || {
-    echo "Vendor WiFi7 patch directory missing: $_mt_wifi7_patch_dir" >&2
-    exit 1
-}
-[ -f "$_mt_wifi7_acl_patch" ] || {
-    echo "MAP ACL compatibility patch missing: $_mt_wifi7_acl_patch" >&2
-    exit 1
-}
-if [ -e "$_mt_wifi7_acl_target" ] && ! cmp -s "$_mt_wifi7_acl_patch" "$_mt_wifi7_acl_target"; then
-    echo "Vendor WiFi7 patch slot already occupied: $_mt_wifi7_acl_target" >&2
-    exit 1
-fi
-install -m 0644 "$_mt_wifi7_acl_patch" "$_mt_wifi7_acl_target"
-echo "Installed MAP-disabled ACL build fix: $_mt_wifi7_acl_target"
 
 _mtk_source_root="$PWD"
 
