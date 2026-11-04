@@ -78,8 +78,6 @@ rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/luci/applications/luci-app-argon-config
 rm -rf feeds/luci/applications/luci-app-passwall
 rm -rf feeds/luci/applications/luci-app-modemband
-rm -rf feeds/luci/applications/luci-app-package-manager
-rm -rf package/feeds/luci/luci-app-package-manager
 rm -rf feeds/luci/applications/luci-app-adguardhome
 rm -rf package/feeds/luci/luci-app-adguardhome
 rm -rf package/mtk/applications/luci-app-adguardhome
@@ -213,19 +211,25 @@ fi
 
 # The selected source already includes vendor driver compatibility patches.
 # Keep its wifi-profile and mtwifi-cfg together; do not replace them from 6.6.
-for recipe in package/mtk/drivers/mt_wifi7/Makefile package/mtk/drivers/mt_hwifi/Makefile \
-    package/emortal/luci-app-package-manager/Makefile; do
+for recipe in package/mtk/drivers/mt_wifi7/Makefile package/mtk/drivers/mt_hwifi/Makefile; do
     [ -f "$recipe" ] || { echo "Required source recipe missing: $recipe" >&2; exit 1; }
 done
 # Feed deps needed by community clones (pcre2 is in main tree since 25.12)
 ./scripts/feeds update -a
+# Select the concrete default backend: the virtual 'weechat' dependency
+# produces a self-referential Kconfig condition with the split variants.
+if grep -q '^define Package/weechat-minimal$' feeds/packages/net/weechat/Makefile 2>/dev/null && \
+    grep -qF ' +weechat ' feeds/luci/applications/luci-app-weechat/Makefile 2>/dev/null; then
+    patch_makefile_dep feeds/luci/applications/luci-app-weechat/Makefile \
+        ' +weechat ' ' +weechat-minimal '
+    ./scripts/feeds update -i luci
+fi
 ./scripts/feeds install -a
 ./scripts/feeds install c-ares udns
 # Feed installation may restore providers replaced by our LuCI packages.
 for package in "${mtk_luci_packages[@]}"; do
     rm -rf -- "feeds/luci/applications/$package" "package/feeds/luci/$package"
 done
-rm -rf feeds/luci/applications/luci-app-package-manager package/feeds/luci/luci-app-package-manager
 rm -rf feeds/packages/net/adguardhome package/feeds/packages/adguardhome
 rm -rf feeds/packages/net/prosody feeds/packages/utils/telegraf
 rm -rf package/feeds/packages/prosody package/feeds/packages/telegraf
