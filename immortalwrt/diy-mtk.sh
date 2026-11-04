@@ -73,23 +73,13 @@ patch_makefile_dep() {
     }
 }
 
-apply_workspace_patch() {
-    local patch_file="$1"
-
-    [ -f "$patch_file" ] || return 0
-
-    if git apply --recount --ignore-space-change --ignore-whitespace --reverse --check "$patch_file" >/dev/null 2>&1; then
-        return 0
-    fi
-
-    git apply --recount --ignore-space-change --ignore-whitespace "$patch_file"
-}
-
 # Remove feed packages replaced by community clones
 rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/luci/applications/luci-app-argon-config
 rm -rf feeds/luci/applications/luci-app-passwall
 rm -rf feeds/luci/applications/luci-app-modemband
+rm -rf feeds/luci/applications/luci-app-package-manager
+rm -rf package/feeds/luci/luci-app-package-manager
 rm -rf feeds/luci/applications/luci-app-adguardhome
 rm -rf package/feeds/luci/luci-app-adguardhome
 rm -rf package/mtk/applications/luci-app-adguardhome
@@ -216,9 +206,6 @@ fi
 # Drop onionshare-cli (unresolved metadata, not in our config)
 rm -rf feeds/packages/net/onionshare-cli
 
-[ -f feeds/luci/applications/luci-app-package-manager/root/usr/libexec/package-manager-call ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1004-luci-package-manager-apk-upload-untrusted-master.patch"
-
 # vpnc: add -p to mkdir for idempotency
 if grep -q 'mkdir $(PKG_BUILD_DIR)/bin' feeds/packages/net/vpnc/Makefile 2>/dev/null; then
     sed -i '/mkdir $(PKG_BUILD_DIR)\/bin/s/mkdir /mkdir -p /' feeds/packages/net/vpnc/Makefile
@@ -226,8 +213,9 @@ fi
 
 # The selected source already includes vendor driver compatibility patches.
 # Keep its wifi-profile and mtwifi-cfg together; do not replace them from 6.6.
-for recipe in package/mtk/drivers/mt_wifi7/Makefile package/mtk/drivers/mt_hwifi/Makefile; do
-    [ -f "$recipe" ] || { echo "Required vendor driver recipe missing: $recipe" >&2; exit 1; }
+for recipe in package/mtk/drivers/mt_wifi7/Makefile package/mtk/drivers/mt_hwifi/Makefile \
+    package/emortal/luci-app-package-manager/Makefile; do
+    [ -f "$recipe" ] || { echo "Required source recipe missing: $recipe" >&2; exit 1; }
 done
 # Feed deps needed by community clones (pcre2 is in main tree since 25.12)
 ./scripts/feeds update -a
@@ -237,6 +225,7 @@ done
 for package in "${mtk_luci_packages[@]}"; do
     rm -rf -- "feeds/luci/applications/$package" "package/feeds/luci/$package"
 done
+rm -rf feeds/luci/applications/luci-app-package-manager package/feeds/luci/luci-app-package-manager
 rm -rf feeds/packages/net/adguardhome package/feeds/packages/adguardhome
 rm -rf feeds/packages/net/prosody feeds/packages/utils/telegraf
 rm -rf package/feeds/packages/prosody package/feeds/packages/telegraf
@@ -248,21 +237,6 @@ for f in \
     package/utils/alpine-repositories/files/repositories; do
     [ -f "$f" ] && grep -q 'kiddin9' "$f" 2>/dev/null && sed -i '/kiddin9/d' "$f" 2>/dev/null || true
 done
-
-# APK runtime fixes: allow local unsigned APK uploads and disable broken feed entries
-rm -f package/base-files/files/etc/uci-defaults/99-apk-untrusted
-[ -d package/base-files/files/etc/uci-defaults ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1005-base-files-apk-manager-fixes-master.patch"
-
-# fibocom-dial: GCC 14 promotes implicit-function-declaration and return-mismatch to errors
-[ -f package/mtk/applications/5g-modem/fibocom-dial/src/main.c ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1015-fibocom-dial-gcc14-fixes.patch"
-
-[ -f package/mtk/applications/5g-modem/quectel_cm_5G/src/device.c ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1016-quectel-cm-5g-dname-buffer.patch"
-
-[ -f package/mtk/applications/5g-modem/quectel_MHI/src/core/mhi_init.c ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1017-quectel-mhi-kernel-api-compat.patch"
 
 # Verify libmbedtls presence (required by shadowsocks-libev)
 if [ ! -f package/libs/mbedtls/Makefile ]; then
