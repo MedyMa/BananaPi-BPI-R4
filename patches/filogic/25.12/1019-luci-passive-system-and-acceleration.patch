@@ -1,0 +1,192 @@
+Subject: [PATCH] luci: use passive overview telemetry and cached MTK engine status
+
+--- a/feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js
++++ b/feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js
+@@ -35,15 +35,76 @@
+ 	method: 'getCPUInfo'
+ });
+ 
+-var callCPUUsage = rpc.declare({
+-	object: 'luci',
+-	method: 'getCPUUsage'
++var callSystemMetrics = rpc.declare({
++	object: 'router.status',
++	method: 'getSystemMetrics'
+ });
+ 
+-var callTempInfo = rpc.declare({
+-	object: 'luci',
+-	method: 'getTempInfo'
++var callAccelerationStatus = rpc.declare({
++	object: 'router.status',
++	method: 'getAccelerationStatus'
+ });
++
++// /proc/stat already aggregates all CPUs. Guest ticks are excluded by the RPC
++// because Linux includes them in user/nice. First, stale or reset samples are
++// unavailable; they must never turn into a fabricated zero or a usage spike.
++function sampleCPU(metrics, previous, now) {
++	var cpu = metrics.cpu || {}, total = cpu.total, idle = cpu.idle;
++	if (!/^\d+$/.test(String(total)) || !/^\d+$/.test(String(idle)))
++		return { sample: null, value: null };
++	total = Number(total);
++	idle = Number(idle);
++	if (!Number.isSafeInteger(total) || !Number.isSafeInteger(idle) || idle > total)
++		return { sample: null, value: null };
++	var current = { total: total, idle: idle, time: now }, value = null;
++	if (previous && now > previous.time && now - previous.time <= 30000) {
++		var elapsed = total - previous.total, waiting = idle - previous.idle;
++		if (elapsed > 0 && waiting >= 0 && waiting <= elapsed)
++			value = '%.1f%%'.format(100 * (elapsed - waiting) / elapsed);
++	}
++	return { sample: current, value: value };
++}
++
++function formatTemperatures(metrics) {
++	var readings = Array.isArray(metrics.temperatures) ? metrics.temperatures : [];
++	return readings.filter(function(t) {
++		return ['cpu', 'wifi', 'disk'].indexOf(t.kind) >= 0 &&
++			t.celsius != null && isFinite(Number(t.celsius));
++	}).map(function(t) {
++		var name = t.kind == 'cpu' ? 'CPU' : t.kind == 'wifi' ? 'WiFi' : _('Disk');
++		if (t.kind != 'cpu')
++			name += ' (' + t.name + ')';
++		return name + ': %.1f°C'.format(Number(t.celsius));
++	}).join(', ');
++}
++
++function formatAcceleration(status, uptime) {
++	if (status.schema !== 1 || status.available !== true ||
++		!Number.isInteger(status.sampled_uptime) || !Number.isFinite(uptime) ||
++		status.sampled_uptime > uptime || uptime - status.sampled_uptime > 20)
++		return _('No recent sample');
++	var ppe = status.ppe || {}, wed = status.wed || {}, npu = status.npu || {};
++	var counts = [ppe.ipv4, ppe.ipv6, ppe.other, ppe.bound, ppe.capacity];
++	var summary = 'PPE: ' + _('Unavailable');
++	if (ppe.available === true && ppe.unit === 'bound_table_entries' &&
++		counts.every(function(n) { return Number.isInteger(n) && n >= 0; }) &&
++		ppe.ipv4 + ppe.ipv6 + ppe.other === ppe.bound && ppe.bound <= ppe.capacity) {
++		summary = 'PPE IPv4: %d · IPv6: %d · '.format(ppe.ipv4, ppe.ipv6) +
++			_('Tunnel / other') + ': %d'.format(ppe.other);
++	}
++	function moduleState(value) {
++		return value === true ? _('Loaded') : value === false ? _('Not loaded') : _('Unknown');
++	}
++	var usage = npu.available === true && npu.core_count === 5 &&
++		Number.isInteger(npu.percent_milli) && npu.percent_milli >= 0 && npu.percent_milli <= 100000
++		? '%.1f%%'.format(npu.percent_milli / 1000) : _('Unavailable');
++	return E('div', { 'title': _('PPE counts are bound table entries, including separate directions. They do not measure throughput. Module presence does not prove wireless offload.') }, [
++		E('div', {}, [summary]),
++		E('div', {}, [ _('WED/WARP module') + ': ' + moduleState(wed.module_loaded) +
++			' · ' + _('NPU module') + ': ' + moduleState(npu.module_loaded) +
++			' · ' + _('NPU utilization') + ': ' + usage ])
++	]);
++}
+ 
+ return baseclass.extend({
+ 	title: _('System'),
+@@ -54,8 +115,8 @@
+ 			L.resolveDefault(callSystemInfo(), {}),
+ 			L.resolveDefault(callCPUBench(), {}),
+ 			L.resolveDefault(callCPUInfo(), {}),
+-			L.resolveDefault(callCPUUsage(), {}),
+-			L.resolveDefault(callTempInfo(), {}),
++			L.resolveDefault(callSystemMetrics(), {}),
++			L.resolveDefault(callAccelerationStatus(), {}),
+ 			L.resolveDefault(callLuciVersion(), { revision: _('unknown version'), branch: 'LuCI' }),
+ 			L.resolveDefault(callGetUnixtime(), 0),
+ 			uci.load('system')
+@@ -67,10 +128,14 @@
+ 		    systeminfo  = data[1],
+ 		    cpubench    = data[2],
+ 		    cpuinfo     = data[3],
+-		    cpuusage    = data[4],
+-		    tempinfo    = data[5],
++		    metrics     = data[4],
++		    acceleration = data[5],
+ 		    luciversion = data[6],
+ 		    unixtime    = data[7];
++
++		var cpu = sampleCPU(metrics, this.cpuSample, performance.now()),
++		    temperature = formatTemperatures(metrics);
++		this.cpuSample = cpu.sample;
+ 
+ 		luciversion = luciversion.branch + ' ' + luciversion.revision;
+ 
+@@ -92,7 +157,7 @@
+ 
+ 		var fields = [
+ 			_('Hostname'),         boardinfo.hostname,
+-			_('Model'),            boardinfo.model + cpubench.cpubench,
++			_('Model'),            (boardinfo.model || '?') + (cpubench.cpubench || ''),
+ 			_('Architecture'),     cpuinfo.cpuinfo || boardinfo.system,
+ 			_('Target Platform'),  (L.isObject(boardinfo.release) ? boardinfo.release.target : ''),
+ 			_('Firmware Version'), (L.isObject(boardinfo.release) ? boardinfo.release.description + ' / ' : '') + (luciversion || ''),
+@@ -104,12 +169,13 @@
+ 				systeminfo.load[1] / 65535.0,
+ 				systeminfo.load[2] / 65535.0
+ 			) : null,
+-			_('CPU usage (%)'),    cpuusage.cpuusage
++			_('CPU usage (%)'),    cpu.value || (cpu.sample ? _('Sampling') : _('Unavailable')),
++			_('Hardware acceleration engines'), formatAcceleration(acceleration, systeminfo.uptime)
+ 		];
+ 
+-		if (tempinfo.tempinfo) {
++		if (temperature) {
+ 			fields.splice(6, 0, _('Temperature'));
+-			fields.splice(7, 0, tempinfo.tempinfo);
++			fields.splice(7, 0, temperature);
+ 		}
+ 
+ 		var table = E('table', { 'class': 'table' });
+--- a/feeds/luci/modules/luci-mod-status/root/usr/share/rpcd/acl.d/luci-mod-status-index.json
++++ b/feeds/luci/modules/luci-mod-status/root/usr/share/rpcd/acl.d/luci-mod-status-index.json
+@@ -11,7 +11,8 @@
+ 			"ubus": {
+ 				"luci": [ "getVersion", "getUnixtime", "getOdhcp6cStats", "getBuiltinEthernetPorts" ],
+ 				"file": [ "list", "read" ],
+-				"system": [ "board", "info" ]
++				"system": [ "board", "info" ],
++				"router.status": [ "getSystemMetrics", "getAccelerationStatus" ]
+ 			}
+ 		},
+ 		"write": {
+--- a/feeds/luci/modules/luci-base/po/zh_Hans/base.po
++++ b/feeds/luci/modules/luci-base/po/zh_Hans/base.po
+@@ -14840,3 +14840,36 @@
+ 
+ msgid "Temperature"
+ msgstr "温度"
++
++msgid "Hardware acceleration engines"
++msgstr "硬件加速引擎"
++
++msgid "Tunnel / other"
++msgstr "隧道／其他"
++
++msgid "WED/WARP module"
++msgstr "WED/WARP 模块"
++
++msgid "NPU module"
++msgstr "NPU 模块"
++
++msgid "NPU utilization"
++msgstr "NPU 使用率"
++
++msgid "No recent sample"
++msgstr "暂无有效采样"
++
++msgid "Sampling"
++msgstr "采样中"
++
++msgid "Loaded"
++msgstr "已加载"
++
++msgid "Not loaded"
++msgstr "未加载"
++
++msgid "Unavailable"
++msgstr "不可用"
++
++msgid "PPE counts are bound table entries, including separate directions. They do not measure throughput. Module presence does not prove wireless offload."
++msgstr "PPE 数值为已绑定表项数，不同方向分别计数，不代表吞吐量。模块已加载不能证明无线流量已卸载。"
