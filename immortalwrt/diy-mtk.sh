@@ -19,7 +19,7 @@ configure_wifi7() {
     # are controlled by the defconfig and must not be forced off here.
     for package in kmod-mt76-core kmod-mt76-connac kmod-mt7996e \
         kmod-mt7990-firmware kmod-mt7996-firmware kmod-mt7996-233-firmware \
-        kmod-mt7996-firmware-common wifi-profile wifi-script luci-app-mtk \
+        kmod-mt7996-firmware-common wifi-profile wifi-script \
         kmod-en_npu kmod-mt_wifi_cmn kmod-crypto-hw-safexcel \
         mtk-hqos luci-app-mtk-hqos mtkhnat_util ethswbox flowtable \
         netsys_dbg_util tops-tool; do

@@ -501,7 +501,7 @@ CONFIG_PACKAGE_hostapd-utils=y
 CONFIG_PACKAGE_wpa-cli=y
 # CONFIG_PACKAGE_wifi-profile is not set
 # CONFIG_PACKAGE_wifi-script is not set
-# CONFIG_PACKAGE_luci-app-mtk is not set
+CONFIG_PACKAGE_luci-app-mtk=y
 
 # MT7988 TOPS: load the matching firmware/PCE/HNAT tunnel stack, mirroring the
 # BPI-R4 MT7988 profile (immortalwrt/MT7988/defconfig). The TOPS0/TOPS1 power
