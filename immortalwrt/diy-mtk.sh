@@ -225,10 +225,7 @@ if ! git apply --reverse --check "$_luci_apk_patch" >/dev/null 2>&1; then
     git apply --check "$_luci_apk_patch"
     git apply "$_luci_apk_patch"
 fi
-# Append the requested acceleration row; retain the native CPU and temperature
-# fields. The read-only RPC is supplied by rpcd-mod-router-status above.
-_luci_overview_patch="$GITHUB_WORKSPACE/patches/filogic/25.12/1019-luci-system-acceleration-row.patch"
-bash "$GITHUB_WORKSPACE/scripts/apply-r4-overview.sh" "$_luci_overview_patch"
+# The source-owned LuCI feed hook applies the acceleration row during update.
 # Select the concrete default backend: the virtual 'weechat' dependency
 # produces a self-referential Kconfig condition with the split variants.
 if grep -q '^define Package/weechat-minimal$' feeds/packages/net/weechat/Makefile 2>/dev/null && \

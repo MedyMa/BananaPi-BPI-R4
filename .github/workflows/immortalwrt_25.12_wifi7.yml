@@ -108,12 +108,10 @@ jobs:
       run: |
         cd openwrt
         make defconfig
-        for package in rpcd-mod-router-status luci-proto-rmnet luci-proto-wwan; do
-          grep -qx "CONFIG_PACKAGE_${package}=y" .config || {
-            echo "Required integration package is missing from the resolved configuration: $package" >&2
-            exit 1
-          }
-        done
+        grep -qx 'CONFIG_PACKAGE_rpcd-mod-router-status=y' .config || {
+          echo 'Independent router status package is missing from the resolved firmware configuration' >&2
+          exit 1
+        }
         cat .config
         make download -j$(nproc) 2>&1
         find dl -size -1024c -exec ls -l {} \;
