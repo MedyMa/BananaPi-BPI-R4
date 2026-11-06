@@ -1,0 +1,115 @@
+Subject: [PATCH] luci: add cached acceleration information to the system overview
+
+Keep the original CPU, frequency, temperature and all other overview fields.
+Only append the requested hardware-acceleration row and its read-only ACL.
+
+--- a/feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js
++++ b/feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js
+@@ -45,6 +45,39 @@
+ 	method: 'getTempInfo'
+ });
+ 
++var callAccelerationStatus = rpc.declare({
++	object: 'router.status',
++	method: 'getAccelerationStatus'
++});
++
++function formatAcceleration(status, uptime) {
++	if (status.schema !== 1 || status.available !== true ||
++		!Number.isInteger(status.sampled_uptime) || !Number.isFinite(uptime) ||
++		status.sampled_uptime > uptime || uptime - status.sampled_uptime > 20)
++		return _('No recent sample');
++	var ppe = status.ppe || {}, wed = status.wed || {}, npu = status.npu || {};
++	var counts = [ppe.ipv4, ppe.ipv6, ppe.other, ppe.bound, ppe.capacity];
++	var summary = 'PPE: ' + _('Unavailable');
++	if (ppe.available === true && ppe.unit === 'bound_table_entries' &&
++		counts.every(function(n) { return Number.isInteger(n) && n >= 0; }) &&
++		ppe.ipv4 + ppe.ipv6 + ppe.other === ppe.bound && ppe.bound <= ppe.capacity) {
++		summary = 'PPE IPv4: %d · IPv6: %d · '.format(ppe.ipv4, ppe.ipv6) +
++			_('Tunnel / other') + ': %d'.format(ppe.other);
++	}
++	function moduleState(value) {
++		return value === true ? _('Loaded') : value === false ? _('Not loaded') : _('Unknown');
++	}
++	var usage = npu.available === true && npu.core_count === 5 &&
++		Number.isInteger(npu.percent_milli) && npu.percent_milli >= 0 && npu.percent_milli <= 100000
++		? '%.1f%%'.format(npu.percent_milli / 1000) : _('Unavailable');
++	return E('div', { 'title': _('PPE counts are bound table entries, including separate directions. They do not measure throughput. Module presence does not prove wireless offload.') }, [
++		E('div', {}, [summary]),
++		E('div', {}, [ _('WED/WARP module') + ': ' + moduleState(wed.module_loaded) +
++			' · ' + _('NPU module') + ': ' + moduleState(npu.module_loaded) +
++			' · ' + _('NPU utilization') + ': ' + usage ])
++	]);
++}
++
+ return baseclass.extend({
+ 	title: _('System'),
+ 
+@@ -58,7 +91,8 @@
+ 			L.resolveDefault(callTempInfo(), {}),
+ 			L.resolveDefault(callLuciVersion(), { revision: _('unknown version'), branch: 'LuCI' }),
+ 			L.resolveDefault(callGetUnixtime(), 0),
+-			uci.load('system')
++			uci.load('system'),
++			L.resolveDefault(callAccelerationStatus(), {})
+ 		]);
+ 	},
+ 
+@@ -104,7 +138,8 @@
+ 				systeminfo.load[1] / 65535.0,
+ 				systeminfo.load[2] / 65535.0
+ 			) : null,
+-			_('CPU usage (%)'),    cpuusage.cpuusage
++			_('CPU usage (%)'),    cpuusage.cpuusage,
++			_('Hardware acceleration engines'), formatAcceleration(data[9], systeminfo.uptime)
+ 		];
+ 
+ 		if (tempinfo.tempinfo) {
+--- a/feeds/luci/modules/luci-mod-status/root/usr/share/rpcd/acl.d/luci-mod-status-index.json
++++ b/feeds/luci/modules/luci-mod-status/root/usr/share/rpcd/acl.d/luci-mod-status-index.json
+@@ -11,7 +11,8 @@
+ 			"ubus": {
+ 				"luci": [ "getVersion", "getUnixtime", "getOdhcp6cStats", "getBuiltinEthernetPorts" ],
+ 				"file": [ "list", "read" ],
+-				"system": [ "board", "info" ]
++				"system": [ "board", "info" ],
++				"router.status": [ "getAccelerationStatus" ]
+ 			}
+ 		},
+ 		"write": {
+--- a/feeds/luci/modules/luci-base/po/zh_Hans/base.po
++++ b/feeds/luci/modules/luci-base/po/zh_Hans/base.po
+@@ -14840,3 +14840,33 @@
+ 
+ msgid "Temperature"
+ msgstr "温度"
++
++msgid "Hardware acceleration engines"
++msgstr "硬件加速引擎"
++
++msgid "Tunnel / other"
++msgstr "隧道／其他"
++
++msgid "WED/WARP module"
++msgstr "WED/WARP 模块"
++
++msgid "NPU module"
++msgstr "NPU 模块"
++
++msgid "NPU utilization"
++msgstr "NPU 五核平均使用率"
++
++msgid "No recent sample"
++msgstr "暂无有效采样"
++
++msgid "Loaded"
++msgstr "已加载"
++
++msgid "Not loaded"
++msgstr "未加载"
++
++msgid "Unavailable"
++msgstr "不可用"
++
++msgid "PPE counts are bound table entries, including separate directions. They do not measure throughput. Module presence does not prove wireless offload."
++msgstr "PPE 数值为已绑定表项数，不同方向分别计数，不代表吞吐量。模块已加载不能证明无线流量已卸载。"
