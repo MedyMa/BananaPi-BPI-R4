@@ -8,8 +8,8 @@ function merge_package(){
     pkg=`echo $2 | rev | cut -d'/' -f 1 | rev`
     # find package/ -follow -name $pkg -not -path "package/openwrt-packages/*" | xargs -rt rm -rf
     git clone --depth=1 --single-branch $1
-    [ -d package/openwrt-packages ] || mkdir -p package/openwrt-packages
-    mv $2 package/openwrt-packages/
+    mkdir -p "${3:-package/openwrt-packages}"
+    mv "$2" "${3:-package/openwrt-packages}/"
     rm -rf $repo
 }
 
@@ -52,6 +52,7 @@ rm -rf feeds/luci/applications/luci-app-argon-config
 rm -rf feeds/luci/applications/luci-app-passwall
 rm -rf feeds/luci/applications/luci-app-modemband
 rm -rf feeds/packages/net/adguardhome
+rm -rf feeds/packages/net/samba4
 rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2socks,hysteria,ipt2socks,microsocks,naiveproxy,shadowsocks-libev,shadowsocks-rust,shadowsocksr-libev,simple-obfs,tcping,trojan-plus,tuic-client,v2ray-plugin,xray-plugin,geoview,shadow-tls}
 
 # Clone community packages
@@ -69,6 +70,7 @@ git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
 # git clone --depth=1 https://github.com/Siriling/5G-Modem-Support
 # merge_package https://github.com/DHDAXCW/dhdaxcw-app dhdaxcw-app/luci-app-adguardhome
 merge_package https://github.com/kenzok8/jell jell/adguardhome
+merge_package "-b master https://github.com/immortalwrt/packages" packages/net/samba4 ../../feeds/packages/net
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-fan
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-sfp-status
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-adguardhome
