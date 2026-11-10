@@ -299,7 +299,7 @@ jobs:
         touch release.txt
         echo "📥 BPI-R4 BE14 WiFi7 固件" >> release.txt
         echo "Target line: ${{ env.OPENWRT_LINE }}" >> release.txt
-        echo "Wireless: mt_wifi7 / HWIFI; BE14000-20260311" >> release.txt
+        echo "Wireless: mt_wifi7 / HWIFI; BE14000-20260721" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
         
     - name: Publish to release
