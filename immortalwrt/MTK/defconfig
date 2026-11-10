@@ -559,15 +559,28 @@ CONFIG_KERNEL_RELAY=y
 # CONFIG_MTK_NPU_LOGGER is not set
 # CONFIG_MTK_NPU_SECURE_FW is not set
 
-# L2TPv2 over software IPsec.
-# Connection endpoints and credentials remain runtime settings.
-CONFIG_PACKAGE_mtk-npu-tunnel=y
-# CONFIG_PACKAGE_kmod-crypto-hw-safexcel is not set
-CONFIG_PACKAGE_kmod-pce-autoload=y
+# IPsec VPN: IKEv1/IKEv2 and L2TPv2.
+CONFIG_PACKAGE_strongswan=y
 CONFIG_PACKAGE_strongswan-default=y
-CONFIG_PACKAGE_strongswan-mod-kdf=y
 CONFIG_PACKAGE_strongswan-swanctl=y
+CONFIG_PACKAGE_strongswan-mod-kdf=y
+CONFIG_PACKAGE_strongswan-mod-eap-identity=y
+CONFIG_PACKAGE_strongswan-mod-eap-mschapv2=y
+CONFIG_PACKAGE_kmod-crypto-gcm=y
+CONFIG_PACKAGE_kmod-crypto-ccm=y
+CONFIG_PACKAGE_kmod-nft-xfrm=y
 CONFIG_PACKAGE_xl2tpd=y
 CONFIG_PACKAGE_ppp-mod-pppol2tp=y
-CONFIG_PACKAGE_kmod-nft-xfrm=y
+
+# EIP-197 inline driver and firmware; load the driver manually.
+CONFIG_PACKAGE_kmod-crypto-eip=y
+CONFIG_PACKAGE_kmod-crypto-eip-inline=y
+CONFIG_PACKAGE_crypto-eip-inline-fw=y
+CONFIG_CRYPTO_OFFLOAD_INLINE=y
+CONFIG_CRYPTO_XFRM_OFFLOAD_MTK_PCE=y
+# CONFIG_PACKAGE_kmod-crypto-eip-autoload is not set
+# CONFIG_PACKAGE_kmod-crypto-hw-safexcel is not set
+
+CONFIG_PACKAGE_mtk-npu-tunnel=y
+CONFIG_PACKAGE_kmod-pce-autoload=y
 CONFIG_MTK_NPU_24_10_TUNNEL_BACKEND=y
