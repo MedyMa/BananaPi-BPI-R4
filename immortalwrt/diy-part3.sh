@@ -88,6 +88,11 @@ if [ ! -f package/openwrt-packages/rpcd-mod-router-status/Makefile ] || \
 fi
 popd
 
+xray_cronet_patch="$GITHUB_WORKSPACE/patches/filogic/packages/1000-xray-core-cronet-cgo-archive.patch"
+if ! git -C package/community/helloworld apply --reverse --check "$xray_cronet_patch" >/dev/null 2>&1; then
+    git -C package/community/helloworld apply "$xray_cronet_patch" || exit 1
+fi
+
 rm -rf feeds/packages/lang/golang
 git clone https://github.com/sbwml/packages_lang_golang -b 27.x feeds/packages/lang/golang
 rm -rf feeds/packages/net/mosdns

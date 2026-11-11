@@ -114,6 +114,11 @@ merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnst
 merge_package "-b main https://github.com/linkease/ddnsto-openwrt-package" ddnsto-openwrt-package/luci-app-ddnsto
 popd
 
+xray_cronet_patch="$GITHUB_WORKSPACE/patches/filogic/packages/1000-xray-core-cronet-cgo-archive.patch"
+if ! git -C package/community/helloworld apply --reverse --check "$xray_cronet_patch" >/dev/null 2>&1; then
+    git -C package/community/helloworld apply "$xray_cronet_patch" || exit 1
+fi
+
 sh "$GITHUB_WORKSPACE/scripts/fix-mihomo-source.sh" || exit 1
 
 # Keep the feed's versioned Go compilers, bootstrap and matching helpers.

@@ -1,0 +1,20 @@
+From: MedyMa <75345465+MedyMa@users.noreply.github.com>
+Subject: [PATCH] xray-core: allow Cronet's exact static archive linker flag
+
+Go rejects Cronet's -l:libcronet.a directive during cgo flag validation.
+Allow only this exact archive argument in the Xray package environment
+when its Naive outbound is enabled.
+
+Signed-off-by: MedyMa <75345465+MedyMa@users.noreply.github.com>
+---
+--- a/xray-core/Makefile
++++ b/xray-core/Makefile
+@@ -37,6 +37,8 @@
+ 
+ ifeq ($(CONFIG_XRAY_CORE_NAIVE),y)
+   GO_PKG_TAGS+=with_naive_outbound
++  # Cronet names its static archive with GNU ld's -l:filename syntax.
++  GO_PKG_VARS+=CGO_LDFLAGS_ALLOW='-l:libcronet[.]a'
+   ifeq ($(CONFIG_USE_MUSL),y)
+     GO_PKG_TAGS+=with_musl
+   endif
