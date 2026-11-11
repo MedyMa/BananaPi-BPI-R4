@@ -29,7 +29,8 @@ jobs:
     - name: Maximize build space
       uses: easimon/maximize-build-space@v10
       with:
-        root-reserve-mb: 512
+        # Cache archives use RUNNER_TEMP on /, outside the enlarged build volume.
+        root-reserve-mb: 8192
         swap-size-mb: 1024
         remove-dotnet: 'true'
         remove-android: 'true'
@@ -69,13 +70,20 @@ jobs:
       id: cache-key
       run: |
         echo "ccache_period=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+        df -h "$RUNNER_TEMP" "$GITHUB_WORKSPACE"
+        df -i "$RUNNER_TEMP" "$GITHUB_WORKSPACE"
 
     - name: Restore toolchain cache
+      id: toolchain-cache
       uses: klever1988/cachewrtbuild@54ed4fe2f7d8b5cfbc0b928c159266ee892c2d3d
       with:
         ccache: 'false'
         prefix: ${{ github.workspace }}/openwrt
         mixkey: ${{ env.OPENWRT_NAME }}-${{ env.OPENWRT_DEVICE }}-${{ env.REPO_BRANCH }}
+
+    - name: Confirm toolchain cache restored
+      if: steps.toolchain-cache.outputs.hit == '1'
+      run: echo 'Toolchain cache successfully downloaded and extracted.'
 
     - name: Restore ccache
       id: ccache-restore
