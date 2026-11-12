@@ -50,6 +50,7 @@ rm -rf feeds/luci/applications/luci-app-argon-config
 rm -rf feeds/luci/applications/luci-app-passwall
 rm -rf feeds/luci/applications/luci-app-modemband
 rm -rf package/mtk/applications/luci-app-turboacc-mtk
+rm -rf package/mtk/applications/luci-app-hqos-mtk
 rm -rf feeds/packages/net/adguardhome
 rm -rf feeds/packages/net/samba4
 rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2socks,hysteria,ipt2socks,microsocks,naiveproxy,shadowsocks-libev,shadowsocks-rust,shadowsocksr-libev,simple-obfs,tcping,trojan-plus,tuic-client,v2ray-plugin,xray-plugin,geoview,shadow-tls}
@@ -80,6 +81,7 @@ merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-mode
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-sfp-status
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-turboacc-mtk
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-traffic
+merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-hqos-mtk
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/rpcd-mod-router-status
 if [ ! -f package/openwrt-packages/rpcd-mod-router-status/Makefile ] || \
    [ ! -f package/openwrt-packages/rpcd-mod-router-status/root/etc/init.d/router-status ]; then

@@ -116,7 +116,7 @@ echo "MedyMa LuCI source: $(git -C luci-app rev-parse HEAD)"
 mkdir -p "$_mtk_source_root/package/openwrt-packages"
 mtk_luci_packages=(
     luci-app-fan luci-app-sfp-status luci-app-adguardhome
-    luci-app-modemband luci-app-turboacc-mtk luci-app-traffic rpcd-mod-router-status
+    luci-app-modemband luci-app-turboacc-mtk luci-app-traffic luci-app-hqos-mtk rpcd-mod-router-status
 )
 for package in "${mtk_luci_packages[@]}"; do
     [ -f "luci-app/Luci-app/$package/Makefile" ] || {
