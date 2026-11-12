@@ -225,11 +225,14 @@ for recipe in package/mtk/drivers/mt_wifi7/Makefile package/mtk/drivers/mt_hwifi
 done
 # Feed deps needed by community clones (pcre2 is in main tree since 25.12)
 ./scripts/feeds update -a
-_luci_apk_patch="$GITHUB_WORKSPACE/patches/filogic/25.12/1004-luci-package-manager-apk-upload-untrusted-master.patch"
-if ! git apply --reverse --check "$_luci_apk_patch" >/dev/null 2>&1; then
-    git apply --check "$_luci_apk_patch"
-    git apply "$_luci_apk_patch"
-fi
+for _luci_feed_patch in \
+    "$GITHUB_WORKSPACE/patches/filogic/25.12/1004-luci-package-manager-apk-upload-untrusted-master.patch" \
+    "$GITHUB_WORKSPACE/patches/filogic/25.12/1005-luci-dockerman-docker-menu.patch"; do
+    if ! git apply --reverse --check "$_luci_feed_patch" >/dev/null 2>&1; then
+        git apply --check "$_luci_feed_patch"
+        git apply "$_luci_feed_patch"
+    fi
+done
 # The source-owned LuCI feed hook applies the acceleration row during update.
 # Select the concrete default backend: the virtual 'weechat' dependency
 # produces a self-referential Kconfig condition with the split variants.

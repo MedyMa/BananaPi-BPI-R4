@@ -280,8 +280,11 @@ patch_makefile_dep \
     'CONFIG_BOOTDELAY=30' \
     'CONFIG_BOOTDELAY=10'
 
-# LuCI patches for 25.12 (regenerated 2026-07-03); guarded with || true so a
-# moved feed base fails silently instead of aborting the build.
+# LuCI patches for 25.12. Docker navigation is required; the older optional
+# wireless overlays below retain their compatibility guards.
+
+# Keep Dockerman's menu and streaming endpoints under the Docker category.
+apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1005-luci-dockerman-docker-menu.patch" || exit 1
 
 # RPCD: add getWifiStationHints ubus method + helper functions
 [ -f feeds/luci/modules/luci-base/root/usr/share/rpcd/ucode/luci ] && \
