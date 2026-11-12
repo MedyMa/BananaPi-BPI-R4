@@ -228,7 +228,8 @@ done
 for _luci_feed_patch in \
     "$GITHUB_WORKSPACE/patches/filogic/25.12/1004-luci-package-manager-apk-upload-untrusted-master.patch" \
     "$GITHUB_WORKSPACE/patches/filogic/25.12/1005-luci-dockerman-docker-menu.patch" \
-    "$GITHUB_WORKSPACE/patches/filogic/25.12/1006-luci-argon-docker-menu-layout.patch"; do
+    "$GITHUB_WORKSPACE/patches/filogic/25.12/1006-luci-argon-docker-menu-layout.patch" \
+    "$GITHUB_WORKSPACE/patches/filogic/25.12/1007-luci-dhcpv4-hide-empty-identifiers.patch"; do
     if ! git apply --reverse --check "$_luci_feed_patch" >/dev/null 2>&1; then
         git apply --check "$_luci_feed_patch"
         git apply "$_luci_feed_patch"

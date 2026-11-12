@@ -1,0 +1,40 @@
+From: MedyMa <75345465+MedyMa@users.noreply.github.com>
+Subject: [PATCH] luci: hide empty DHCPv4 identity columns
+
+Only show DUID and IAID when at least one IPv4 lease supplies that field.
+Keep header and row columns aligned, preserve IAID zero and leave IPv6
+identity data and static lease actions unchanged.
+
+--- a/feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/40_dhcp.js
++++ b/feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/40_dhcp.js
+@@ -86,6 +86,8 @@
+ 		const leases6 = Array.isArray(dhcp_leases.dhcp6_leases) ? dhcp_leases.dhcp6_leases : [];
+ 		if (leases.length == 0 && leases6.length == 0)
+ 			return E('em', _('No active leases found'));
++		const showDUID = leases.some(lease => !!lease.duid);
++		const showIAID = leases.some(lease => lease.iaid === 0 || !!lease.iaid);
+ 		const machints = host_hints.getMACHints(false);
+ 		const isReadonlyView = !L.hasViewPermission();
+ 
+@@ -110,8 +112,8 @@
+ 				E('th', { 'class': 'th' }, _('Hostname')),
+ 				E('th', { 'class': 'th' }, _('IPv4 address')),
+ 				E('th', { 'class': 'th' }, _('MAC address')),
+-				E('th', { 'class': 'th' }, _('DUID')),
+-				E('th', { 'class': 'th' }, _('IAID')),
++				showDUID ? E('th', { 'class': 'th' }, _('DUID')) : E([]),
++				showIAID ? E('th', { 'class': 'th' }, _('IAID')) : E([]),
+ 				E('th', { 'class': 'th' }, _('Remaining time')),
+ 				isReadonlyView ? E([]) : E('th', { 'class': 'th cbi-section-actions' }, _('Static Lease'))
+ 			])
+@@ -143,8 +145,8 @@
+ 				'%h'.format(host || '-'),
+ 				lease.ipaddr,
+ 				'%h'.format(vendor ? lease.macaddr + ` (${vendor})` : lease.macaddr),
+-				lease.duid || '-',
+-				lease.iaid || '-',
++				...(showDUID ? [lease.duid || '-'] : []),
++				...(showIAID ? [lease.iaid === 0 ? '0' : lease.iaid || '-'] : []),
+ 				exp,
+ 			];
+ 

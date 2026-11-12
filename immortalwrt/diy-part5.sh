@@ -280,12 +280,15 @@ patch_makefile_dep \
     'CONFIG_BOOTDELAY=30' \
     'CONFIG_BOOTDELAY=10'
 
-# LuCI patches for 25.12. Docker navigation is required; the older optional
-# wireless overlays below retain their compatibility guards.
+# Required LuCI menu and status patches for 25.12. The optional wireless
+# overlays below retain their compatibility guards.
 
 # Keep Dockerman's menu and streaming endpoints under the Docker category.
 apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1005-luci-dockerman-docker-menu.patch" || exit 1
 apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1006-luci-argon-docker-menu-layout.patch" || exit 1
+
+# Keep empty DHCPv4 identifiers out of the overview.
+apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1007-luci-dhcpv4-hide-empty-identifiers.patch" || exit 1
 
 # RPCD: add getWifiStationHints ubus method + helper functions
 [ -f feeds/luci/modules/luci-base/root/usr/share/rpcd/ucode/luci ] && \
