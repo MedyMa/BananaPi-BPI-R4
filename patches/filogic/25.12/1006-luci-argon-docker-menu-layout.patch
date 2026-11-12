@@ -1,0 +1,53 @@
+From: MedyMa <75345465+MedyMa@users.noreply.github.com>
+Subject: [PATCH] argon: retain Dockerman action layout under the Docker menu
+
+Match both LuCI route layouts in the LESS source and the shipped stylesheet.
+Preserve the desktop action width and responsive button wrapping after
+Dockerman moves from services/dockerman to the Docker top-level category.
+
+--- a/package/community/luci-theme-argon/less/pages/dockerman.less
++++ b/package/community/luci-theme-argon/less/pages/dockerman.less
+@@ -23,5 +23,6 @@
+ // The JS app returns a plain td for its action group, without LuCI's usual
+ // cbi-section-actions class. Reserve space for several icons before wrapping.
++[data-page="admin-docker-containers"],
+ [data-page="admin-services-dockerman-containers"] {
+     .td:last-child:has(> div > .cbi-button + .cbi-button) {
+         width: 16rem;
+--- a/package/community/luci-theme-argon/htdocs/luci-static/argon/css/cascade.css
++++ b/package/community/luci-theme-argon/htdocs/luci-static/argon/css/cascade.css
+@@ -7400,12 +7400,14 @@
+ [data-page="admin-services-dockerman-overview"] .cbi-section-table .th:first-child {
+   width: 30% !important;
+ }
++[data-page="admin-docker-containers"] .td:last-child:has(> div > .cbi-button + .cbi-button),
+ [data-page="admin-services-dockerman-containers"] .td:last-child:has(> div > .cbi-button + .cbi-button) {
+   width: 16rem;
+   min-width: 16rem;
+   white-space: normal;
+   text-align: end;
+ }
++[data-page="admin-docker-containers"] .td:last-child:has(> div > .cbi-button + .cbi-button) > div,
+ [data-page="admin-services-dockerman-containers"] .td:last-child:has(> div > .cbi-button + .cbi-button) > div {
+   display: flex;
+   flex-wrap: wrap;
+@@ -7415,16 +7417,19 @@
+   margin-inline-start: auto;
+   gap: var(--control-gap);
+ }
++[data-page="admin-docker-containers"] .td:last-child:has(> div > .cbi-button + .cbi-button) > div > *,
+ [data-page="admin-services-dockerman-containers"] .td:last-child:has(> div > .cbi-button + .cbi-button) > div > * {
+   flex: 0 0 auto;
+ }
+ @media screen and (max-width: 1152px) {
++  [data-page="admin-docker-containers"] .td:last-child:has(> div > .cbi-button + .cbi-button),
+   [data-page="admin-services-dockerman-containers"] .td:last-child:has(> div > .cbi-button + .cbi-button) {
+     flex: 1 1 100%;
+     width: 100%;
+     min-width: 0;
+     max-width: 100%;
+   }
++  [data-page="admin-docker-containers"] .td:last-child:has(> div > .cbi-button + .cbi-button) > div,
+   [data-page="admin-services-dockerman-containers"] .td:last-child:has(> div > .cbi-button + .cbi-button) > div {
+     max-width: 100%;
+   }
