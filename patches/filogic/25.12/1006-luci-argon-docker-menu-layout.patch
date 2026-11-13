@@ -5,6 +5,7 @@ Match both LuCI route layouts in the LESS source and the shipped stylesheet.
 Preserve the desktop action width and responsive button wrapping after
 Dockerman moves from services/dockerman to the Docker top-level category.
 
+diff --git a/package/community/luci-theme-argon/less/pages/dockerman.less b/package/community/luci-theme-argon/less/pages/dockerman.less
 --- a/package/community/luci-theme-argon/less/pages/dockerman.less
 +++ b/package/community/luci-theme-argon/less/pages/dockerman.less
 @@ -23,5 +23,6 @@
@@ -14,6 +15,7 @@ Dockerman moves from services/dockerman to the Docker top-level category.
  [data-page="admin-services-dockerman-containers"] {
      .td:last-child:has(> div > .cbi-button + .cbi-button) {
          width: 16rem;
+diff --git a/package/community/luci-theme-argon/htdocs/luci-static/argon/css/cascade.css b/package/community/luci-theme-argon/htdocs/luci-static/argon/css/cascade.css
 --- a/package/community/luci-theme-argon/htdocs/luci-static/argon/css/cascade.css
 +++ b/package/community/luci-theme-argon/htdocs/luci-static/argon/css/cascade.css
 @@ -7400,12 +7400,14 @@

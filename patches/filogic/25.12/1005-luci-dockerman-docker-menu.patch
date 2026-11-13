@@ -5,6 +5,7 @@ Move the full menu tree and the common endpoint base together, retaining
 all ACL, executable, authentication and POST constraints. Argon resolves
 the docker node to its native Docker menu icon.
 
+diff --git a/feeds/luci/applications/luci-app-dockerman/htdocs/luci-static/resources/dockerman/common.js b/feeds/luci/applications/luci-app-dockerman/htdocs/luci-static/resources/dockerman/common.js
 --- a/feeds/luci/applications/luci-app-dockerman/htdocs/luci-static/resources/dockerman/common.js
 +++ b/feeds/luci/applications/luci-app-dockerman/htdocs/luci-static/resources/dockerman/common.js
 @@ -437,7 +437,7 @@
@@ -16,6 +17,7 @@ the docker node to its native Docker menu icon.
  	},
  
  	parseHeaders(headers, array) {
+diff --git a/feeds/luci/applications/luci-app-dockerman/root/usr/share/luci/menu.d/luci-app-dockerman.json b/feeds/luci/applications/luci-app-dockerman/root/usr/share/luci/menu.d/luci-app-dockerman.json
 --- a/feeds/luci/applications/luci-app-dockerman/root/usr/share/luci/menu.d/luci-app-dockerman.json
 +++ b/feeds/luci/applications/luci-app-dockerman/root/usr/share/luci/menu.d/luci-app-dockerman.json
 @@ -1,6 +1,6 @@
