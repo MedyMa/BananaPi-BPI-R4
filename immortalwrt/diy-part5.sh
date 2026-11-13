@@ -283,7 +283,7 @@ patch_makefile_dep \
 # Required LuCI menu and status patches for 25.12. The optional wireless
 # overlays below retain their compatibility guards.
 
-# Keep Docker in Services with the feed's matching endpoint paths.
+# Keep Dockerman's menu and streaming endpoints under the Docker category.
 apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1005-luci-dockerman-docker-menu.patch" || exit 1
 apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1006-luci-argon-docker-menu-layout.patch" || exit 1
 
