@@ -32,15 +32,70 @@ configure_wifi7() {
         sed -i "/^${symbol}=/d; /^# ${symbol} is not set$/d" "$cfg"
         printf '%s=y\n' "$symbol" >> "$cfg"
     done
+    if grep -qx 'CONFIG_PACKAGE_mtwifi-scripts=y' "$cfg"; then
+        [ -f package/mtk/applications/mtwifi-scripts/Makefile ] || {
+            echo 'The selected source does not provide mtwifi-scripts' >&2
+            exit 1
+        }
+        # The legacy LuCI page depends on mtwifi-cfg and replaces wireless.js.
+        # Remove both owners so Kconfig cannot pull the old startup stack back in.
+        for package in mtwifi-cfg wifi-scripts luci-app-mtwifi-cfg \
+            luci-i18n-mtwifi-cfg-zh-cn; do
+            symbol="CONFIG_PACKAGE_${package}"
+            sed -i "/^${symbol}=/d; /^# ${symbol} is not set$/d" "$cfg"
+            printf '# %s is not set\n' "$symbol" >> "$cfg"
+        done
+    fi
     sed -i '/^CONFIG_EN_HWIFI_NPU_SUPPORT=/d; /^# CONFIG_EN_HWIFI_NPU_SUPPORT is not set$/d' "$cfg"
     printf '# CONFIG_EN_HWIFI_NPU_SUPPORT is not set\n' >> "$cfg"
     # Let this source's kernel configuration and package dependencies select HNAT.
     sed -i '/^CONFIG_KERNEL_NET_MEDIATEK_HNAT=/d; /^CONFIG_KERNEL_MEDIATEK_NETSYS_/d; /^# CONFIG_KERNEL_MEDIATEK_NETSYS_.* is not set$/d' "$cfg"
 }
 
+verify_ucode_wifi7() {
+    local cfg="${1:-.config}" symbol
+    [ -r "$cfg" ] || { echo "Cannot read config: $cfg" >&2; return 1; }
+    for symbol in CONFIG_PACKAGE_mtwifi-scripts CONFIG_WIFI_SCRIPTS_UCODE \
+        CONFIG_PACKAGE_kmod-mt_wifi7 CONFIG_PACKAGE_kmod-mt_hwifi \
+        CONFIG_PACKAGE_kmod-mt_wifi_osal CONFIG_PACKAGE_kmod-cfg80211 \
+        CONFIG_MTK_WIFI7_OSAL_SUPPORT CONFIG_MTK_WIFI7_CFG80211_SUPPORT \
+        CONFIG_MTK_WIFI7_IWCOMMAND_CFG80211_SUPPORT \
+        CONFIG_MTK_WIFI7_CFG80211_FULL_OPS_SUPPORT \
+        CONFIG_MTK_WIFI7_HOSTAPD_MBSS_SUPPORT CONFIG_MTK_WIFI7_APCLI_SUPPLICANT_SUPPORT \
+        CONFIG_MTK_WIFI_OSAL_CFG80211_SUPPORT CONFIG_MTK_HWIFI_FW_BE14000_20260721 \
+        CONFIG_PACKAGE_wifi-dats CONFIG_PACKAGE_mwctl CONFIG_PACKAGE_iw \
+        CONFIG_PACKAGE_wpad-openssl CONFIG_PACKAGE_hostapd-utils CONFIG_PACKAGE_wpa-cli \
+        CONFIG_PACKAGE_rpcd-mod-iwinfo CONFIG_PACKAGE_luci-mod-network; do
+        grep -qx "${symbol}=y" "$cfg" || {
+            echo "Resolved ucode firmware configuration is missing ${symbol}=y" >&2
+            return 1
+        }
+    done
+    for symbol in CONFIG_PACKAGE_mtwifi-cfg CONFIG_PACKAGE_wifi-scripts \
+        CONFIG_PACKAGE_luci-app-mtwifi-cfg CONFIG_PACKAGE_luci-i18n-mtwifi-cfg-zh-cn \
+        CONFIG_PACKAGE_wifi-profile CONFIG_PACKAGE_wifi-script \
+        CONFIG_PACKAGE_kmod-mt7996e CONFIG_PACKAGE_kmod-en_npu; do
+        if grep -Eq "^${symbol}=[ym]$" "$cfg"; then
+            echo "Conflicting wireless owner selected: ${symbol}" >&2
+            return 1
+        fi
+    done
+    echo '[DIY] verified: vendor OSAL/cfg80211, shared wpad and ucode management'
+}
+
 
 case "${1:-}" in
-    --configure) configure_wifi7 "${2:-.config}"; exit ;;
+    --configure)
+        configure_wifi7 "${2:-.config}"
+        # The existing firmware workflow passes .config. Resolve and verify here
+        # so enabling this build does not require changing its YAML or defaults
+        # in the source repository. Custom files keep the configure-only API.
+        if [ "${2:-.config}" = '.config' ] && grep -qx 'CONFIG_PACKAGE_mtwifi-scripts=y' .config; then
+            make defconfig
+            verify_ucode_wifi7 .config
+        fi
+        exit ;;
+    --verify-ucode) verify_ucode_wifi7 "${2:-.config}"; exit ;;
     "") ;;
     *) echo "Unknown DIY mode: $1" >&2; exit 2 ;;
 esac
