@@ -30,7 +30,6 @@ case "${1:-}" in
     *) echo "Unknown DIY mode: $1" >&2; exit 2 ;;
 esac
 
-# Modify default IP
 sed -i 's/192.168.1.1/192.168.2.1/g' package/base-files/files/bin/config_generate
 
 validate_and_apply_mt76_patch() {
@@ -56,7 +55,6 @@ validate_and_apply_mt76_patch() {
     (cd package/kernel/mt76 && patch -p1 < "$patch_file")
 }
 
-# 25.12 上游自带 mt7990-firmware，只需追加 wed_enable=1 的 patch
 MT76_PATCH="1007-mt76-makefile-wed-enable.patch"
 
 validate_and_apply_mt76_patch \

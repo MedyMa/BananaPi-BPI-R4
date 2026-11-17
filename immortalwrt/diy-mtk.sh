@@ -1,6 +1,4 @@
 #!/bin/bash
-# diy-mtk.sh -- BPI-R4 BE14 WiFi7 build for MedyMa/immortalwrt-mt798x-25.12.
-# Configure the vendor WiFi7 stack and prepare build sources.
 set -e
 
 configure_wifi7() {
@@ -14,9 +12,6 @@ configure_wifi7() {
         exit 1
     }
     [ -r "$cfg" ] || { echo "Cannot read config: $cfg" >&2; exit 1; }
-    # Disable target defaults that conflict with the vendor radio stack.
-    # The MTK NPU driver (kmod-npu), its ReBB firmware and the PCE dependency
-    # are controlled by the defconfig and must not be forced off here.
     for package in kmod-mt76-core kmod-mt76-connac kmod-mt7996e \
         kmod-mt7990-firmware kmod-mt7996-firmware kmod-mt7996-233-firmware \
         kmod-mt7996-firmware-common wifi-profile wifi-script \
@@ -27,7 +22,6 @@ configure_wifi7() {
         sed -i "/^${symbol}=/d; /^# ${symbol} is not set$/d" "$cfg"
         printf '# %s is not set\n' "$symbol" >> "$cfg"
     done
-    # WiFi7 and HWIFI share one OSAL provider.
     for symbol in CONFIG_MTK_WIFI7_OSAL_SUPPORT CONFIG_PACKAGE_kmod-mt_wifi_osal; do
         sed -i "/^${symbol}=/d; /^# ${symbol} is not set$/d" "$cfg"
         printf '%s=y\n' "$symbol" >> "$cfg"
@@ -37,8 +31,6 @@ configure_wifi7() {
             echo 'The selected source does not provide mtwifi-scripts' >&2
             exit 1
         }
-        # The legacy LuCI page depends on mtwifi-cfg and replaces wireless.js.
-        # Remove both owners so Kconfig cannot pull the old startup stack back in.
         for package in mtwifi-cfg wifi-scripts luci-app-mtwifi-cfg \
             luci-i18n-mtwifi-cfg-zh-cn; do
             symbol="CONFIG_PACKAGE_${package}"
@@ -48,7 +40,6 @@ configure_wifi7() {
     fi
     sed -i '/^CONFIG_EN_HWIFI_NPU_SUPPORT=/d; /^# CONFIG_EN_HWIFI_NPU_SUPPORT is not set$/d' "$cfg"
     printf '# CONFIG_EN_HWIFI_NPU_SUPPORT is not set\n' >> "$cfg"
-    # Let this source's kernel configuration and package dependencies select HNAT.
     sed -i '/^CONFIG_KERNEL_NET_MEDIATEK_HNAT=/d; /^CONFIG_KERNEL_MEDIATEK_NETSYS_/d; /^# CONFIG_KERNEL_MEDIATEK_NETSYS_.* is not set$/d' "$cfg"
 }
 
@@ -94,9 +85,6 @@ configure_ucode_luci() {
         echo 'The ucode firmware requires the LuCI wireless page' >&2
         return 1
     }
-    # Current sources apply their own complete MTK page through the feed hook.
-    # The older compatibility patch targets the unmodified upstream page and
-    # must not be layered over the source-owned private controls and MLO UI.
     if grep -qF 'require tools.mtwifi as mtwifi' "$page"; then
         for marker in 'mtwifi.addDeviceOptions(' 'mtwifi.addIfaceOptions(' 'mtwifi.handleSaveApply('; do
             grep -qF "$marker" "$page" || {
@@ -124,13 +112,9 @@ configure_ucode_luci() {
     echo '[DIY] adapted the native LuCI wireless page for mtwifi ucode management'
 }
 
-
 case "${1:-}" in
     --configure)
         configure_wifi7 "${2:-.config}"
-        # The existing firmware workflow passes .config. Resolve and verify here
-        # so enabling this build does not require changing its YAML or defaults
-        # in the source repository. Custom files keep the configure-only API.
         if [ "${2:-.config}" = '.config' ] && grep -qx 'CONFIG_PACKAGE_mtwifi-scripts=y' .config; then
             make defconfig
             verify_ucode_wifi7 .config
@@ -179,7 +163,6 @@ patch_makefile_dep() {
     }
 }
 
-# Remove feed packages replaced by community clones
 rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/luci/applications/luci-app-argon-config
 rm -rf feeds/luci/applications/luci-app-passwall
@@ -191,15 +174,12 @@ rm -rf package/mtk/applications/luci-app-turboacc-mtk
 rm -rf feeds/packages/net/adguardhome
 rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2socks,hysteria,ipt2socks,microsocks,naiveproxy,shadowsocks-libev,shadowsocks-rust,shadowsocksr-libev,simple-obfs,tcping,trojan-plus,tuic-client,v2ray-plugin,xray-plugin,geoview,shadow-tls}
 
-# Clone community packages
 mkdir -p package/community
 pushd package/community
 git clone --depth=1 -b dev https://github.com/fw876/helloworld
 git clone --depth=1 -b main https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git
 git clone --depth=1 -b main https://github.com/Openwrt-Passwall/openwrt-passwall.git
 git clone --depth=1 https://github.com/nikkinikki-org/OpenWrt-nikki
-# The selected helloworld/mihomo core satisfies Nikki's +mihomo dependency.
-# Drop unused alternative providers whose mutual CONFLICTS cause a Kconfig cycle.
 [ -f helloworld/mihomo/Makefile ] || exit 1
 rm -rf OpenWrt-nikki/mihomo-alpha OpenWrt-nikki/mihomo-meta
 git clone --depth=1 https://github.com/1522042029/luci-app-socat
@@ -244,9 +224,6 @@ fi
 
 sh "$GITHUB_WORKSPACE/scripts/fix-mihomo-source.sh" || exit 1
 
-# Keep the feed's versioned Go compilers, bootstrap and matching helpers.
-# Replacing this tree with the old single-version recipe removes
-# golang1.27/host, which cloudflared, tailscale and telegraf require.
 _go_values="feeds/packages/lang/golang/golang-values.mk"
 _go_feed_default="$(sed -n 's/^GO_DEFAULT_VERSION:=[[:space:]]*//p' "$_go_values" 2>/dev/null)"
 _go_default="$_go_feed_default"
@@ -263,7 +240,6 @@ if ! grep -qxF "PKG_NAME:=golang$_go_default" "feeds/packages/lang/golang/golang
     echo "Missing native Go $_go_default toolchain in the packages feed" >&2
     exit 1
 fi
-# Use at least Go 1.27 for community packages; keep a newer feed default.
 if [ "$_go_default" != "$_go_feed_default" ]; then
     sed -i "s/^GO_DEFAULT_VERSION:=.*/GO_DEFAULT_VERSION:=$_go_default/" "$_go_values" || exit 1
 fi
@@ -275,21 +251,17 @@ pushd package/OpenClash
 git clone --depth=1 https://github.com/vernesong/OpenClash
 popd
 
-# helloworld simple-obfs/shadowsocks-libev: skip the non-deterministic PKG_MIRROR_HASH
 for f in \
     package/community/helloworld/simple-obfs/Makefile \
     package/community/helloworld/shadowsocks-libev/Makefile; do
     [ -f "$f" ] && sed -i '/^PKG_MIRROR_HASH:=/s/:=.*/:=skip/' "$f"
 done
 
-# adguardhome: skip frontend hash (GitHub release asset hash is volatile)
 patch_makefile_dep \
     package/openwrt-packages/adguardhome/Makefile \
     'FRONTEND_HASH:=084bf3e00ca3e49487fc5a87270b4e1eb26617710ca6116b9e42ce90cb1ad358' \
     'FRONTEND_HASH:=skip'
 
-# containerd's vendored cpuid v2.0.4 hits Go's >= 1.23 linkname check. MAKE_FLAGS is
-# frozen by the BuildPackage eval, so the line must be injected before it.
 f=feeds/packages/utils/containerd/Makefile
 if [ ! -f "$f" ]; then
     echo "[DIY] containerd Makefile missing: $f" >&2
@@ -298,7 +270,6 @@ elif ! grep -q 'checklinkname=0' "$f"; then
     echo "[DIY] containerd: -checklinkname=0 injected=$(grep -c 'checklinkname=0' "$f")"
 fi
 
-# GCC 14 + musl fortify workaround for mbedtls
 if ! grep -q '_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile; then
     if grep -q '\$(if \$(findstring cortex-a53,\$(CONFIG_CPU_TYPE)),-march=armv8-a)' package/libs/mbedtls/Makefile; then
         sed -i '/$(if $(findstring cortex-a53,$(CONFIG_CPU_TYPE)),-march=armv8-a)/a TARGET_CFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile
@@ -307,20 +278,15 @@ if ! grep -q '_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile; then
   fi
 fi
 
-# Drop onionshare-cli (unresolved metadata, not in our config)
 rm -rf feeds/packages/net/onionshare-cli
 
-# vpnc: add -p to mkdir for idempotency
 if grep -q 'mkdir $(PKG_BUILD_DIR)/bin' feeds/packages/net/vpnc/Makefile 2>/dev/null; then
     sed -i '/mkdir $(PKG_BUILD_DIR)\/bin/s/mkdir /mkdir -p /' feeds/packages/net/vpnc/Makefile
 fi
 
-# The selected source already includes vendor driver compatibility patches.
-# Keep its wifi-profile and mtwifi-cfg together; do not replace them from 6.6.
 for recipe in package/mtk/drivers/mt_wifi7/Makefile package/mtk/drivers/mt_hwifi/Makefile; do
     [ -f "$recipe" ] || { echo "Required source recipe missing: $recipe" >&2; exit 1; }
 done
-# Feed deps needed by community clones (pcre2 is in main tree since 25.12)
 ./scripts/feeds update -a
 for _luci_feed_patch in \
     "$GITHUB_WORKSPACE/patches/filogic/25.12/1004-luci-package-manager-apk-upload-untrusted-master.patch" \
@@ -332,9 +298,6 @@ for _luci_feed_patch in \
         git apply "$_luci_feed_patch"
     fi
 done
-# The source-owned LuCI feed hook applies the acceleration row during update.
-# Select the concrete default backend: the virtual 'weechat' dependency
-# produces a self-referential Kconfig condition with the split variants.
 if grep -q '^define Package/weechat-minimal$' feeds/packages/net/weechat/Makefile 2>/dev/null && \
     grep -qF ' +weechat ' feeds/luci/applications/luci-app-weechat/Makefile 2>/dev/null; then
     patch_makefile_dep feeds/luci/applications/luci-app-weechat/Makefile \
@@ -343,7 +306,6 @@ if grep -q '^define Package/weechat-minimal$' feeds/packages/net/weechat/Makefil
 fi
 ./scripts/feeds install -a
 ./scripts/feeds install c-ares udns
-# Feed installation may restore providers replaced by our LuCI packages.
 for package in "${mtk_luci_packages[@]}"; do
     rm -rf -- "feeds/luci/applications/$package" "package/feeds/luci/$package"
 done
@@ -351,7 +313,6 @@ rm -rf feeds/packages/net/adguardhome package/feeds/packages/adguardhome
 rm -rf feeds/packages/net/prosody feeds/packages/utils/telegraf
 rm -rf package/feeds/packages/prosody package/feeds/packages/telegraf
 
-# Remove kiddin9 APK repo (triggers broken video/ sub-repo)
 for f in \
     package/base-files/files/etc/apk/repositories \
     package/base-files/files/etc/apk/repositories.d/* \
@@ -359,20 +320,15 @@ for f in \
     [ -f "$f" ] && grep -q 'kiddin9' "$f" 2>/dev/null && sed -i '/kiddin9/d' "$f" 2>/dev/null || true
 done
 
-# Verify libmbedtls presence (required by shadowsocks-libev)
 if [ ! -f package/libs/mbedtls/Makefile ]; then
   echo "WARNING: package/libs/mbedtls/Makefile not found" >&2
 elif ! grep -q 'define Package/libmbedtls' package/libs/mbedtls/Makefile; then
   echo "WARNING: package/libs/mbedtls/Makefile does not define libmbedtls" >&2
 fi
 
-# GO proxy for sing-box
 export GOEXPERIMENT=
 export GOPROXY=https://proxy.golang.org,direct
 
-# Compatibility fixes for floating feeds metadata
-# rust: rust-lang pruned the 1.94.0 CI LLVM artifacts, so download-ci-llvm=true
-# 404s; build LLVM from source instead (configure.py: last --set wins).
 _rust_makefile="feeds/packages/lang/rust/Makefile"
 if [ -f "$_rust_makefile" ]; then
     if grep -qF -- '--set=llvm.download-ci-llvm=false' "$_rust_makefile"; then
@@ -389,7 +345,6 @@ if [ -f "$_rust_makefile" ]; then
     fi
 fi
 
-# luci-ssl-openssl: fall back to px5g-standalone (same /usr/sbin/px5g)
 _ssl_makefile="feeds/luci/collections/luci-ssl-openssl/Makefile"
 if [ -f "$_ssl_makefile" ] && \
     grep -qF -- '+px5g-openssl' "$_ssl_makefile" && \
@@ -420,11 +375,9 @@ patch_makefile_dep \
     'libnetsnmp-ssl' \
     'libnetsnmp'
 
-# Reduce BPI-R4 U-Boot bootdelay
 patch_makefile_dep \
     package/boot/uboot-mediatek/patches/450-add-bpi-r4.patch \
     'CONFIG_BOOTDELAY=30' \
     'CONFIG_BOOTDELAY=10'
 
-# Modify default IP
 sed -i 's/192.168.6.1/192.168.2.1/g' package/base-files/files/bin/config_generate

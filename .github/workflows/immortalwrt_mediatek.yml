@@ -24,7 +24,7 @@ env:
 jobs:
   build:
     runs-on: ubuntu-26.04
-    
+
     steps:
     - name: Maximize build space
       uses: easimon/maximize-build-space@v10
@@ -37,34 +37,36 @@ jobs:
         remove-android: 'true'
         remove-haskell: 'true'
         remove-codeql: 'true'
-        
+
     - name: Check out the project branch
-      uses: actions/checkout@v6.0.2       
- 
+      uses: actions/checkout@v6.0.2
+
     - name: Initialize the compilation environment
-      env:
-        DEBIAN_FRONTEND: noninteractive
       run: |
-        ( sudo -E apt-get -qq update
-        sudo -E apt-get -qq install build-essential clang flex g++ gawk gcc-multilib gettext \
-        git libncurses5-dev libssl-dev python3-distutils rsync unzip zlib1g-dev swig libpython3-dev aria2 jq subversion qemu-utils ccache rename libelf-dev
-        sudo -E apt-get -qq purge azure-cli ghc* zulu* hhvm llvm* firefox powershell openjdk* dotnet* google* mysql* php* android* rename speedtest-cli
-        sudo rm -rf /etc/apt/sources.list.d/* /usr/share/dotnet /usr/local/lib/android /opt/ghc
-        sudo -E apt-get -qq autoremove --purge
-        sudo -E apt-get -qq clean ) &
-        sudo timedatectl set-timezone "$TZ" || true
-        
+        set -euo pipefail
+
+        export DEBIAN_FRONTEND=noninteractive
+        sudo -E apt-get -qq update
+        sudo -E apt-get -y -qq install --no-install-recommends \
+            build-essential clang bison flex gawk gcc-multilib gettext git \
+            libncurses-dev libssl-dev python3 python3-setuptools python3-pyelftools \
+            rsync unzip zlib1g-dev swig libpython3-dev aria2 jq subversion \
+            qemu-utils ccache rename libelf-dev file patch xz-utils zstd
+        sudo -E apt-get -qq clean
+        sudo timedatectl set-timezone "${TZ:-Asia/Shanghai}" || true
+
     - name: Initialize Environment and Display System Info
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
         chmod +x $OPENWRT_NAME/*.sh
         $GITHUB_WORKSPACE/$OPENWRT_NAME/system-Information.sh
-        
+
     - name: Download firmware source code
       run: |
         git clone --filter=blob:none --single-branch -c core.abbrev=7 $REPO_URL -b $REPO_BRANCH openwrt
         cd openwrt
+        echo "SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
         git log --pretty=tformat:"%h" -n1 tools toolchain || echo "No toolchain history"
 
     - name: Generate cache keys
@@ -92,7 +94,7 @@ jobs:
       working-directory: ./openwrt
       run: |
         ./scripts/feeds update -a
-        
+
     - name: Load feeds.conf.default
       run: |
         chmod +x $OPENWRT_NAME/*.sh
@@ -118,7 +120,7 @@ jobs:
         make download -j$(nproc) 2>&1
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
-             
+
     - name: Compile the firmware
       id: compile
       run: |
@@ -143,94 +145,43 @@ jobs:
       continue-on-error: true
       uses: actions/github-script@v8
       env:
-        CACHE_SCOPE: ${{ env.OPENWRT_NAME }}-${{ env.OPENWRT_DEVICE }}-${{ env.REPO_BRANCH }}
         CCACHE_PREFIX: ccache-${{ env.OPENWRT_NAME }}-${{ env.OPENWRT_DEVICE }}-${{ env.REPO_BRANCH }}-
         TOOLCHAIN_PREFIX: ${{ env.OPENWRT_NAME }}-${{ env.OPENWRT_DEVICE }}-${{ env.REPO_BRANCH }}-cache-openwrt-
         CURRENT_CCACHE_KEY: ${{ steps.ccache-restore.outputs.cache-primary-key }}
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
-          const owner = context.repo.owner;
-          const repo = context.repo.repo;
-          const scope = process.env.CACHE_SCOPE;
+          const { owner, repo } = context.repo;
           const ccachePrefix = process.env.CCACHE_PREFIX;
           const toolchainPrefix = process.env.TOOLCHAIN_PREFIX;
-          const currentCcacheKey = process.env.CURRENT_CCACHE_KEY;
+          const currentKey = process.env.CURRENT_CCACHE_KEY || '';
+          if (!ccachePrefix || !toolchainPrefix)
+            throw new Error('Cache prefixes are required');
 
           const caches = [];
-          for (let page = 1; ; page += 1) {
+          for (let page = 1; ; page++) {
             const response = await github.request('GET /repos/{owner}/{repo}/actions/caches', {
-              owner,
-              repo,
-              per_page: 100,
-              page,
+              owner, repo, per_page: 100, page,
             });
-
-            const pageCaches = response.data.actions_caches || [];
-            caches.push(...pageCaches);
-            if (pageCaches.length < 100) {
-              break;
-            }
+            const rows = response.data.actions_caches || [];
+            caches.push(...rows);
+            if (rows.length < 100) break;
           }
 
-          const byNewest = (left, right) => {
-            const leftTime = new Date(left.last_accessed_at || left.created_at || 0).getTime();
-            const rightTime = new Date(right.last_accessed_at || right.created_at || 0).getTime();
-            return rightTime - leftTime;
-          };
-
-          const ccacheCaches = caches
-            .filter((cache) => (cache.key || '').startsWith(ccachePrefix))
-            .sort(byNewest);
-          const staleCcacheCaches = ccacheCaches.filter((cache) => cache.key !== currentCcacheKey);
-
-          const toolchainCaches = caches
-            .filter((cache) => {
-              const key = cache.key || '';
-              return key.startsWith(toolchainPrefix);
-            })
-            .sort(byNewest);
-          const staleToolchainCaches = toolchainCaches.slice(1);
-
-          const staleCaches = [...staleCcacheCaches, ...staleToolchainCaches];
-          if (staleCaches.length === 0) {
-            core.info(
-              `No stale caches to delete for prefixes: ${ccachePrefix} , ${toolchainPrefix}`
-            );
-            return;
-          }
-
-          const deletedPrefixes = [...new Set(
-            staleCaches.map((cache) => {
-              const key = cache.key || '';
-              if (key.startsWith(ccachePrefix)) {
-                return ccachePrefix;
-              }
-              if (key.startsWith(toolchainPrefix)) {
-                return toolchainPrefix;
-              }
-              return `unmatched:${scope}`;
-            })
-          )];
-
-          core.info(`Deleting stale caches for key prefixes: ${deletedPrefixes.join(', ')}`);
-
-          for (const cache of staleCaches) {
-            const prefix = (cache.key || '').startsWith(ccachePrefix) ? ccachePrefix : toolchainPrefix;
-            core.info(`Deleting cache with prefix ${prefix}: ${cache.key} (${cache.id})`);
+          const newest = (a, b) => new Date(b.last_accessed_at || b.created_at || 0)
+            - new Date(a.last_accessed_at || a.created_at || 0);
+          const toolchains = caches.filter(c => (c.key || '').startsWith(toolchainPrefix)).sort(newest);
+          // A missing restore output must not evict every ccache entry.
+          const staleCcache = currentKey.startsWith(ccachePrefix)
+            ? caches.filter(c => (c.key || '').startsWith(ccachePrefix) && c.key !== currentKey) : [];
+          const stale = [...staleCcache, ...toolchains.slice(1)];
+          for (const cache of stale) {
+            core.info(`Deleting cache ${cache.key} (${cache.id})`);
             await github.request('DELETE /repos/{owner}/{repo}/actions/caches/{cache_id}', {
-              owner,
-              repo,
-              cache_id: cache.id,
+              owner, repo, cache_id: cache.id,
             });
           }
-
-          core.info(
-            `Deleted ${staleCaches.length} stale cache(s). ` +
-            `Kept ccache key: ${currentCcacheKey || 'none'}. ` +
-            `Kept toolchain cache count: ${toolchainCaches.length > 0 ? 1 : 0}. ` +
-            `Tracked prefixes: ${ccachePrefix}, ${toolchainPrefix}.`
-          );
+          core.info(`Deleted ${stale.length} stale build cache(s)`);
 
     - name: 清理旧的CI运行记录
       if: ${{ !cancelled() }}
@@ -241,48 +192,43 @@ jobs:
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
-          const keepRuns = parseInt(process.env.KEEP_RUNS || '15', 10);
-          const owner = context.repo.owner;
-          const repo = context.repo.repo;
-          const thisRunId = context.runId;
-          const wfPath = `.github/workflows/${context.workflow}`;
+          const { owner, repo } = context.repo;
+          const keep = Number(process.env.KEEP_RUNS || '15');
+          if (!Number.isInteger(keep) || keep < 1)
+            throw new Error('KEEP_RUNS must be a positive integer');
 
-          // List completed runs of this workflow, newest first.
+          const current = await github.request('GET /repos/{owner}/{repo}/actions/runs/{run_id}', {
+            owner, repo, run_id: context.runId,
+          });
+          const workflow_id = current.data.workflow_id;
+          if (!workflow_id) throw new Error('Current workflow ID is missing');
           const runs = [];
-          for (let page = 1; ; page += 1) {
-            const response = await github.request(
-              'GET /repos/{owner}/{repo}/actions/runs?per_page=100&page={page}',
-              { owner, repo, page }
-            );
-            const pageRuns = (response.data.workflow_runs || [])
-              .filter((run) => run.path === wfPath && run.status === 'completed')
-              .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-            runs.push(...pageRuns);
-            if ((response.data.workflow_runs || []).length < 100) break;
+          for (let page = 1; ; page++) {
+            const response = await github.request('GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs', {
+              owner, repo, workflow_id, status: 'completed', per_page: 100, page,
+            });
+            const rows = response.data.workflow_runs || [];
+            runs.push(...rows.filter(run => run.status === 'completed' && run.id !== context.runId));
+            if (rows.length < 100) break;
           }
-
-          const toDelete = runs.filter((run) => run.id !== thisRunId).slice(keepRuns);
-          core.info(
-            `[run-cleanup] ${runs.length} completed runs of this workflow; keeping newest ${keepRuns}, deleting ${toDelete.length}`
-          );
-          for (const run of toDelete) {
-            core.info(`[run-cleanup] deleting run ${run.id} (${run.name}) from ${run.created_at}`);
+          runs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+          for (const run of runs.slice(keep)) {
+            core.info(`Deleting completed run ${run.id} from ${run.created_at}`);
             await github.request('DELETE /repos/{owner}/{repo}/actions/runs/{run_id}', {
-              owner,
-              repo,
-              run_id: run.id,
+              owner, repo, run_id: run.id,
             });
           }
+          core.info(`Kept ${Math.min(keep, runs.length)} completed runs; deleted ${Math.max(0, runs.length - keep)}`);
 
     - name: Organize and Rename Files
       id: organize
       if: ${{ steps.compile.outputs.status == 'success' && env.UPLOAD_FIRMWARE == 'true' && !cancelled() }}
       run: |
         cd openwrt/bin/targets/mediatek/filogic
-        rm -rf packages *mt798* *.config *.buildinfo *.json sha256sums 
+        rm -rf packages *mt798* *.config *.buildinfo *.json sha256sums
         echo "FIRMWARE=$PWD" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
-        
+
     - name: Upload the firmware to github
       uses: actions/upload-artifact@v7.0.1
       if: steps.organize.outputs.status == 'success' && !cancelled()
@@ -295,10 +241,10 @@ jobs:
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_RELEASE == 'true' && !cancelled()
       run: |
         echo "release_tag=${{ env.date1 }}-${{ env.OPENWRT_NAME }}_${{ env.REPO_BRANCH }}" >> $GITHUB_OUTPUT
-        touch release.txt
+        printf "Source: %s/commit/%s\n" "$REPO_URL" "$SOURCE_SHA" > release.txt
         echo "📥 固件下载" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
-        
+
     - name: Publish to release
       uses: softprops/action-gh-release@v3
       if: steps.tag.outputs.status == 'success' && !cancelled()
@@ -309,7 +255,7 @@ jobs:
         name: ${{ steps.tag.outputs.release_tag }}
         tag_name: ${{ steps.tag.outputs.release_tag }}
         body_path: release.txt
-    
+
     - name: 删除旧的Releases
       if: steps.tag.outputs.status == 'success' && !cancelled()
       uses: MedyMa/delete-older-releases@v0.3.4

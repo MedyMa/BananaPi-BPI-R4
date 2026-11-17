@@ -1,5 +1,4 @@
 #!/bin/bash
-# diy-part5.sh — ImmortalWrt 25.12 feeds & community packages
 
 merge_package(){
     repo=`echo $1 | rev | cut -d'/' -f 1 | rev`
@@ -43,8 +42,6 @@ apply_workspace_patch() {
     git apply --recount --ignore-space-change --ignore-whitespace "$patch_file"
 }
 
-# 25.12 autocore uses files/tempinfo instead of the 24.10 files/arm layout.
-# Keep the existing overview temperature row and its CPU value.
 _autocore_makefile="package/emortal/autocore/Makefile"
 if [ -f "$_autocore_makefile" ] && [ -f package/emortal/autocore/files/tempinfo ]; then
     install -m 0755 "$GITHUB_WORKSPACE/scripts/tempinfo" \
@@ -56,8 +53,6 @@ if [ -f "$_autocore_makefile" ] && [ -f package/emortal/autocore/files/tempinfo 
         fi
     done
     if [ -n "$_temp_deps" ]; then
-        # Add to this package after its DEPENDS assignment. No dependency on
-        # another platform's lines or on the vendor-only mhz package.
         if ! awk -v deps="$_temp_deps" '
             /^define Package\/autocore$/ { in_package = 1 }
             in_package && /^endef$/ {
@@ -82,14 +77,12 @@ if [ -f "$_autocore_makefile" ] && [ -f package/emortal/autocore/files/tempinfo 
     done
 fi
 
-# Remove feed packages replaced by community clones
 rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/luci/applications/luci-app-argon-config
 rm -rf feeds/luci/applications/luci-app-passwall
 rm -rf feeds/luci/applications/luci-app-modemband
 rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2socks,hysteria,ipt2socks,microsocks,naiveproxy,shadowsocks-libev,shadowsocks-rust,shadowsocksr-libev,simple-obfs,tcping,trojan-plus,tuic-client,v2ray-plugin,xray-plugin,geoview,shadow-tls}
 
-# Clone community packages
 mkdir -p package/community
 pushd package/community
 git clone --depth=1 -b dev https://github.com/fw876/helloworld
@@ -121,9 +114,6 @@ fi
 
 sh "$GITHUB_WORKSPACE/scripts/fix-mihomo-source.sh" || exit 1
 
-# Keep the feed's versioned Go compilers, bootstrap and matching helpers.
-# Replacing this tree with the old single-version recipe removes
-# golang1.27/host, which cloudflared, tailscale and telegraf require.
 _go_values="feeds/packages/lang/golang/golang-values.mk"
 _go_feed_default="$(sed -n 's/^GO_DEFAULT_VERSION:=[[:space:]]*//p' "$_go_values" 2>/dev/null)"
 _go_default="$_go_feed_default"
@@ -140,7 +130,6 @@ if ! grep -qxF "PKG_NAME:=golang$_go_default" "feeds/packages/lang/golang/golang
     echo "Missing native Go $_go_default toolchain in the packages feed" >&2
     exit 1
 fi
-# Use at least Go 1.27 for community packages; keep a newer feed default.
 if [ "$_go_default" != "$_go_feed_default" ]; then
     sed -i "s/^GO_DEFAULT_VERSION:=.*/GO_DEFAULT_VERSION:=$_go_default/" "$_go_values" || exit 1
 fi
@@ -152,15 +141,12 @@ pushd package/OpenClash
 git clone --depth=1 https://github.com/vernesong/OpenClash
 popd
 
-# helloworld simple-obfs/shadowsocks-libev: skip the non-deterministic PKG_MIRROR_HASH
 for f in \
     package/community/helloworld/simple-obfs/Makefile \
     package/community/helloworld/shadowsocks-libev/Makefile; do
     [ -f "$f" ] && sed -i '/^PKG_MIRROR_HASH:=/s/:=.*/:=skip/' "$f"
 done
 
-# containerd's vendored cpuid v2.0.4 hits Go's >= 1.23 linkname check. MAKE_FLAGS is
-# frozen by the BuildPackage eval, so the line must be injected before it.
 f=feeds/packages/utils/containerd/Makefile
 if [ ! -f "$f" ]; then
     echo "[DIY] containerd Makefile missing: $f" >&2
@@ -169,7 +155,6 @@ elif ! grep -q 'checklinkname=0' "$f"; then
     echo "[DIY] containerd: -checklinkname=0 injected=$(grep -c 'checklinkname=0' "$f")"
 fi
 
-# GCC 14 + musl fortify workaround for mbedtls
 if ! grep -q '_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile; then
     if grep -q '\$(if \$(findstring cortex-a53,\$(CONFIG_CPU_TYPE)),-march=armv8-a)' package/libs/mbedtls/Makefile; then
         sed -i '/$(if $(findstring cortex-a53,$(CONFIG_CPU_TYPE)),-march=armv8-a)/a TARGET_CFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile
@@ -178,23 +163,19 @@ if ! grep -q '_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile; then
   fi
 fi
 
-# Drop onionshare-cli (unresolved metadata, not in our config)
 rm -rf feeds/packages/net/onionshare-cli
 
 [ -f feeds/luci/applications/luci-app-package-manager/root/usr/libexec/package-manager-call ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1004-luci-package-manager-apk-upload-untrusted-master.patch"
 
-# vpnc: add -p to mkdir for idempotency
 if grep -q 'mkdir $(PKG_BUILD_DIR)/bin' feeds/packages/net/vpnc/Makefile 2>/dev/null; then
     sed -i '/mkdir $(PKG_BUILD_DIR)\/bin/s/mkdir /mkdir -p /' feeds/packages/net/vpnc/Makefile
 fi
 
 ./scripts/feeds install -a
 
-# Feed deps needed by community clones (pcre2 is in main tree since 25.12)
 ./scripts/feeds install c-ares udns
 
-# Remove kiddin9 APK repo (triggers broken video/ sub-repo)
 for f in \
     package/base-files/files/etc/apk/repositories \
     package/base-files/files/etc/apk/repositories.d/* \
@@ -202,25 +183,19 @@ for f in \
     [ -f "$f" ] && grep -q 'kiddin9' "$f" 2>/dev/null && sed -i '/kiddin9/d' "$f" 2>/dev/null || true
 done
 
-# APK runtime fixes: allow local unsigned APK uploads and disable broken feed entries
 rm -f package/base-files/files/etc/uci-defaults/99-apk-untrusted
 [ -d package/base-files/files/etc/uci-defaults ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1005-base-files-apk-manager-fixes-master.patch"
 
-# Verify libmbedtls presence (required by shadowsocks-libev)
 if [ ! -f package/libs/mbedtls/Makefile ]; then
   echo "WARNING: package/libs/mbedtls/Makefile not found" >&2
 elif ! grep -q 'define Package/libmbedtls' package/libs/mbedtls/Makefile; then
   echo "WARNING: package/libs/mbedtls/Makefile does not define libmbedtls" >&2
 fi
 
-# GO proxy for sing-box
 export GOEXPERIMENT=
 export GOPROXY=https://proxy.golang.org,direct
 
-# Compatibility fixes for floating feeds metadata
-# rust: rust-lang pruned the 1.94.0 CI LLVM artifacts, so download-ci-llvm=true
-# 404s; build LLVM from source instead (configure.py: last --set wins).
 _rust_makefile="feeds/packages/lang/rust/Makefile"
 if [ -f "$_rust_makefile" ]; then
     if grep -qF -- '--set=llvm.download-ci-llvm=false' "$_rust_makefile"; then
@@ -237,7 +212,6 @@ if [ -f "$_rust_makefile" ]; then
     fi
 fi
 
-# luci-ssl-openssl: fall back to px5g-standalone if px5g-openssl is absent
 _ssl_makefile="feeds/luci/collections/luci-ssl-openssl/Makefile"
 if [ -f "$_ssl_makefile" ] && \
     grep -qF -- '+px5g-openssl' "$_ssl_makefile" && \
@@ -250,8 +224,6 @@ if [ -f "$_ssl_makefile" ] && \
     echo "[DIY] luci-ssl-openssl: dep px5g-openssl -> px5g-standalone"
 fi
 
-# kernel 6.12.103: the 2026-08-24 merge added fmsh SPI-NAND patches (436/437)
-# that do not apply; the chips are unused by BPI-R4, so drop them.
 rm -f target/linux/generic/backport-6.12/436-v7.3-mtd-spinand-fmsh-*.patch \
       target/linux/generic/backport-6.12/437-v7.3-mtd-spinand-fmsh-*.patch
 echo "[DIY] removed fmsh backport patches 436/437 (broken against kernel 6.12.103)"
@@ -274,30 +246,21 @@ patch_makefile_dep \
     'libnetsnmp-ssl' \
     'libnetsnmp'
 
-# Reduce BPI-R4 U-Boot bootdelay
 patch_makefile_dep \
     package/boot/uboot-mediatek/patches/450-add-bpi-r4.patch \
     'CONFIG_BOOTDELAY=30' \
     'CONFIG_BOOTDELAY=10'
 
-# Required LuCI menu and status patches for 25.12. The optional wireless
-# overlays below retain their compatibility guards.
-
-# Keep Dockerman's menu and streaming endpoints under the Docker category.
 apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1005-luci-dockerman-docker-menu.patch" || exit 1
 apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1006-luci-argon-docker-menu-layout.patch" || exit 1
 
-# Keep empty DHCPv4 identifiers out of the overview.
 apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1007-luci-dhcpv4-hide-empty-identifiers.patch" || exit 1
 
-# RPCD: add getWifiStationHints ubus method + helper functions
 [ -f feeds/luci/modules/luci-base/root/usr/share/rpcd/ucode/luci ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1000-luci-rpcd-getWifiStationHints-master.patch" || true
 
-# 60_wifi.js: wifi7/MLO station hints + mhz_hi support (merged 1000+1002)
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1000-luci-status-60wifi-master.patch" || true
 
-# wireless.js: station hints + mtk mode matrix + MLO OFDMA (merged 1001+999+1003)
 [ -f feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1001-luci-wireless-combined-master.patch" || true

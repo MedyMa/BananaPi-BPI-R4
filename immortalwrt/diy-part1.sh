@@ -1,12 +1,8 @@
 #!/bin/bash
 
-# ImmortalWrt 24.10 already carries the rpcd lifetime fixes in its package.
-# Applying our older backports again conflicts with those upstream patches.
-
 function merge_package(){
     repo=`echo $1 | rev | cut -d'/' -f 1 | rev`
     pkg=`echo $2 | rev | cut -d'/' -f 1 | rev`
-    # find package/ -follow -name $pkg -not -path "package/openwrt-packages/*" | xargs -rt rm -rf
     git clone --depth=1 --single-branch $1
     mkdir -p "${3:-package/openwrt-packages}"
     mv "$2" "${3:-package/openwrt-packages}/"
@@ -46,7 +42,6 @@ apply_workspace_patch() {
     git apply --recount --ignore-space-change --ignore-whitespace "$patch_file"
 }
 
-# Remove feed packages replaced by community clones (before feeds install)
 rm -rf feeds/luci/themes/luci-theme-argon
 rm -rf feeds/luci/applications/luci-app-argon-config
 rm -rf feeds/luci/applications/luci-app-passwall
@@ -55,20 +50,15 @@ rm -rf feeds/packages/net/adguardhome
 rm -rf feeds/packages/net/samba4
 rm -rf feeds/packages/net/{xray-core,v2ray-geodata,sing-box,chinadns-ng,dns2socks,hysteria,ipt2socks,microsocks,naiveproxy,shadowsocks-libev,shadowsocks-rust,shadowsocksr-libev,simple-obfs,tcping,trojan-plus,tuic-client,v2ray-plugin,xray-plugin,geoview,shadow-tls}
 
-# Clone community packages
 mkdir -p package/community
 pushd package/community
 git clone --depth=1 -b dev https://github.com/fw876/helloworld
-# rm -rf helloworld/{naiveproxy,shadowsocks-libev,shadowsocksr-libev,shadow-tls,simple-obfs,tcping,tuic-client,v2ray-plugin,xray-core,xray-plugin}
 git clone --depth=1 -b main https://github.com/Openwrt-Passwall/openwrt-passwall-packages.git
 git clone --depth=1 -b main https://github.com/Openwrt-Passwall/openwrt-passwall.git
 git clone --depth=1 https://github.com/nikkinikki-org/OpenWrt-nikki
-# rm -rf OpenWrt-nikki/{mihomo-meta,mihomo-alpha}
 git clone --depth=1 https://github.com/1522042029/luci-app-socat
 git clone --depth=1 https://github.com/jerrykuku/luci-theme-argon
 git clone --depth=1 https://github.com/jerrykuku/luci-app-argon-config
-# git clone --depth=1 https://github.com/Siriling/5G-Modem-Support
-# merge_package https://github.com/DHDAXCW/dhdaxcw-app dhdaxcw-app/luci-app-adguardhome
 merge_package https://github.com/kenzok8/jell jell/adguardhome
 merge_package "-b master https://github.com/immortalwrt/packages" packages/net/samba4 ../../feeds/packages/net
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-fan
@@ -92,8 +82,6 @@ if ! git -C package/community/helloworld apply --reverse --check "$xray_cronet_p
     git -C package/community/helloworld apply "$xray_cronet_patch" || exit 1
 fi
 
-# Wireless stack migration lives in diy-part2.sh
-
 rm -rf feeds/packages/lang/golang
 git clone --depth=1 https://github.com/sbwml/packages_lang_golang -b 27.x feeds/packages/lang/golang
 rm -rf feeds/packages/net/mosdns
@@ -104,9 +92,6 @@ pushd package/OpenClash
 git clone --depth=1 https://github.com/vernesong/OpenClash
 popd
 
-# merge_package "-b openwrt-24.10-6.6 https://github.com/padavanonly/immortalwrt-mt798x-6.6" immortalwrt-mt798x-6.6/package/mtk/applications/mtkhqos_util
-
-# openwrt-24.10 feed metadata compatibility fixes
 patch_makefile_dep \
     feeds/packages/lang/python/python-ubus/Makefile \
     'PKG_BUILD_DEPENDS:=python-setuptools/host' \
@@ -124,9 +109,7 @@ patch_makefile_dep \
     package/feeds/packages/zabbix/Makefile \
     'libnetsnmp-ssl' \
     'libnetsnmp'
-    
-# containerd's vendored cpuid v2.0.4 hits Go's >= 1.23 linkname check. MAKE_FLAGS is
-# frozen by the BuildPackage eval, so the line must be injected before it.
+
 f=feeds/packages/utils/containerd/Makefile
 if [ ! -f "$f" ]; then
     echo "[DIY] containerd Makefile missing: $f" >&2
@@ -135,7 +118,6 @@ elif ! grep -q 'checklinkname=0' "$f"; then
     echo "[DIY] containerd: -checklinkname=0 injected=$(grep -c 'checklinkname=0' "$f")"
 fi
 
-# Shrink BPI-R4 U-Boot autoboot wait (30s -> 10s)
 patch_makefile_dep \
     package/boot/uboot-mediatek/patches/450-add-bpi-r4.patch \
     'CONFIG_BOOTDELAY=30' \
@@ -143,7 +125,6 @@ patch_makefile_dep \
 
 ./scripts/feeds install -a
 
-# LuCI patches for immortalwrt/openwrt-24.10 (not the diy-part3.sh mtwifi set)
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/24.10/1000-openwrt-24.10-luci-status-overview-wifi7-mlo.patch"
 
@@ -151,7 +132,7 @@ patch_makefile_dep \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/24.10/1004-openwrt-24.10-luci-wireless-combined.patch"
 
 [ -f feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/60_wifi.js ] && \
-    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/24.10/1002-openwrt-24.10-luci-status-overview-rate-mhz-hi.patch"    
+    apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/24.10/1002-openwrt-24.10-luci-status-overview-rate-mhz-hi.patch"
 
 [ -f feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js ] && \
     apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/24.10/1003-openwrt-24.10-luci-wireless-mtk-mlo-ofdma-controls.patch"

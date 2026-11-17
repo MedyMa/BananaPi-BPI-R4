@@ -1,8 +1,3 @@
-# ImmortalWrt mt798x-mt799x-6.6-mtwifi defconfig draft for BananaPi BPI-R4.
-# This keeps the branch's MT7990/Eagle WiFi 7 layout for BPI-R4, then nudges
-# the vendor stack toward NIC-BE14 by selecting the BE14000 custom hwifi blob.
-# The mt_wifi7 profile in this tree still maps Eagle to the BE19000 SKU string.
-
 CONFIG_TARGET_mediatek=y
 CONFIG_TARGET_mediatek_filogic_a73=y
 CONFIG_TARGET_mediatek_filogic_a73_DEVICE_bananapi_bpi-r4=y
@@ -23,11 +18,9 @@ CONFIG_IPV6=y
 CONFIG_DRIVER_11AC_SUPPORT=y
 CONFIG_DRIVER_11AX_SUPPORT=y
 CONFIG_DRIVER_11BE_SUPPORT=y
-# Keep the upstream mt76/mt7996 path out of the vendor WiFi7 build.
 # CONFIG_PACKAGE_kmod-mt7996-firmware is not set
 # CONFIG_PACKAGE_kmod-mt7996-233-firmware is not set
 
-# Keep the nftables firewall / IPv6 userspace explicit.
 CONFIG_PACKAGE_firewall4=y
 CONFIG_PACKAGE_odhcp6c=y
 CONFIG_PACKAGE_odhcpd-ipv6only=y
@@ -36,7 +29,6 @@ CONFIG_PACKAGE_ip6tables-nft=y
 CONFIG_PACKAGE_ppp=y
 CONFIG_PACKAGE_ppp-mod-pppoe=y
 
-# MTK vendor WiFi 7 block aligned to mt798x-mt799x-6.6-mtwifi.
 CONFIG_PACKAGE_datconf=y
 CONFIG_PACKAGE_datconf-lua=y
 CONFIG_PACKAGE_mii_mgr=y
@@ -65,7 +57,6 @@ CONFIG_MTK_HWIFI_MT7990_OPTION_TYPE=2
 CONFIG_MTK_HWIFI_MT7990_INTR_OPTION_SET=0
 CONFIG_PACKAGE_kmod-mt7991=y
 CONFIG_PACKAGE_kmod-mtk_pci=y
-# WiFi7's OSAL and CMN providers are mutually exclusive.
 # CONFIG_PACKAGE_kmod-mt_wifi_cmn is not set
 CONFIG_PACKAGE_kmod-mt_wifi_osal=y
 CONFIG_PACKAGE_kmod-mtk_wed=y
@@ -136,7 +127,6 @@ CONFIG_MTK_WIFI7_FAST_NAT_SUPPORT=y
 CONFIG_MTK_WIFI7_WHNAT_SUPPORT=m
 CONFIG_MTK_WIFI7_WARP_V2=y
 CONFIG_MTK_WIFI7_OSAL_SUPPORT=y
-# This profile uses the vendor WEXT path, not the optional cfg80211 OSAL path.
 # CONFIG_MTK_WIFI7_CFG80211_SUPPORT is not set
 # CONFIG_MTK_WIFI_OSAL_CFG80211_SUPPORT is not set
 CONFIG_MTK_WIFI7_RTMP_FLASH_SUPPORT=y
@@ -213,7 +203,6 @@ CONFIG_first_card_name="MT7990"
 CONFIG_second_card=y
 CONFIG_second_card_name="MT7990"
 
-# 5G / WWAN / SFP bring-up and diagnostics.
 CONFIG_MODEMMANAGER_WITH_MBIM=y
 CONFIG_MODEMMANAGER_WITH_QMI=y
 CONFIG_MODEMMANAGER_WITH_QRTR=y
@@ -267,7 +256,6 @@ CONFIG_PACKAGE_parted=y
 CONFIG_PACKAGE_smartmontools=y
 CONFIG_PACKAGE_kmod-nvme=y
 
-# Core service set trimmed to packages that are present in current feeds.
 CONFIG_PACKAGE_adguardhome=y
 CONFIG_PACKAGE_alsa-utils=y
 CONFIG_PACKAGE_aria2=y
@@ -374,7 +362,6 @@ CONFIG_PACKAGE_xray-plugin=y
 CONFIG_PACKAGE_yq=y
 CONFIG_PACKAGE_zlib=y
 
-# LuCI core + stable apps.
 CONFIG_LUCI_LANG_zh_Hans=y
 CONFIG_PACKAGE_luci-compat=y
 CONFIG_PACKAGE_luci-lib-chartjs=y
@@ -407,7 +394,6 @@ CONFIG_PACKAGE_luci-proto-vpnc=y
 CONFIG_PACKAGE_luci-proto-vxlan=y
 CONFIG_PACKAGE_luci-proto-wireguard=y
 
-# Community LuCI apps supplied by diy-part5.sh.
 CONFIG_PACKAGE_luci-theme-argon=y
 CONFIG_PACKAGE_luci-app-argon-config=y
 CONFIG_PACKAGE_luci-app-adguardhome=y
@@ -478,12 +464,10 @@ CONFIG_PACKAGE_luci-app-vlmcsd=y
 CONFIG_PACKAGE_luci-app-wechatpush=y
 CONFIG_PACKAGE_luci-app-wrtbwmon=y
 
-# Keep the SSR Libev client pieces, but leave the server off on aarch64 defaults.
 CONFIG_PACKAGE_shadowsocksr-libev-ssr-local=y
 CONFIG_PACKAGE_shadowsocksr-libev-ssr-redir=y
 CONFIG_PACKAGE_shadowsocksr-libev-ssr-server=n
 
-# Samba4 / discovery options kept explicit for the LuCI app.
 CONFIG_PACKAGE_samba4-libs=y
 CONFIG_PACKAGE_samba4-server=y
 CONFIG_SAMBA4_SERVER_AVAHI=y
@@ -491,8 +475,6 @@ CONFIG_SAMBA4_SERVER_NETBIOS=y
 CONFIG_SAMBA4_SERVER_VFS=y
 CONFIG_SAMBA4_SERVER_WSDD2=y
 
-
-# MT7988 TOPS: default load the matching firmware/PCE/HNAT tunnel stack.
 CONFIG_PACKAGE_kmod-npu=y
 CONFIG_PACKAGE_kmod-npu-nf_hnat=y
 CONFIG_PACKAGE_kmod-npu-autoload=y
@@ -527,7 +509,6 @@ CONFIG_PACKAGE_kmod-pppol2tp=y
 CONFIG_PACKAGE_kmod-ppp=y
 CONFIG_PACKAGE_kmod-pppoe=y
 
-# IPsec VPN: IKEv1/IKEv2 and L2TPv2.
 CONFIG_PACKAGE_luci-app-strongswan-swanctl=y
 CONFIG_PACKAGE_strongswan=y
 CONFIG_PACKAGE_strongswan-default=y
@@ -541,7 +522,6 @@ CONFIG_PACKAGE_kmod-nft-xfrm=y
 CONFIG_PACKAGE_xl2tpd=y
 CONFIG_PACKAGE_ppp-mod-pppol2tp=y
 
-# EIP-197 inline driver and firmware; load the driver manually.
 CONFIG_PACKAGE_kmod-crypto-eip=y
 CONFIG_PACKAGE_kmod-crypto-eip-inline=y
 CONFIG_PACKAGE_crypto-eip-inline-fw=y
