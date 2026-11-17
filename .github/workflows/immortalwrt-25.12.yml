@@ -241,7 +241,8 @@ jobs:
       if: steps.compile.outputs.status == 'success' && env.UPLOAD_RELEASE == 'true' && !cancelled()
       run: |
         echo "release_tag=${{ env.date1 }}-${{ env.OPENWRT_NAME }}_${{ env.REPO_BRANCH }}" >> $GITHUB_OUTPUT
-        echo "📥 固件下载" > release.txt
+        printf "Source: %s/commit/%s\n" "$REPO_URL" "$SOURCE_SHA" > release.txt
+        echo "📥 固件下载" >> release.txt
         echo "status=success" >> $GITHUB_OUTPUT
 
     - name: Publish to release
