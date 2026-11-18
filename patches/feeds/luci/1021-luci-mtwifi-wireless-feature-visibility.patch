@@ -1,16 +1,120 @@
+Subject: [PATCH] luci: fix MTK feature visibility and preserve wireless modes
+
+Qualify interface feature dependencies with the owning radio, cover both
+320 MHz layouts and preserve legacy MTK band settings. Carry the previous
+ucode page compatibility checks into the source-owned wireless integration.
+
+--- a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/tools/mtwifi.js
++++ b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/tools/mtwifi.js
+@@ -637,15 +637,20 @@
+ 	return o;
+ }
+ 
+-function radioFeature(option, prefixes, modes) {
++function radioFeature(option, prefixes, modes, device) {
++	// Interface options depend on the radio's frequency widget, not a
++	// same-name field in the wifi-iface section. Use a fully qualified ID.
++	const field = device ? 'wireless.%s._freq'.format(device) : '_freq';
+ 	for (const prefix of prefixes)
+ 		for (const width of [20, 40, 80, 160, 320]) {
+ 			if (width == 320 && prefix != 'EHT') continue;
+-			for (const mode of modes || ['']) {
+-				const dependency = { '_freq': prefix + width, '!contains': true };
+-				if (mode) dependency.mode = mode;
+-				option.depends(dependency);
+-			}
++			const suffixes = width == 320 ? ['', '-1', '-2'] : [''];
++			for (const suffix of suffixes)
++				for (const mode of modes || ['']) {
++					const dependency = { [field]: prefix + width + suffix, '!contains': true };
++					if (mode) dependency.mode = mode;
++					option.depends(dependency);
++				}
+ 		}
+ 	return option;
+ }
+@@ -656,7 +661,7 @@
+ 	let o = section.taboption('general', CountryValue, 'country', _('Country Code'));
+ 	o.wifiNetwork = radioNet;
+ 	o = section.taboption('general', form.Value, 'txpower', _('Maximum transmit power'), _('Percentage of the driver power limit. Regulatory and calibration limits still apply.'));
+-	o.datatype = 'range(1,100)';
++	o.datatype = 'and(uinteger,range(1,100))';
+ 	o.placeholder = '100';
+ 	if (band == '5g') {
+ 		profileOption(section, 'vht_1024', _('VHT 1024-QAM (5 GHz)'), null,
+@@ -675,9 +680,7 @@
+ 		['0', _('Disabled')], ['1', _('Individual TWT')],
+ 		['2', _('Broadcast TWT')], ['3', _('Individual and broadcast TWT')]
+ 	]), ['HE', 'EHT']);
+-	o = profileOption(section, 'eht_restricted_twt', _('EHT Restricted TWT'));
+-	['EHT20', 'EHT40', 'EHT80', 'EHT160', 'EHT320', 'EHT320-1', 'EHT320-2'].forEach(htmode =>
+-		o.depends({ '_freq': htmode, '!contains': true }));
++	radioFeature(profileOption(section, 'eht_restricted_twt', _('EHT Restricted TWT')), ['EHT']);
+ 	if (band == '2g') {
+ 		o = section.taboption('advanced', form.Flag, 'noscan', _('Force 40MHz mode'),
+ 			_('Always use 40 MHz even when the secondary channel overlaps. This does not comply with IEEE 802.11n coexistence requirements.'));
+@@ -689,11 +692,11 @@
+ 	[['0', _('Disabled')], ['1', _('Normal')], ['2', _('High')], ['3', _('Very High')]].forEach(v => o.value(...v));
+ 	o.optional = true;
+ 	o = section.taboption('advanced', form.Value, 'distance', _('Distance Optimization'), _('Distance to the farthest client in meters.'));
+-	o.datatype = 'range(0,114750)';
++	o.datatype = 'and(uinteger,range(0,114750))';
+ 	o.placeholder = '0';
+ 	if (uci.get('wireless', device, 'dbdc_main') == '1') {
+ 		o = section.taboption('advanced', form.Value, 'beacon_int', _('Beacon Interval'));
+-		o.datatype = 'range(20,999)';
++		o.datatype = 'and(uinteger,range(20,999))';
+ 		o.placeholder = '100';
+ 	}
+ 	o = section.taboption('advanced', form.Flag, 'whnat', _('Wireless HWNAT'));
+@@ -730,17 +733,17 @@
+ 	]) {
+ 		const o = profileOption(section, key, title);
+ 		if (['mumimo_dl', 'mumimo_ul', 'ofdma_dl', 'ofdma_ul'].includes(key))
+-			radioFeature(o, ['HE', 'EHT'], ['ap', 'ap-wds']);
++			radioFeature(o, ['HE', 'EHT'], ['ap', 'ap-wds'], radioNet.getWifiDeviceName());
+ 		else {
+ 			o.depends('mode', 'ap');
+ 			o.depends('mode', 'ap-wds');
+ 		}
+ 	}
+ 	for (const [key, title, datatype, placeholder] of [
+-		['kicklow', _('Kick low RSSI station threshold'), 'range(-100,0)', '0'],
+-		['assocthres', _('Station associate threshold'), 'range(-100,0)', '0'],
+-		['frag', _('Fragmentation Threshold'), 'range(256,2346)', '2346'],
+-		['rts', _('RTS/CTS Threshold'), 'range(0,2347)', '2347']
++		['kicklow', _('Kick low RSSI station threshold'), 'and(integer,range(-100,0))', '0'],
++		['assocthres', _('Station associate threshold'), 'and(integer,range(-100,0))', '0'],
++		['frag', _('Fragmentation Threshold'), 'and(uinteger,range(256,2346))', '2346'],
++		['rts', _('RTS/CTS Threshold'), 'and(uinteger,range(0,2347))', '2347']
+ 	]) {
+ 		const o = section.taboption('advanced', form.Value, key, title);
+ 		o.datatype = datatype;
 --- a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
 +++ b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
-@@ -522,7 +522,8 @@
+@@ -402,7 +402,11 @@
+ 					'EHT40', '40 MHz', { available: htmodelist.EHT40 },
+ 					'EHT80', '80 MHz', { available: htmodelist.EHT80 },
+ 					'EHT160', '160 MHz', { available: htmodelist.EHT160 },
+-					'EHT320', '320 MHz', { available: htmodelist.EHT320 }
++					'EHT320', '320 MHz', { available: htmodelist.EHT320 },
++					...(uci.get('wireless', section_id, 'type') == 'mtwifi' ? [
++						'EHT320-1', '320 MHz (1)', { available: htmodelist.EHT320 },
++						'EHT320-2', '320 MHz (2)', { available: htmodelist.EHT320 }
++					] : [])
+ 				]
+ 			};
+ 
+@@ -523,7 +527,7 @@
  
  		this.toggleWifiMode(elem);
  
 -		if (hwval != null) {
-+		// Existing MTK configs can retain hwmode=11a on a 6 GHz radio.
 +		if (hwval != null && (uci.get('wireless', section_id, 'type') != 'mtwifi' || bandval == null)) {
  			this.useBandOption = false;
  
  			band.value = /a/.test(hwval) ? '5g': '2g';
-@@ -595,7 +596,8 @@
+@@ -596,7 +600,8 @@
  	cfgvalue: function(section_id) {
  		return [
  		    uci.get('wireless', section_id, 'htmode'),
@@ -20,7 +124,7 @@
  		    uci.get('wireless', section_id, 'channel')
  		];
  	},
-@@ -611,9 +613,13 @@
+@@ -612,9 +617,13 @@
  	},
  
  	write: function(section_id, value) {
@@ -37,69 +141,7 @@
  			uci.set('wireless', section_id, 'band', value[1]) : 
  			uci.set('wireless', section_id, 'hwmode', (value[1] == '2g') ? '11g' : '11a');
  
-@@ -993,7 +999,7 @@
- 		s.addModalOptions = function(s) {
- 			return network.getWifiNetwork(s.section).then(function(radioNet) {
- 				const hwtype = uci.get('wireless', radioNet.getWifiDeviceName(), 'type');
--				const have_mesh = L.hasSystemFeature('hostapd', 'mesh') || L.hasSystemFeature('wpasupplicant', 'mesh');
-+				const have_mesh = hwtype != 'mtwifi' && (L.hasSystemFeature('hostapd', 'mesh') || L.hasSystemFeature('wpasupplicant', 'mesh'));
- 				let o, ss;
- 
- 				o = s.option(form.SectionValue, '_device', form.NamedSection, radioNet.getWifiDeviceName(), 'wifi-device', _('Device Configuration'));
-@@ -1020,12 +1026,20 @@
- 				o = ss.taboption('general', CBIWifiFrequencyValue, '_freq', '<br />' + _('Operating frequency'), _('Some channels may be restricted to Indoor Only use by your Regulatory Domain. Make sure to follow this advice if a channel is reported as such.'));
- 				o.ucisection = s.section;
- 
--				if (hwtype == 'mac80211') {
-+				if (hwtype == 'mac80211' || hwtype == 'mtwifi') {
- 					o = ss.taboption('general', form.Flag, 'legacy_rates', _('Allow legacy 802.11b rates'), _('Legacy or badly behaving devices may require legacy 802.11b rates to interoperate. Airtime efficiency may be significantly reduced where these are used. It is recommended to not allow 802.11b rates where possible.'));
- 					o.depends({'_freq': '2g', '!contains': true});
- 
--					o = ss.taboption('general', CBIWifiTxPowerValue, 'txpower', _('Maximum transmit power'), _('Specifies the maximum transmit power the wireless radio may use. Depending on regulatory requirements and wireless usage, the actual transmit power may be reduced by the driver.'));
--					o.wifiNetwork = radioNet;
-+					// MTK .dat uses a percentage, while mac80211 uses dBm.
-+					if (hwtype == 'mtwifi') {
-+						o = ss.taboption('general', form.Value, 'txpower', _('Maximum transmit power') + ' (%)');
-+						o.datatype = 'and(uinteger,range(0,100))';
-+						o.placeholder = '100';
-+					}
-+					else {
-+						o = ss.taboption('general', CBIWifiTxPowerValue, 'txpower', _('Maximum transmit power'), _('Specifies the maximum transmit power the wireless radio may use. Depending on regulatory requirements and wireless usage, the actual transmit power may be reduced by the driver.'));
-+						o.wifiNetwork = radioNet;
-+					}
- 
- 					o = ss.taboption('general', CBIWifiCountryValue, 'country', _('Country Code'));
- 					o.wifiNetwork = radioNet;
-@@ -1037,16 +1051,18 @@
- 					o.value('3', _('Very High'));
- 
- 					o = ss.taboption('advanced', form.Value, 'distance', _('Distance Optimization'), _('Distance to farthest network member in meters. Set only for distances above one kilometer; otherwise it is harmful.'));
--					o.datatype = 'or(range(0,114750),"auto")';
--					o.placeholder = 'auto';
--
--					o = ss.taboption('advanced', form.Value, 'frag', _('Fragmentation Threshold'));
--					o.datatype = 'min(256)';
--					o.placeholder = _('off');
--
--					o = ss.taboption('advanced', form.Value, 'rts', _('RTS/CTS Threshold'));
--					o.datatype = 'uinteger';
--					o.placeholder = _('off');
-+					o.datatype = hwtype == 'mtwifi' ? 'and(uinteger,range(0,114750))' : 'or(range(0,114750),"auto")';
-+					o.placeholder = hwtype == 'mtwifi' ? '0' : 'auto';
-+
-+					if (hwtype != 'mtwifi') {
-+						o = ss.taboption('advanced', form.Value, 'frag', _('Fragmentation Threshold'));
-+						o.datatype = 'min(256)';
-+						o.placeholder = _('off');
-+
-+						o = ss.taboption('advanced', form.Value, 'rts', _('RTS/CTS Threshold'));
-+						o.datatype = 'uinteger';
-+						o.placeholder = _('off');
-+					}
- 
- 					o = ss.taboption('advanced', form.Flag, 'noscan', _('Force 40MHz mode'), _('Always use 40MHz channels even if the secondary channel overlaps. Using this option does not comply with IEEE 802.11n-2009!'));
- 					o.rmempty = true;
-@@ -1078,11 +1094,12 @@
+@@ -1088,7 +1097,7 @@
  				ss.tab('advanced', _('Advanced Settings'));
  				ss.tab('roaming', _('WLAN roaming'), _('Settings for assisting wireless clients in roaming between multiple APs: 802.11r, 802.11k and 802.11v'));
  
@@ -108,59 +150,7 @@
  						.format(L.url('admin/system/package-manager') + '?query=wpad-mesh', _('802.11s? Install mesh wpad') ) : '');
  				o.value('ap', _('Access Point'));
  				o.value('sta', _('Client'));
--				o.value('adhoc', _('Ad-Hoc'));
-+				if (hwtype != 'mtwifi')
-+					o.value('adhoc', _('Ad-Hoc'));
- 
- 				o = ss.taboption('general', form.Value, 'mesh_id', _('Mesh Id'));
- 				o.depends('mode', 'mesh');
-@@ -1163,13 +1180,15 @@
- 				};
- 
- 				let encr;
--				if (hwtype == 'mac80211') {
-+				if (hwtype == 'mac80211' || hwtype == 'mtwifi') {
- 					const mode = ss.children.find(obj => obj.option === 'mode');
- 					const bssid = ss.children.find(obj => obj.option === 'bssid');
- 
- 					if (have_mesh) mode.value('mesh', '802.11s');
--					mode.value('ahdemo', _('Pseudo Ad-Hoc (ahdemo)'));
--					mode.value('monitor', _('Monitor'));
-+					if (hwtype != 'mtwifi') {
-+						mode.value('ahdemo', _('Pseudo Ad-Hoc (ahdemo)'));
-+						mode.value('monitor', _('Monitor'));
-+					}
- 
- 					bssid.depends('mode', 'adhoc');
- 					bssid.depends('mode', 'sta');
-@@ -1261,8 +1280,24 @@
- 					const macaddr = uci.get('wireless', radioNet.getName(), 'macaddr');
- 					o = ss.taboption('advanced', form.Value, 'macaddr', _('MAC address'), _('Override default MAC address - the range of usable addresses might be limited by the driver'));
- 					o.value('', _('driver default (%s)').format(!macaddr ? radioNet.getActiveBSSID() : _('no override')));
--					o.value('random', _('randomly generated'));
--					o.datatype = "or('random',macaddr)";
-+					if (hwtype != 'mtwifi')
-+						o.value('random', _('randomly generated'));
-+					o.datatype = hwtype == 'mtwifi' ? 'macaddr' : "or('random',macaddr)";
-+
-+					// MTK applies these thresholds to each AP, not the radio.
-+					if (hwtype == 'mtwifi') {
-+						o = ss.taboption('advanced', form.Value, 'frag', _('Fragmentation Threshold'));
-+						o.datatype = 'min(256)';
-+						o.placeholder = _('off');
-+						o.depends('mode', 'ap');
-+						o.depends('mode', 'ap-wds');
-+
-+						o = ss.taboption('advanced', form.Value, 'rts', _('RTS/CTS Threshold'));
-+						o.datatype = 'uinteger';
-+						o.placeholder = _('off');
-+						o.depends('mode', 'ap');
-+						o.depends('mode', 'ap-wds');
-+					}
- 
- 					o = ss.taboption('advanced', form.Flag, 'short_preamble', _('Short Preamble'));
- 					o.default = o.enabled;
-@@ -1331,9 +1366,11 @@
+@@ -1348,9 +1357,11 @@
  				o = ss.taboption('encryption', form.ListValue, 'cipher', _('Cipher'));
  				o.depends('encryption', 'wpa');
  				o.depends('encryption', 'wpa2');
@@ -175,16 +165,17 @@
  				o.depends('encryption', 'psk');
  				o.depends('encryption', 'sae');
  				o.depends('encryption', 'psk2');
-@@ -1346,6 +1383,16 @@
+@@ -1363,6 +1374,17 @@
  				o.value('gcmp256', _('Force GCMP-256 (AES)'));
  				o.value('tkip', _('Force TKIP'));
  				o.value('tkip+ccmp', _('Force TKIP and CCMP (AES)'));
 +				if (hwtype == 'mtwifi') {
-+					// Validate complete tuples against the MTK .dat encryption table.
 +					o.validate = function(section_id, value) {
 +						const enc = this.section.children.find(o => o.option == 'encryption').formvalue(section_id);
 +						const allowed = enc == 'sae'
-+							? (is_6ghz ? ['auto', 'ccmp', 'gcmp', 'gcmp256'] : ['auto', 'ccmp', 'ccmp256', 'gcmp', 'gcmp256'])
++							? (uci.get('wireless', radioNet.getWifiDeviceName(), 'band') == '6g'
++								? ['auto', 'ccmp', 'gcmp', 'gcmp256']
++								: ['auto', 'ccmp', 'ccmp256', 'gcmp', 'gcmp256'])
 +							: ['auto', 'ccmp', 'tkip', 'tkip+ccmp'];
 +						return allowed.includes(value) || _('The selected %s mode is incompatible with %s encryption').format(enc, value);
 +					};
@@ -192,48 +183,8 @@
  				o.write = ss.children.filter(function(o) { return o.option == 'encryption'; })[0].write;
  
  				o.cfgvalue = function(section_id) {
-@@ -1364,7 +1411,7 @@
- 				const crypto_modes = [];
- 				const is_6ghz = uci.get('wireless', radioNet.getWifiDeviceName(), 'band') == '6g';
- 
--				if (hwtype == 'mac80211') {
-+				if (hwtype == 'mac80211' || hwtype == 'mtwifi') {
- 					const has_supplicant = L.hasSystemFeature('wpasupplicant');
- 					const has_hostapd = L.hasSystemFeature('hostapd');
- 
-@@ -1406,7 +1453,7 @@
- 					}
- 
- 					// WPA3-Personal Compatibility Mode uses RSN overriding, which is an AP-only feature
--					if (has_ap_sae && !is_6ghz)
-+					if (has_ap_sae && !is_6ghz && hwtype != 'mtwifi')
- 						crypto_modes.push(['sae-compat', 'WPA2-PSK/WPA3-SAE Compatibility Mode', 30]);
- 
- 					if (!is_6ghz && (has_ap_wep || has_sta_wep)) {
-@@ -1904,7 +1951,7 @@
- 				}
- 
- 
--				if (hwtype == 'mac80211') {
-+				if (hwtype == 'mac80211' || hwtype == 'mtwifi') {
- 
- 					// Probe 802.11r support (and EAP support as a proxy for Openwrt)
- 					const has_80211r = L.hasSystemFeature('hostapd', '11r') || L.hasSystemFeature('hostapd', 'eap');
-@@ -2019,7 +2066,7 @@
- 					/* 802.11v settings end */
- 				}
- 
--				if (hwtype == 'mac80211') {
-+				if (hwtype == 'mac80211' || hwtype == 'mtwifi') {
- 					o = ss.taboption('encryption', form.ListValue, 'eap_type', _('EAP-Method'));
- 					o.value('tls',  'TLS');
- 					o.value('ttls', 'TTLS');
-@@ -2133,11 +2180,13 @@
- 					o.password = true;
- 
- 
--					if (hwtype == 'mac80211') {
-+					if (hwtype == 'mac80211' || hwtype == 'mtwifi') {
+@@ -2153,8 +2175,10 @@
+ 					if (hwtype == 'mac80211' || hwtype == 'mtwifi') {
  						// ieee802.11w options
  						o = ss.taboption('encryption', form.ListValue, 'ieee80211w', _('802.11w Management Frame Protection'), _("Note: Some wireless drivers do not fully support 802.11w. E.g. mwlwifi may have problems"));
 -						o.value('0', _('Disabled'));
@@ -245,7 +196,7 @@
  						o.value('2', _('Required'));
  						add_dependency_permutations(o, { mode: ['ap', 'ap-wds', 'sta', 'sta-wds'], encryption: ['owe', 'psk2', 'psk-mixed', 'sae', 'sae-mixed', 'wpa2', 'wpa3', 'wpa3-mixed'] });
  
-@@ -2192,9 +2241,11 @@
+@@ -2209,9 +2233,11 @@
  						o = ss.taboption('encryption', form.Flag, 'wpa_disable_eapol_key_retries', _('Enable key reinstallation (KRACK) countermeasures'), _('Complicates key reinstallation attacks on the client side by disabling retransmission of EAPOL-Key frames that are used to install keys. This workaround might cause interoperability issues and reduced robustness of key negotiation especially in environments with heavy traffic load.'));
  						add_dependency_permutations(o, { mode: ['ap', 'ap-wds'], encryption: ['psk2', 'psk-mixed', 'sae', 'sae-mixed', 'sae-compat', 'wpa2', 'wpa3', 'wpa3-mixed'] });
  
@@ -260,7 +211,7 @@
  
  						o = ss.taboption('encryption', form.Flag, 'sae_ext_key', _('SAE-EXT-KEY (SAE-GDH)'), _('Advertise the SAE-EXT-KEY AKM (SAE using a group-dependent hash). Mandatory for Wi-Fi 7 (EHT) and recommended otherwise, but some clients misbehave when it is offered, in particular together with 802.11r Fast Transition. Enabled by default only in Compatibility Mode on a Wi-Fi 7 (EHT) radio, disabled otherwise.'));
  						add_dependency_permutations(o, { mode: ['ap', 'ap-wds'], encryption: ['sae', 'sae-mixed', 'sae-compat'] });
-@@ -2380,6 +2431,14 @@
+@@ -2397,6 +2423,14 @@
  			const is_wep = (enc && Array.isArray(enc.wep));
  			const is_psk = (enc && Array.isArray(enc.wpa) && L.toArray(enc.authentication).some(a => a == 'psk'));
  			const is_sae = (enc && Array.isArray(enc.wpa) && L.toArray(enc.authentication).some(a => a == 'sae'));
@@ -275,23 +226,23 @@
  
  			if (nameval == null || (passopt && passval == null))
  				return;
-@@ -2405,7 +2464,14 @@
+@@ -2422,7 +2456,14 @@
  
  				const htmodes = radioDev.getHTModes();
  
 -				if (bss.vht_operation && htmodes && htmodes.indexOf('VHT20') !== -1) {
 +				if (isMtwifi) {
-+					// Joining must not erase a valid MTK width or select VHT on 6 GHz.
 +					const current = uci.get('wireless', radioDev.getName(), 'htmode');
 +					const allowed = L.toArray(htmodes).filter(m => !is6GHz || /^(HE|EHT)/.test(m));
 +					const fallback = ['EHT20', 'HE20', 'VHT20', 'HT20'].find(m => allowed.includes(m));
-+					uci.set('wireless', radioDev.getName(), 'htmode', allowed.includes(current) ? current : (fallback || 'NOHT'));
++					const currentMode = /^EHT320-[12]$/.test(current || '') ? 'EHT320' : current;
++					uci.set('wireless', radioDev.getName(), 'htmode', allowed.includes(currentMode) ? current : (fallback || 'NOHT'));
 +				}
 +				else if (bss.vht_operation && htmodes && htmodes.indexOf('VHT20') !== -1) {
  					for (let w = bss.vht_operation.channel_width; w >= 20; w /= 2) {
  						if (htmodes.indexOf('VHT'+w) !== -1) {
  							uci.set('wireless', radioDev.getName(), 'htmode', 'VHT'+w);
-@@ -2461,6 +2527,9 @@
+@@ -2478,6 +2519,9 @@
  
  					uci.set('wireless', section_id, 'key', passval);
  				}
@@ -301,7 +252,7 @@
  				else if (is_wep) {
  					uci.set('wireless', section_id, 'encryption', 'wep-open');
  					uci.set('wireless', section_id, 'key', '1');
-@@ -2469,6 +2538,9 @@
+@@ -2486,6 +2530,9 @@
  				else {
  					uci.set('wireless', section_id, 'encryption', 'none');
  				}

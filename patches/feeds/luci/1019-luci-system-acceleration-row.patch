@@ -1,0 +1,80 @@
+Subject: [PATCH] luci: show cached PPE counts in the system overview
+
+Keep the original CPU, active frequency, temperature and all other overview
+fields. Display only the requested IPv4 and IPv6 PPE binding counts.
+
+--- a/feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js
++++ b/feeds/luci/modules/luci-mod-status/htdocs/luci-static/resources/view/status/include/10_system.js
+@@ -45,6 +45,25 @@
+ 	method: 'getTempInfo'
+ });
+ 
++var callAccelerationStatus = rpc.declare({
++	object: 'router.status',
++	method: 'getAccelerationStatus'
++});
++
++function formatAcceleration(status, uptime) {
++	if (status.schema !== 1 || status.available !== true ||
++		!Number.isInteger(status.sampled_uptime) || !Number.isFinite(uptime) ||
++		status.sampled_uptime > uptime || uptime - status.sampled_uptime > 20)
++		return 'PPE: ' + _('No recent sample');
++	var ppe = status.ppe || {};
++	var counts = [ppe.ipv4, ppe.ipv6, ppe.other, ppe.bound, ppe.capacity];
++	if (ppe.available === true && ppe.unit === 'bound_table_entries' &&
++		counts.every(function(n) { return Number.isInteger(n) && n >= 0; }) &&
++		ppe.ipv4 + ppe.ipv6 + ppe.other === ppe.bound && ppe.bound <= ppe.capacity)
++		return 'PPE IPv4: %d · IPv6: %d'.format(ppe.ipv4, ppe.ipv6);
++	return 'PPE: ' + _('Unavailable');
++}
++
+ return baseclass.extend({
+ 	title: _('System'),
+ 
+@@ -58,7 +77,8 @@
+ 			L.resolveDefault(callTempInfo(), {}),
+ 			L.resolveDefault(callLuciVersion(), { revision: _('unknown version'), branch: 'LuCI' }),
+ 			L.resolveDefault(callGetUnixtime(), 0),
+-			uci.load('system')
++			uci.load('system'),
++			L.resolveDefault(callAccelerationStatus(), {})
+ 		]);
+ 	},
+ 
+@@ -104,7 +124,8 @@
+ 				systeminfo.load[1] / 65535.0,
+ 				systeminfo.load[2] / 65535.0
+ 			) : null,
+-			_('CPU usage (%)'),    cpuusage.cpuusage
++			_('CPU usage (%)'),    cpuusage.cpuusage,
++			_('Hardware acceleration engines'), formatAcceleration(data[9], systeminfo.uptime)
+ 		];
+ 
+ 		if (tempinfo.tempinfo) {
+--- a/feeds/luci/modules/luci-mod-status/root/usr/share/rpcd/acl.d/luci-mod-status-index.json
++++ b/feeds/luci/modules/luci-mod-status/root/usr/share/rpcd/acl.d/luci-mod-status-index.json
+@@ -11,7 +11,8 @@
+ 			"ubus": {
+ 				"luci": [ "getVersion", "getUnixtime", "getOdhcp6cStats", "getBuiltinEthernetPorts" ],
+ 				"file": [ "list", "read" ],
+-				"system": [ "board", "info" ]
++				"system": [ "board", "info" ],
++				"router.status": [ "getAccelerationStatus" ]
+ 			}
+ 		},
+ 		"write": {
+--- a/feeds/luci/modules/luci-base/po/zh_Hans/base.po
++++ b/feeds/luci/modules/luci-base/po/zh_Hans/base.po
+@@ -14840,3 +14840,12 @@
+ 
+ msgid "Temperature"
+ msgstr "温度"
++
++msgid "Hardware acceleration engines"
++msgstr "硬件加速引擎"
++
++msgid "No recent sample"
++msgstr "暂无有效采样"
++
++msgid "Unavailable"
++msgstr "不可用"

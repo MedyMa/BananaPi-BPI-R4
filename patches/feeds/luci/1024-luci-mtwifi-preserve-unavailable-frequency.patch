@@ -1,0 +1,59 @@
+diff --git a/feeds/luci/modules/luci-base/po/zh_Hans/base.po b/feeds/luci/modules/luci-base/po/zh_Hans/base.po
+index 60d0ac2..577b1b1 100644
+--- a/feeds/luci/modules/luci-base/po/zh_Hans/base.po
++++ b/feeds/luci/modules/luci-base/po/zh_Hans/base.po
+@@ -2286,6 +2286,9 @@ msgid "Could not request a wireless rebuild."
+ msgstr "无法请求重建无线。"
+ 
+ 
++msgid "Wireless band or channel information is unavailable. Refresh before saving."
++msgstr "无线频段或信道信息不可用，请刷新后再保存。"
++
+ #: modules/luci-base/htdocs/luci-static/resources/network.js:3054
+ #: modules/luci-compat/luasrc/model/network.lua:1421
+ msgid "Bridge"
+diff --git a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
+index 07e7198..015c6d5 100644
+--- a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
++++ b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
+@@ -296,6 +296,15 @@ function add_dependency_permutations(o, deps) {
+ 	res.forEach(dep => o.depends(dep));
+ }
+ 
++function validate_mtwifi_frequency(section_id, value) {
++	if (uci.get('wireless', section_id, 'type') != 'mtwifi')
++		return true;
++	return Array.isArray(value) && !!value[0] &&
++		['2g', '5g', '6g'].includes(value[1]) &&
++		(value[2] == 'auto' || /^[1-9][0-9]*$/.test(String(value[2] || ''))) ||
++		_('Wireless band or channel information is unavailable. Refresh before saving.');
++}
++
+ // Default gcmp256/sae_ext_key like the wifi-scripts backend: on only for
+ // WPA3-Personal Compatibility Mode (sae-compat) on an EHT (Wi-Fi 7) radio, off
+ // otherwise. htmode is a radio property, not a wifi-iface one, so it cannot be a
+@@ -614,14 +623,19 @@ var CBIWifiFrequencyValue = form.Value.extend({
+ 	formvalue: function(section_id) {
+ 		const node = this.map.findElement('data-field', this.cbid(section_id));
+ 
+-		return [
+-		    node.querySelector('.htmode').value,
+-		    node.querySelector('.band').value,
+- 			node.querySelector('.channel').value
+-		];
++		const mode = node.querySelector('.mode');
++		let width = node.querySelector('.htmode').value;
++		if (uci.get('wireless', section_id, 'type') == 'mtwifi' &&
++		    mode.selectedIndex >= 0 && mode.value == '')
++			width = 'NOHT';
++		return [width, node.querySelector('.band').value, node.querySelector('.channel').value];
+ 	},
+ 
++	validate: validate_mtwifi_frequency,
++
+ 	write: function(section_id, value) {
++		const valid = validate_mtwifi_frequency(section_id, value);
++		if (valid !== true) throw new Error(valid);
+ 		const isMtwifi = uci.get('wireless', section_id, 'type') == 'mtwifi';
+ 		uci.set('wireless', section_id, 'htmode', value[0] || (isMtwifi ? 'NOHT' : null));
+ 

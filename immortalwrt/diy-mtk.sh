@@ -75,51 +75,43 @@ verify_ucode_wifi7() {
     echo '[DIY] verified: vendor OSAL/cfg80211, shared wpad and ucode management'
 }
 
-configure_ucode_luci() {
+configure_luci() {
+    local LC_ALL=C
     local build_root="${GITHUB_WORKSPACE:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
-    local page='feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js'
-    local vendor_tools='feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/tools/mtwifi.js'
-    local vendor_acl='feeds/luci/modules/luci-mod-network/root/usr/share/rpcd/acl.d/luci-mod-network.json'
-    local marker
-    local compat_patch="$build_root/patches/filogic/25.12/1012-luci-wireless-mtwifi-ucode.patch"
-    [ -r "$page" ] || {
-        echo 'The ucode firmware requires the LuCI wireless page' >&2
+    local patch_dir="$build_root/patches/feeds/luci"
+    local overview="$patch_dir/1019-luci-system-acceleration-row.patch"
+    local index
+    local -a wireless=("$patch_dir"/102[0-8]-luci-mtwifi-*.patch)
+
+    if ! git apply --reverse --check "$overview" >/dev/null 2>&1; then
+        git apply "$overview"
+    fi
+    grep -qx 'CONFIG_PACKAGE_mtwifi-scripts=y' .config || return 0
+    [ -f "${wireless[0]}" ] || {
+        echo 'MTK wireless LuCI patches are missing' >&2
         return 1
     }
-    if grep -qF 'require tools.mtwifi as mtwifi' "$page"; then
-        for marker in 'mtwifi.addDeviceOptions(' 'mtwifi.addIfaceOptions(' 'mtwifi.handleSaveApply('; do
-            grep -qF "$marker" "$page" || {
-                echo 'The source-owned MTK wireless page is incomplete' >&2
-                return 1
-            }
-        done
-        [ -r "$vendor_tools" ] && [ -r "$vendor_acl" ] && \
-            grep -qF '/usr/sbin/mtwifi-mlo-status' "$vendor_acl" && \
-            grep -qF '/usr/sbin/mtwifi-mlo-control' "$vendor_acl" || {
-                echo 'The source-owned MTK wireless tools or MLO permissions are missing' >&2
-                return 1
-            }
-        echo '[DIY] using source-owned MTK wireless controls and managed MLO'
-        return 0
-    fi
-    [ -r "$compat_patch" ] || {
-        echo 'The ucode firmware requires the LuCI wireless page and compatibility patch' >&2
-        return 1
-    }
-    if ! git apply --reverse --check "$compat_patch" >/dev/null 2>&1; then
-        git apply --check "$compat_patch"
-        git apply "$compat_patch"
-    fi
-    echo '[DIY] adapted the native LuCI wireless page for mtwifi ucode management'
+
+    # Later patches may change earlier context. Resume after the latest match.
+    for ((index=${#wireless[@]}-1; index>=0; index--)); do
+        if git apply --reverse --check "${wireless[index]}" >/dev/null 2>&1; then
+            break
+        fi
+    done
+    for ((index+=1; index<${#wireless[@]}; index++)); do
+        git apply "${wireless[index]}"
+    done
 }
 
 case "${1:-}" in
     --configure)
         configure_wifi7 "${2:-.config}"
-        if [ "${2:-.config}" = '.config' ] && grep -qx 'CONFIG_PACKAGE_mtwifi-scripts=y' .config; then
-            make defconfig
-            verify_ucode_wifi7 .config
-            configure_ucode_luci
+        if [ "${2:-.config}" = '.config' ]; then
+            if grep -qx 'CONFIG_PACKAGE_mtwifi-scripts=y' .config; then
+                make defconfig
+                verify_ucode_wifi7 .config
+            fi
+            configure_luci
         fi
         exit ;;
     --verify-ucode) verify_ucode_wifi7 "${2:-.config}"; exit ;;

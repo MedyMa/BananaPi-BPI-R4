@@ -1,0 +1,216 @@
+diff --git a/feeds/luci/modules/luci-base/po/zh_Hans/base.po b/feeds/luci/modules/luci-base/po/zh_Hans/base.po
+index da9430f..60d0ac2 100644
+--- a/feeds/luci/modules/luci-base/po/zh_Hans/base.po
++++ b/feeds/luci/modules/luci-base/po/zh_Hans/base.po
+@@ -2258,6 +2258,34 @@ msgstr "边框"
+ msgid "Both \"Relay from\" and \"Relay to address\" must be specified."
+ msgstr "“中继来源”和“中继目标地址”都需要指定。"
+ 
++msgid "Wireless devices are being rebuilt. Connections may briefly disconnect."
++msgstr "正在重建无线设备，连接可能短暂中断。"
++
++msgid "Wireless rebuild failed. Check the wireless status before retrying."
++msgstr "无线重建失败，请检查无线状态后重试。"
++
++msgid "This change requires restarting the wireless driver."
++msgstr "此更改需要重启无线驱动。"
++
++msgid "This wireless driver does not support dynamic or per-station VLANs."
++msgstr "当前无线驱动不支持动态 VLAN 或按客户端分配 VLAN。"
++
++msgid "Wireless rebuild failed; the previous configuration has been restored."
++msgstr "无线重建失败，已恢复之前的配置。"
++
++msgid "Wireless rebuild failed; manual recovery is required."
++msgstr "无线重建失败，需要手动恢复。"
++
++msgid "Apply or discard other wireless changes before retrying."
++msgstr "重试前请先应用或放弃其他无线更改。"
++
++msgid "Wireless rebuild requested. Refresh the wireless status shortly."
++msgstr "已请求重建无线，请稍后刷新无线状态。"
++
++msgid "Could not request a wireless rebuild."
++msgstr "无法请求重建无线。"
++
++
+ #: modules/luci-base/htdocs/luci-static/resources/network.js:3054
+ #: modules/luci-compat/luasrc/model/network.lua:1421
+ msgid "Bridge"
+diff --git a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/tools/mtwifi.js b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/tools/mtwifi.js
+index 6c00c24..b83c762 100644
+--- a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/tools/mtwifi.js
++++ b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/tools/mtwifi.js
+@@ -4,6 +4,68 @@
+ 'require ui';
+ 'require uci';
+ 'require form';
++'require network';
++
++
++let runtimeCapabilities = {};
++
++function supportsApVlan(radio) {
++	return runtimeCapabilities[radio]?.ap_vlan === true;
++}
++
++function hasVlanSettings(id) {
++	return +uci.get('wireless', id, 'dynamic_vlan') > 0 ||
++		uci.get('wireless', id, 'per_sta_vif') == '1';
++}
++
++function validateVlan(id, value) {
++	const radio = uci.get('wireless', id, 'device');
++	return supportsApVlan(radio) || !+value ||
++		_('This wireless driver does not support dynamic or per-station VLANs.');
++}
++
++function loadCapabilities() {
++	if (!uci.sections('wireless', 'wifi-device').some(radio => radio.type == 'mtwifi'))
++		return Promise.resolve();
++	const messages = {
++		DRIVER_REBUILD_PENDING: _('Wireless devices are being rebuilt. Connections may briefly disconnect.'),
++		DRIVER_REBUILD_FAILED: _('Wireless rebuild failed. Check the wireless status before retrying.'),
++		DRIVER_RESTART_REQUIRED: _('This change requires restarting the wireless driver.'),
++		AP_VLAN_NOT_SUPPORTED: _('This wireless driver does not support dynamic or per-station VLANs.')
++	};
++	for (const [code, message] of Object.entries(messages))
++		network.registerErrorCode(code, message);
++	return fs.exec('/sbin/l1util', ['capabilities']).then(result => {
++		if (result.code != 0) throw new Error('capabilities unavailable');
++		const data = JSON.parse(result.stdout);
++		runtimeCapabilities = data.radios || {};
++		if (data.rebuild?.phase == 'failed') {
++			const content = [ E('p', {}, data.rebuild.recovered ?
++				_('Wireless rebuild failed; the previous configuration has been restored.') :
++				_('Wireless rebuild failed; manual recovery is required.')) ];
++			if (L.hasViewPermission())
++				content.push(E('button', {
++					'class': 'btn cbi-button-action',
++					'click': ui.createHandlerFn(null, function(ev) {
++						if (mlo_has_pending_wireless_changes()) {
++							ui.addNotification(null, E('p', {}, _('Apply or discard other wireless changes before retrying.')), 'warning');
++							return;
++						}
++						const button = ev.currentTarget;
++						button.disabled = true;
++						return fs.exec('/sbin/wifi', ['rebuild']).then(result => {
++							if (result.code != 0) throw new Error('retry failed');
++							ui.addNotification(null, E('p', {}, _('Wireless rebuild requested. Refresh the wireless status shortly.')), 'info');
++						}).catch(() => {
++							button.disabled = false;
++							ui.addNotification(null, E('p', {}, _('Could not request a wireless rebuild.')), 'error');
++						});
++					})
++				}, _('Retry')));
++			ui.addNotification(null, E('div', {}, content), 'warning');
++		}
++	}).catch(() => { runtimeCapabilities = {}; });
++}
+ 
+ // MTK private controls and the existing transactional MLO manager.
+ function mlo_error_text(code) {
+@@ -786,5 +848,6 @@ function handleSaveApply(view, ev, mode, fallback) {
+ 
+ return baseclass.extend({
+ 	addDeviceOptions, addIfaceOptions, handleSaveApply,
++	loadCapabilities, supportsApVlan, hasVlanSettings, validateVlan,
+ 	cancel: function() { mlo_pending_action = null; }
+ });
+diff --git a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
+index 41062f2..07e7198 100644
+--- a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
++++ b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
+@@ -841,7 +841,7 @@ return view.extend({
+ 			uci.load('wireless'),
+ 			uci.load('system'),
+ 			firewall.getZones(),
+-		]);
++		]).then(data => mtwifi.loadCapabilities().then(() => data));
+ 	},
+ 
+ 	checkAnonymousSections: function() {
+@@ -1831,42 +1831,51 @@ return view.extend({
+ 				o.validate = attr_validate;
+ 				o.placeholder = '77:x:74657374696e67';
+ 
+-				o = ss.taboption('encryption', form.ListValue, 'dynamic_vlan', _('RADIUS Dynamic VLAN Assignment'), _('Required: Rejects auth if RADIUS server does not provide appropriate VLAN attributes.'));
+-				add_dependency_permutations(o, { mode: ['ap', 'ap-wds'], encryption: ['wpa', 'wpa2', 'wpa3', 'wpa3-mixed', 'wpa3-192'] });
+-				add_dependency_permutations(o, { mode: ['ap', 'ap-wds'], encryption: ['psk', 'psk2', 'psk+psk2', 'psk-mixed'], ppsk: ['1'] });
+-				o.value('0', _('Disabled'));
+-				o.value('1', _('Optional'));
+-				o.value('2', _('Required'));
+-				o.write = function (section_id, value) {
+-					return this.super('write', [section_id, (value == 0) ? null: value]);
+-				};
++				if (hwtype != 'mtwifi' || mtwifi.supportsApVlan(radioNet.getWifiDeviceName()) ||
++				    mtwifi.hasVlanSettings(s.section)) {
++					o = ss.taboption('encryption', form.ListValue, 'dynamic_vlan', _('RADIUS Dynamic VLAN Assignment'), _('Required: Rejects auth if RADIUS server does not provide appropriate VLAN attributes.'));
++					add_dependency_permutations(o, { mode: ['ap', 'ap-wds'], encryption: ['wpa', 'wpa2', 'wpa3', 'wpa3-mixed', 'wpa3-192'] });
++					add_dependency_permutations(o, { mode: ['ap', 'ap-wds'], encryption: ['psk', 'psk2', 'psk+psk2', 'psk-mixed'], ppsk: ['1'] });
++					if (hwtype == 'mtwifi') o.validate = mtwifi.validateVlan;
++					o.value('0', _('Disabled'));
++					o.value('1', _('Optional'));
++					o.value('2', _('Required'));
++					o.write = function (section_id, value) {
++						return this.super('write', [section_id, (value == 0) ? null: value]);
++					};
+ 
+-				o = ss.taboption('encryption', form.Flag, 'per_sta_vif', _('RADIUS Per STA VLAN'), _('Each STA is assigned its own AP_VLAN interface.'));
+-				add_dependency_permutations(o, { mode: ['ap', 'ap-wds'], encryption: ['wpa', 'wpa2', 'wpa3', 'wpa3-mixed', 'wpa3-192'] });
+-				add_dependency_permutations(o, { mode: ['ap', 'ap-wds'], encryption: ['psk', 'psk2', 'psk+psk2', 'psk-mixed'], ppsk: ['1'] });
++					o = ss.taboption('encryption', form.Flag, 'per_sta_vif', _('RADIUS Per STA VLAN'), _('Each STA is assigned its own AP_VLAN interface.'));
++					if (hwtype == 'mtwifi') o.validate = mtwifi.validateVlan;
++					add_dependency_permutations(o, { mode: ['ap', 'ap-wds'], encryption: ['wpa', 'wpa2', 'wpa3', 'wpa3-mixed', 'wpa3-192'] });
++					add_dependency_permutations(o, { mode: ['ap', 'ap-wds'], encryption: ['psk', 'psk2', 'psk+psk2', 'psk-mixed'], ppsk: ['1'] });
+ 
+-				//hostapd internally defaults to vlan_naming=1 even with dynamic VLAN off
+-				o = ss.taboption('encryption', form.Flag, 'vlan_naming', _('RADIUS VLAN Naming'), _('Off: <code>vlanXXX</code>, e.g., <code>vlan1</code>. On: <code>vlan_tagged_interface.XXX</code>, e.g. <code>eth0.1</code>.'));
+-				add_dependency_permutations(o, { mode: ['ap', 'ap-wds'], encryption: ['wpa', 'wpa2', 'wpa3', 'wpa3-mixed', 'wpa3-192'] });
+-				add_dependency_permutations(o, { mode: ['ap', 'ap-wds'], encryption: ['psk', 'psk2', 'psk+psk2', 'psk-mixed'], ppsk: ['1'] });
+-				o.enabled = '1';
+-				o.disabled = '0';
+-				o.default = o.enabled;
++					//hostapd internally defaults to vlan_naming=1 even with dynamic VLAN off
++					o = ss.taboption('encryption', form.Flag, 'vlan_naming', _('RADIUS VLAN Naming'), _('Off: <code>vlanXXX</code>, e.g., <code>vlan1</code>. On: <code>vlan_tagged_interface.XXX</code>, e.g. <code>eth0.1</code>.'));
++					add_dependency_permutations(o, { mode: ['ap', 'ap-wds'], encryption: ['wpa', 'wpa2', 'wpa3', 'wpa3-mixed', 'wpa3-192'] });
++					add_dependency_permutations(o, { mode: ['ap', 'ap-wds'], encryption: ['psk', 'psk2', 'psk+psk2', 'psk-mixed'], ppsk: ['1'] });
++					o.enabled = '1';
++					o.disabled = '0';
++					o.default = o.enabled;
+ 
+-				o = ss.taboption('encryption', widgets.DeviceSelect, 'vlan_tagged_interface', _('RADIUS VLAN Tagged Interface'), _('E.g. eth0, eth1'));
+-				add_dependency_permutations(o, { mode: ['ap', 'ap-wds'], encryption: ['wpa', 'wpa2', 'wpa3', 'wpa3-mixed', 'wpa3-192'] });
+-				add_dependency_permutations(o, { mode: ['ap', 'ap-wds'], encryption: ['psk', 'psk2', 'psk+psk2', 'psk-mixed'], ppsk: ['1'] });
+-				o.size = 1;
+-				o.rmempty = true;
+-				o.multiple = false;
+-				o.noaliases = true;
+-				o.nocreate = true;
+-				o.noinactive = true;
++					o = ss.taboption('encryption', widgets.DeviceSelect, 'vlan_tagged_interface', _('RADIUS VLAN Tagged Interface'), _('E.g. eth0, eth1'));
++					add_dependency_permutations(o, { mode: ['ap', 'ap-wds'], encryption: ['wpa', 'wpa2', 'wpa3', 'wpa3-mixed', 'wpa3-192'] });
++					add_dependency_permutations(o, { mode: ['ap', 'ap-wds'], encryption: ['psk', 'psk2', 'psk+psk2', 'psk-mixed'], ppsk: ['1'] });
++					o.size = 1;
++					o.rmempty = true;
++					o.multiple = false;
++					o.noaliases = true;
++					o.nocreate = true;
++					o.noinactive = true;
+ 
+-				o = ss.taboption('encryption', form.Value, 'vlan_bridge', _('RADIUS VLAN Bridge Naming Scheme'), _('E.g. <code>br-vlan</code> or <code>brvlan</code>.'));
+-				add_dependency_permutations(o, { mode: ['ap', 'ap-wds'], encryption: ['wpa', 'wpa2', 'wpa3', 'wpa3-mixed', 'wpa3-192'] });
+-				add_dependency_permutations(o, { mode: ['ap', 'ap-wds'], encryption: ['psk', 'psk2', 'psk+psk2', 'psk-mixed'], ppsk: ['1'] });
+-				o.rmempty = true;
++					o = ss.taboption('encryption', form.Value, 'vlan_bridge', _('RADIUS VLAN Bridge Naming Scheme'), _('E.g. <code>br-vlan</code> or <code>brvlan</code>.'));
++					add_dependency_permutations(o, { mode: ['ap', 'ap-wds'], encryption: ['wpa', 'wpa2', 'wpa3', 'wpa3-mixed', 'wpa3-192'] });
++					add_dependency_permutations(o, { mode: ['ap', 'ap-wds'], encryption: ['psk', 'psk2', 'psk+psk2', 'psk-mixed'], ppsk: ['1'] });
++					o.rmempty = true;
++				} else {
++					o = ss.taboption('encryption', form.DummyValue, '_mtwifi_vlan_support', _('RADIUS Dynamic VLAN Assignment'));
++					o.cfgvalue = () => _('This wireless driver does not support dynamic or per-station VLANs.');
++					add_dependency_permutations(o, { mode: ['ap', 'ap-wds'], encryption: ['wpa', 'wpa2', 'wpa3', 'wpa3-mixed', 'wpa3-192'] });
++				}
+ 
+ 				/* extra RADIUS settings end */
+ 

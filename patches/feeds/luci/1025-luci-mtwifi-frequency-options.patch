@@ -1,0 +1,177 @@
+diff --git a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
+--- a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
++++ b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
+@@ -299,10 +299,20 @@
+ function validate_mtwifi_frequency(section_id, value) {
+ 	if (uci.get('wireless', section_id, 'type') != 'mtwifi')
+ 		return true;
+-	return Array.isArray(value) && !!value[0] &&
+-		['2g', '5g', '6g'].includes(value[1]) &&
+-		(value[2] == 'auto' || /^[1-9][0-9]*$/.test(String(value[2] || ''))) ||
+-		_('Wireless band or channel information is unavailable. Refresh before saving.');
++	if (!Array.isArray(value) || !value[0] || ['2g', '5g', '6g'].indexOf(value[1]) < 0 ||
++	    !(value[2] == 'auto' || /^[1-9][0-9]*$/.test(String(value[2] || ''))))
++		return _('Wireless band or channel information is unavailable. Refresh before saving.');
++	var band = value[1], mode = String(value[0]).match(/^(HT|VHT|HE|EHT)(20|40|80|160|320)([+-]|-[12])?$/);
++	var valid = value[0] == 'NOHT' ? band != '6g' : mode &&
++		!(mode[1] == 'VHT' && band != '5g') && !(mode[1] == 'HT' && +mode[2] > 40) &&
++		!(band == '2g' && +mode[2] > 40) && !(band != '6g' && +mode[2] > 160) &&
++		!(band == '6g' && ['HE', 'EHT'].indexOf(mode[1]) < 0) &&
++		!(+mode[2] == 320 && mode[1] != 'EHT') &&
++		(!mode[3] || (+mode[2] == 40 && ['+', '-'].indexOf(mode[3]) >= 0) ||
++		 (mode[1] == 'EHT' && +mode[2] == 320 && ['-1', '-2'].indexOf(mode[3]) >= 0));
++	if (!valid || (value[2] != 'auto' && +value[2] > (band == '2g' ? 14 : band == '5g' ? 196 : 233)))
++		return _('Invalid wireless band, mode or bandwidth.');
++	return true;
+ }
+ 
+ // Default gcmp256/sae_ext_key like the wifi-scripts backend: on only for
+@@ -346,6 +356,7 @@
+ 
+ 	// Load method to fetch WiFi device details and frequency list
+ 	load: function(section_id) {
++		this.mtwifi = uci.get('wireless', section_id, 'type') == 'mtwifi';
+ 		return Promise.all([
+ 			network.getWifiDevice(section_id),
+ 			this.callFrequencyList(section_id)
+@@ -377,14 +388,21 @@
+ 				);
+ 			});
+ 
++			var hasBand = {};
++			Object.keys(this.channels).forEach(function(band) {
++				hasBand[band] = this.mtwifi ? this.channels[band].some(function(value, index) {
++					return index % 3 == 0 && value != 'auto';
++				}) : this.channels[band].length > (band == '60g' ? 0 : 3);
++			}, this);
++
+ 			const hwmodelist = L.toArray(wifidevs ? wifidevs.getHWModes() : null)
+ 				.reduce(function(o, v) { o[v] = true; return o; }, {});
+ 
+ 			// Define supported modes
+ 			this.modes = [
+-				'', 'Legacy', { available: hwmodelist.a || hwmodelist.b || hwmodelist.g },
+-				'n', 'N', { available: hwmodelist.n },
+-				'ac', 'AC', { available: L.hasSystemFeature('hostapd', '11ac') && hwmodelist.ac },
++				'', 'Legacy', { available: (hwmodelist.a || hwmodelist.b || hwmodelist.g) && (!this.mtwifi || hasBand['2g'] || hasBand['5g']) },
++				'n', 'N', { available: hwmodelist.n && (!this.mtwifi || hasBand['2g'] || hasBand['5g']) },
++				'ac', 'AC', { available: L.hasSystemFeature('hostapd', '11ac') && hwmodelist.ac && (!this.mtwifi || hasBand['5g']) },
+ 				'ax', 'AX', { available: L.hasSystemFeature('hostapd', '11ax') && hwmodelist.ax },
+ 				'be', 'BE', { available: L.hasSystemFeature('hostapd', '11be') && hwmodelist.be }
+ 			];
+@@ -426,28 +444,34 @@
+ 
+ 			// Define available bands for widget selection based on channel availability
+ 			// AX and BE are available on 2/5/6G bands
++			var configured = String(uci.get('wireless', section_id, 'htmode') || '').match(/^(HT|VHT|HE|EHT)40[+-]$/);
++			if (this.mtwifi && configured && htmodelist[configured[1] + '40']) {
++				var key = { HT: 'n', VHT: 'ac', HE: 'ax', EHT: 'be' }[configured[1]];
++				this.htmodes[key].push(configured[0], '40 MHz (' + configured[0].slice(-1) + ')', { available: true });
++			}
++
+ 			this.bands = {
+ 				'': [
+-					'2g', '2.4 GHz', { available: this.channels['2g'].length > 3 },
+-					'5g', '5 GHz', { available: this.channels['5g'].length > 3 },
++					'2g', '2.4 GHz', { available: hasBand['2g'] },
++					'5g', '5 GHz', { available: hasBand['5g'] },
+ 					'60g', '60 GHz', { available: this.channels['60g'].length > 0 }
+ 				],
+ 				'n': [
+-					'2g', '2.4 GHz', { available: this.channels['2g'].length > 3 },
+-					'5g', '5 GHz', { available: this.channels['5g'].length > 3 }
++					'2g', '2.4 GHz', { available: hasBand['2g'] },
++					'5g', '5 GHz', { available: hasBand['5g'] }
+ 				],
+ 				'ac': [
+-					'5g', '5 GHz', { available: true }
++					'5g', '5 GHz', { available: !this.mtwifi || hasBand['5g'] }
+ 				],
+ 				'ax': [
+-					'2g', '2.4 GHz', { available: this.channels['2g'].length > 3 },
+-					'5g', '5 GHz', { available: this.channels['5g'].length > 3 },
+-					'6g', '6 GHz', { available: this.channels['6g'].length > 3 }
++					'2g', '2.4 GHz', { available: hasBand['2g'] },
++					'5g', '5 GHz', { available: hasBand['5g'] },
++					'6g', '6 GHz', { available: hasBand['6g'] }
+ 				],
+ 				'be': [
+-					'2g', '2.4 GHz', { available: this.channels['2g'].length > 3 },
+-					'5g', '5 GHz', { available: this.channels['5g'].length > 3 },
+-					'6g', '6 GHz', { available: this.channels['6g'].length > 3 }
++					'2g', '2.4 GHz', { available: hasBand['2g'] },
++					'5g', '5 GHz', { available: hasBand['5g'] },
++					'6g', '6 GHz', { available: hasBand['6g'] }
+ 				]
+ 			};
+ 		}, this));
+@@ -471,6 +495,7 @@
+ 	},
+ 
+ 	toggleWifiMode: function(elem) {
++		if (this.mtwifi) return this.toggleWifiBand(elem);
+ 		this.toggleWifiHTMode(elem);
+ 		this.toggleWifiBand(elem);
+ 	},
+@@ -479,7 +504,20 @@
+ 		const mode = elem.querySelector('.mode');
+ 		const bwdt = elem.querySelector('.htmode');
+ 
+-		this.setValues(bwdt, this.htmodes[mode.value]);
++		var values = this.htmodes[mode.value], previous = bwdt.value;
++		if (this.mtwifi) {
++			var band = elem.querySelector('.band').value, filtered = [];
++			var maximum = band == '2g' ? 40 : band == '5g' ? 160 : band == '6g' ? 320 : 0;
++			for (var i = 0; values && i < values.length; i += 3) {
++				var width = +(String(values[i]).match(/[0-9]+/) || [20])[0];
++				if (width <= maximum && (width != 320 || (band == '6g' && mode.value == 'be')))
++					filtered.push(values[i], values[i+1], values[i+2]);
++			}
++			values = filtered;
++		}
++		this.setValues(bwdt, values);
++		if (this.mtwifi && bwdt.options && Array.prototype.some.call(bwdt.options, function(option) { return option.value == previous; }))
++			bwdt.value = previous;
+ 	},
+ 
+ 	toggleWifiBand: function(elem) {
+@@ -487,6 +525,7 @@
+ 		const band = elem.querySelector('.band');
+ 
+ 		this.setValues(band, this.bands[mode.value]);
++		if (this.mtwifi) this.toggleWifiHTMode(elem);
+ 		this.toggleWifiChannel(elem);
+ 
+ 		this.map.checkDepends();
+@@ -501,7 +540,8 @@
+ 		if (chan.selectedIndex < 0)
+ 			return;
+ 
+-		const no_outdoor = channels[(chan.selectedIndex*3)+2].no_outdoor;
++		const selected = channels.findIndex((value, index) => index % 3 == 0 && String(value) == chan.value);
++		const no_outdoor = channels[selected + 2]?.no_outdoor;
+ 		restricted_chan.style.display = no_outdoor ? '': 'none';
+ 	},
+ 
+@@ -555,7 +595,7 @@
+ 		this.toggleWifiBand(elem);
+ 
+ 		bwdt.value = htval;
+-		chan.value = chval ?? (chan.options[0] ? chan.options[0].value : 'auto');
++		chan.value = chval == '0' ? 'auto' : (chval ?? (chan.options[0] ? chan.options[0].value : 'auto'));
+ 
+ 		this.checkWifiChannelRestriction(elem);
+ 
+diff --git a/feeds/luci/modules/luci-base/po/zh_Hans/base.po b/feeds/luci/modules/luci-base/po/zh_Hans/base.po
+--- a/feeds/luci/modules/luci-base/po/zh_Hans/base.po
++++ b/feeds/luci/modules/luci-base/po/zh_Hans/base.po
+@@ -2285,6 +2285,9 @@
+ msgid "Could not request a wireless rebuild."
+ msgstr "无法请求重建无线。"
+ 
++
++msgid "Invalid wireless band, mode or bandwidth."
++msgstr "无线频段、模式或频宽无效。"
+ 
+ msgid "Wireless band or channel information is unavailable. Refresh before saving."
+ msgstr "无线频段或信道信息不可用，请刷新后再保存。"

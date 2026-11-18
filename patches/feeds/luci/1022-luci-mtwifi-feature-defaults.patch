@@ -1,0 +1,117 @@
+From: MedyMa <75345465+MedyMa@users.noreply.github.com>
+Subject: [PATCH] luci: enable MTK Wi-Fi 7 features by default
+
+diff --git a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/tools/mtwifi.js b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/tools/mtwifi.js
+--- a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/tools/mtwifi.js
++++ b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/tools/mtwifi.js
+@@ -637,6 +637,14 @@
+ 	return o;
+ }
+ 
++function featureFlag(section, key, title) {
++	const o = section.taboption('advanced', form.Flag, key, title);
++	o.default = o.enabled;
++	o.rmempty = false;
++	o.retain = true;
++	return o;
++}
++
+ function radioFeature(option, prefixes, modes, device) {
+ 	// Interface options depend on the radio's frequency widget, not a
+ 	// same-name field in the wifi-iface section. Use a fully qualified ID.
+@@ -670,17 +678,20 @@
+ 		profileOption(section, 'dfs', _('DFS'));
+ 		profileOption(section, 'zw_dfs', _('Zero-Wait DFS'));
+ 	}
+-	radioFeature(profileOption(section, 'he_ldpc', _('HE LDPC (all AP BSSIDs)')), ['HE', 'EHT']);
+-	profileOption(section, 'tx_burst', _('Transmit Burst'));
++	radioFeature(featureFlag(section, 'he_ldpc', _('HE LDPC (all AP BSSIDs)')), ['HE', 'EHT']);
++	featureFlag(section, 'tx_burst', _('Transmit Burst'));
+ 	profileOption(section, 'tx_preamble', _('Transmit Preamble'), [
+ 		['0', _('Long')], ['1', _('Short')], ['2', _('Auto')]
+ 	]);
+-	radioFeature(profileOption(section, 'mu_beamformer', _('MU-MIMO beamforming')), ['VHT', 'HE', 'EHT']);
+-	radioFeature(profileOption(section, 'twt', _('Target Wake Time'), [
+-		['0', _('Disabled')], ['1', _('Individual TWT')],
+-		['2', _('Broadcast TWT')], ['3', _('Individual and broadcast TWT')]
+-	]), ['HE', 'EHT']);
+-	radioFeature(profileOption(section, 'eht_restricted_twt', _('EHT Restricted TWT')), ['EHT']);
++	radioFeature(featureFlag(section, 'mu_beamformer', _('MU-MIMO beamforming')), ['VHT', 'HE', 'EHT']);
++	o = section.taboption('advanced', form.ListValue, 'twt', _('Target Wake Time'));
++	[['0', _('Disabled')], ['1', _('Individual TWT')],
++	 ['2', _('Broadcast TWT')], ['3', _('Individual and broadcast TWT')]].forEach(v => o.value(...v));
++	o.default = '3';
++	o.optional = false;
++	o.rmempty = false;
++	radioFeature(o, ['HE', 'EHT']);
++	radioFeature(featureFlag(section, 'eht_restricted_twt', _('EHT Restricted TWT')), ['EHT']);
+ 	if (band == '2g') {
+ 		o = section.taboption('advanced', form.Flag, 'noscan', _('Force 40MHz mode'),
+ 			_('Always use 40 MHz even when the secondary channel overlaps. This does not comply with IEEE 802.11n coexistence requirements.'));
+@@ -731,7 +742,7 @@
+ 		['ofdma_dl', _('OFDMA DL')], ['ofdma_ul', _('OFDMA UL')],
+ 		['amsdu', _('A-MSDU')], ['autoba', _('Auto Block ACK')], ['uapsd', _('U-APSD')]
+ 	]) {
+-		const o = profileOption(section, key, title);
++		const o = featureFlag(section, key, title);
+ 		if (['mumimo_dl', 'mumimo_ul', 'ofdma_dl', 'ofdma_ul'].includes(key))
+ 			radioFeature(o, ['HE', 'EHT'], ['ap', 'ap-wds'], radioNet.getWifiDeviceName());
+ 		else {
+diff --git a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
+--- a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
++++ b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
+@@ -312,6 +312,11 @@
+ 	const freq = dev ? this.map.lookupOption('_freq', dev) : null;
+ 	if (freq)
+ 		htmode = freq[0].formvalue(dev)?.[0] ?? htmode;
++
++	if (dev && uci.get('wireless', dev, 'type') == 'mtwifi') {
++		this.defaults = { [/^EHT/.test(htmode || '') ? '1' : '0']: [] };
++		return form.Flag.prototype.updateDefaultValue.call(this, section_id);
++	}
+ 
+ 	this.defaults = (htmode && htmode.match(/^EHT/))
+ 		? { '1': [{ encryption: 'sae-compat' }], '0': [{ encryption: 'sae' }, { encryption: 'sae-mixed' }] }
+@@ -2233,15 +2238,25 @@
+ 						o = ss.taboption('encryption', form.Flag, 'wpa_disable_eapol_key_retries', _('Enable key reinstallation (KRACK) countermeasures'), _('Complicates key reinstallation attacks on the client side by disabling retransmission of EAPOL-Key frames that are used to install keys. This workaround might cause interoperability issues and reduced robustness of key negotiation especially in environments with heavy traffic load.'));
+ 						add_dependency_permutations(o, { mode: ['ap', 'ap-wds'], encryption: ['psk2', 'psk-mixed', 'sae', 'sae-mixed', 'sae-compat', 'wpa2', 'wpa3', 'wpa3-mixed'] });
+ 
+-						if (hwtype != 'mtwifi') {
+-							o = ss.taboption('encryption', form.Flag, 'gcmp256', _('GCMP-256 pairwise cipher'), _('Advertise the GCMP-256 pairwise cipher. Mandatory for Wi-Fi 7 (EHT) and recommended otherwise, but some clients and chipsets fail to associate when it is offered. Enabled by default only in Compatibility Mode on a Wi-Fi 7 (EHT) radio, disabled otherwise.'));
+-							add_dependency_permutations(o, { mode: ['ap', 'ap-wds'], encryption: ['sae', 'sae-mixed', 'sae-compat'] });
+-							o.updateDefaultValue = eht_compat_default;
++						o = ss.taboption('encryption', form.Flag, 'gcmp256', _('GCMP-256 pairwise cipher'), _('Advertise the GCMP-256 pairwise cipher. Mandatory for Wi-Fi 7 (EHT) and recommended otherwise, but some clients and chipsets fail to associate when it is offered. Enabled by default only in Compatibility Mode on a Wi-Fi 7 (EHT) radio, disabled otherwise.'));
++						add_dependency_permutations(o, { mode: ['ap', 'ap-wds'], encryption: ['sae', 'sae-mixed', 'sae-compat'] });
++						o.updateDefaultValue = eht_compat_default;
++						if (hwtype == 'mtwifi') {
++							o.default = /^EHT/.test(uci.get('wireless', radioNet.getWifiDeviceName(), 'htmode') || '') ? '1' : '0';
++							o.rmempty = false;
++							o.description = _('Enabled by default on Wi-Fi 7 radios. Explicit settings are preserved.');
+ 						}
++
+ 
+ 						o = ss.taboption('encryption', form.Flag, 'sae_ext_key', _('SAE-EXT-KEY (SAE-GDH)'), _('Advertise the SAE-EXT-KEY AKM (SAE using a group-dependent hash). Mandatory for Wi-Fi 7 (EHT) and recommended otherwise, but some clients misbehave when it is offered, in particular together with 802.11r Fast Transition. Enabled by default only in Compatibility Mode on a Wi-Fi 7 (EHT) radio, disabled otherwise.'));
+ 						add_dependency_permutations(o, { mode: ['ap', 'ap-wds'], encryption: ['sae', 'sae-mixed', 'sae-compat'] });
+ 						o.updateDefaultValue = eht_compat_default;
++						if (hwtype == 'mtwifi') {
++							o.default = /^EHT/.test(uci.get('wireless', radioNet.getWifiDeviceName(), 'htmode') || '') ? '1' : '0';
++							o.rmempty = false;
++							o.description = _('Enabled by default on Wi-Fi 7 radios. Explicit settings are preserved.');
++						}
++
+ 
+ 						o = ss.taboption('encryption', form.Flag, 'transition_disable', _('Transition Disable'), _('Signal Transition Disable (WPA3 Specification v3.5 section 13) so that a client which has connected once no longer downgrades to a weaker security mode for this SSID. The advertised bitmap is derived from the encryption mode.'));
+ 						o.enabled = 'on';
+diff --git a/feeds/luci/modules/luci-base/po/zh_Hans/base.po b/feeds/luci/modules/luci-base/po/zh_Hans/base.po
+--- a/feeds/luci/modules/luci-base/po/zh_Hans/base.po
++++ b/feeds/luci/modules/luci-base/po/zh_Hans/base.po
+@@ -15150,6 +15150,9 @@
+ msgid "Quectel Cellular"
+ msgstr "移远蜂窝网络"
+ 
++msgid "Enabled by default on Wi-Fi 7 radios. Explicit settings are preserved."
++msgstr "Wi-Fi 7 电台默认启用，保留已明确保存的设置。"
++
+ msgid "Temperature"
+ msgstr "温度"
+ 

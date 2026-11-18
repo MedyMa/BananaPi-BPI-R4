@@ -1,0 +1,359 @@
+diff --git a/feeds/luci/modules/luci-base/po/zh_Hans/base.po b/feeds/luci/modules/luci-base/po/zh_Hans/base.po
+index ddb8ce0..57ae3b9 100644
+--- a/feeds/luci/modules/luci-base/po/zh_Hans/base.po
++++ b/feeds/luci/modules/luci-base/po/zh_Hans/base.po
+@@ -14,6 +14,141 @@ msgstr ""
+ "Plural-Forms: nplurals=1; plural=0;\n"
+ "X-Generator: Weblate 2026.11.dev0\n"
+ 
++msgid "AP count"
++msgstr "接入点数量"
++
++msgid "Absolute path on the router. Entries are combined with the list above."
++msgstr "填写路由器上的绝对路径。文件条目会与上方列表合并。"
++
++msgid "Allow a WPS registrar on the attached network bridge."
++msgstr "允许该网络桥上的 WPS 注册器管理此接入点。"
++
++msgid "Allowed primary channels"
++msgstr "允许的主信道"
++
++msgid "Automatic channel selection algorithm"
++msgstr "自动选频算法"
++
++msgid "Automatic channel selection could not read the radio channel list."
++msgstr "自动选频无法读取电台的信道列表。"
++
++msgid "Automatic selection may use these channels or channel ranges such as 36-48. Leave empty to use the radio channel list."
++msgstr "自动选频可使用这些信道或信道范围，例如 36-48。留空时使用电台的可用信道列表。"
++
++msgid "Automatic selection skips these additional channels."
++msgstr "自动选频时额外跳过这些信道。"
++
++msgid "Channel busy time"
++msgstr "信道忙碌时间"
++
++msgid "Channel load (CCA)"
++msgstr "信道负载（CCA）"
++
++msgid "Checking for radar (DFS CAC)"
++msgstr "正在检测雷达（DFS CAC）"
++
++msgid "Default (channel busy time)"
++msgstr "默认（信道忙碌时间）"
++
++msgid "Enable MAC address translation on this uplink. Locking the BSSID does not enable it."
++msgstr "在此上联启用 MAC 地址转换。锁定 BSSID 时需单独设置。"
++
++msgid "Enter an absolute file path."
++msgstr "请输入文件的绝对路径。"
++
++msgid "Enter valid channel numbers for this frequency band."
++msgstr "请输入该频段的有效信道号码。"
++
++msgid "Exclude DFS channels from automatic selection"
++msgstr "自动选频时跳过 DFS 信道"
++
++msgid "Excluded channels"
++msgstr "排除的信道"
++
++msgid "Implicit transmit beamforming"
++msgstr "隐式发射波束成形"
++
++msgid "MAC address list file"
++msgstr "MAC 地址列表文件"
++
++msgid "MAC address repeater"
++msgstr "MAC 地址中继"
++
++msgid "MLO links confirmed at apply"
++msgstr "应用设置时已确认 MLO 链路"
++
++msgid "MediaTek airtime fairness"
++msgstr "联发科空口时间公平性"
++
++msgid "MediaTek mWDS"
++msgstr "联发科 mWDS"
++
++msgid "MediaTek mWDS cannot be combined with WDS, MLO or MAC repeater on the same interface."
++msgstr "同一接口上的联发科 mWDS 与 WDS、MLO 或 MAC 地址中继互斥。"
++
++msgid "MediaTek spatial reuse"
++msgstr "联发科空间复用"
++
++msgid "No channel matches the automatic channel selection settings."
++msgstr "没有符合自动选频设置的信道。"
++
++msgid "Previous wireless configuration restored"
++msgstr "已恢复上一次生效的无线配置"
++
++msgid "RSN overriding"
++msgstr "RSN 覆盖"
++
++msgid "Select a primary channel from the 6 GHz PSC list using a channel load algorithm."
++msgstr "使用信道负载算法从 6 GHz PSC 列表中选择主信道。"
++
++msgid "Selecting a wireless channel"
++msgstr "正在选择无线信道"
++
++msgid "The MAC address filter exceeds the driver capacity."
++msgstr "MAC 地址过滤条目超过驱动容量。"
++
++msgid "The MAC address filter file contains invalid or conflicting entries."
++msgstr "MAC 地址过滤文件包含无效或冲突的条目。"
++
++msgid "The access point did not become ready in time."
++msgstr "接入点在规定时间内未就绪。"
++
++msgid "The access point failed to start."
++msgstr "接入点启动失败。"
++
++msgid "The access point status could not be read."
++msgstr "无法读取接入点状态。"
++
++msgid "The automatic channel selection list contains an invalid channel."
++msgstr "自动选频列表中包含无效信道。"
++
++msgid "The configured frequency band does not match the wireless radio."
++msgstr "配置的频段与实体电台不匹配。"
++
++msgid "This wireless build supports only 6 GHz indoor AP power mode."
++msgstr "此无线构建仅支持 6 GHz 室内低功率接入点。"
++
++msgid "Use 6 GHz preferred scanning channels"
++msgstr "使用 6 GHz 首选扫描信道"
++
++msgid "Use MediaTek four-address bridging with a peer configured for mWDS."
++msgstr "对端启用 mWDS 后，可使用联发科四地址桥接。"
++
++msgid "Use a channel load algorithm with 6 GHz PSC selection."
++msgstr "6 GHz PSC 自动选频需要使用信道负载算法。"
++
++msgid "Use the radio policy when this setting is empty. Standard RSN information takes priority."
++msgstr "留空时使用电台策略。优先使用标准 RSN 信息。"
++
++msgid "WPS client setup"
++msgstr "通过 WPS 配置客户端"
++
++msgid "WPS external registrar"
++msgstr "WPS 外部注册器"
++
++msgid "Waiting for the access point"
++msgstr "正在等待接入点就绪"
++
+ msgid "A-MSDU"
+ msgstr "MSDU聚合（A-MSDU）"
+ 
+diff --git a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/tools/mtwifi.js b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/tools/mtwifi.js
+index b83c762..89dbe73 100644
+--- a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/tools/mtwifi.js
++++ b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/tools/mtwifi.js
+@@ -31,7 +31,19 @@ function loadCapabilities() {
+ 		DRIVER_REBUILD_PENDING: _('Wireless devices are being rebuilt. Connections may briefly disconnect.'),
+ 		DRIVER_REBUILD_FAILED: _('Wireless rebuild failed. Check the wireless status before retrying.'),
+ 		DRIVER_RESTART_REQUIRED: _('This change requires restarting the wireless driver.'),
+-		AP_VLAN_NOT_SUPPORTED: _('This wireless driver does not support dynamic or per-station VLANs.')
++		AP_VLAN_NOT_SUPPORTED: _('This wireless driver does not support dynamic or per-station VLANs.'),
++		PHY_PROFILE_MISMATCH: _('The configured frequency band does not match the wireless radio.'),
++		ACS_CHANNELS_UNAVAILABLE: _('Automatic channel selection could not read the radio channel list.'),
++		ACS_INVALID_CHANNEL_LIST: _('The automatic channel selection list contains an invalid channel.'),
++		ACS_NO_ELIGIBLE_CHANNEL: _('No channel matches the automatic channel selection settings.'),
++		ACS_PSC_REQUIRES_BUSY_TIME: _('Use a channel load algorithm with 6 GHz PSC selection.'),
++		INVALID_MAC_ACL: _('The MAC address filter file contains invalid or conflicting entries.'),
++		MAC_ACL_TOO_LARGE: _('The MAC address filter exceeds the driver capacity.'),
++		HOSTAPD_ACTIVATION_FAILED: _('The access point failed to start.'),
++		HOSTAPD_ACTIVATION_TIMEOUT: _('The access point did not become ready in time.'),
++		HOSTAPD_STATUS_UNAVAILABLE: _('The access point status could not be read.'),
++		INVALID_MWDS_MODE: _('MediaTek mWDS cannot be combined with WDS, MLO or MAC repeater on the same interface.'),
++		SIX_GHZ_POWER_TYPE_NOT_SUPPORTED: _('This wireless build supports only 6 GHz indoor AP power mode.')
+ 	};
+ 	for (const [code, message] of Object.entries(messages))
+ 		network.registerErrorCode(code, message);
+@@ -453,7 +465,8 @@ function mlo_render_group_editor(state, section_id, group) {
+ function mlo_render_group_status(state, section_id) {
+ 	var group = state.group;
+ 	var label = group.state == 'saved' ?
+-		(group.runtime == 'config_applied' ? _('Configuration applied · MLO link unverified') : _('Saved · runtime not verified')) :
++		(group.runtime == 'links_confirmed' ? _('MLO links confirmed at apply') :
++		 (group.runtime == 'config_applied' ? _('Configuration applied · MLO link unverified') : _('Saved · runtime not verified'))) :
+ 		(group.state == 'applying' ? _('Applying') :
+ 		(group.state == 'recovery_pending' ? _('Waiting for wireless confirmation') :
+ 		(group.state == 'restore_failed' ? _('Restore failed') : _('Needs attention'))));
+@@ -553,7 +566,8 @@ function add_mlo_interface_option(section, section_id, radioNet) {
+ 
+ 	mlo_install_inline_styles();
+ 	var state = { status: null, group: null, operation: null, payload: null, preview: null, checkbox: null, rows: {}, editing: false, editor: null,
+-		can_create: radioNet.getMode() == 'ap' && uci.get('wireless', section_id, 'wds') != '1' && /^EHT/.test(htmode) };
++		can_create: radioNet.getMode() == 'ap' && uci.get('wireless', section_id, 'wds') != '1' &&
++			uci.get('wireless', section_id, 'mwds') != '1' && /^EHT/.test(htmode) };
+ 	var option = section.taboption('general', form.Flag, '_mlo_enabled', _('Enable MLO'), _('MLO is off by default. Choose radios to create a group; security and passwords are not changed.'));
+ 	option.optional = false;
+ 	option.rmempty = false;
+@@ -733,6 +747,64 @@ function addDeviceOptions(section, radioNet, CountryValue) {
+ 	o = section.taboption('general', form.Value, 'txpower', _('Maximum transmit power'), _('Percentage of the driver power limit. Regulatory and calibration limits still apply.'));
+ 	o.datatype = 'and(uinteger,range(1,100))';
+ 	o.placeholder = '100';
++	if (['2g', '5g', '6g'].includes(band)) {
++		const maximum = { '2g': 14, '5g': 196, '6g': 233 }[band];
++		const onAutoChannel = { _freq: 'auto', '!contains': true };
++		o = section.taboption('advanced', form.ListValue, 'acs_alg', _('Automatic channel selection algorithm'));
++		o.value('', _('Default (channel busy time)'));
++		o.value('1', _('AP count'));
++		o.value('2', _('Channel load (CCA)'));
++		o.value('3', _('Channel busy time'));
++		o.retain = true;
++		o.depends(onAutoChannel);
++		for (const [key, title, description] of [
++			['chanlist', _('Allowed primary channels'), _('Automatic selection may use these channels or channel ranges such as 36-48. Leave empty to use the radio channel list.')],
++			['acs_skiplist', _('Excluded channels'), _('Automatic selection skips these additional channels.')]
++		]) {
++			const ranges = key == 'chanlist';
++			o = section.taboption('advanced', form.DynamicList, key, title, description);
++			o.retain = true;
++			o.depends(onAutoChannel);
++			o.cfgvalue = function(id) {
++				const saved = uci.get('wireless', id, key) ??
++					(ranges ? uci.get('wireless', id, 'channels') ?? uci.get('wireless', id, 'channel_list') : null);
++				return L.toArray(saved).flatMap(value =>
++					String(value).split(/[;\s]+/).filter(Boolean));
++			};
++			if (ranges) {
++				o.write = function(id, value) {
++					uci.unset('wireless', id, 'channels');
++					uci.unset('wireless', id, 'channel_list');
++					return uci.set('wireless', id, key, value);
++				};
++				o.remove = function(id) {
++					uci.unset('wireless', id, 'channels');
++					uci.unset('wireless', id, 'channel_list');
++					return uci.unset('wireless', id, key);
++				};
++			}
++			o.validate = function(id, value) {
++				for (let entry of L.toArray(value)) {
++					if (!entry) continue;
++					const match = String(entry).match(ranges ? /^(\d{1,3})(?:-(\d{1,3}))?$/ : /^(\d{1,3})$/);
++					if (!match || +match[1] < 1 || +(match[2] ?? match[1]) < +match[1] || +(match[2] ?? match[1]) > maximum)
++						return _('Enter valid channel numbers for this frequency band.');
++				}
++				return true;
++			};
++		}
++		if (band == '5g') {
++			o = section.taboption('advanced', form.Flag, 'acs_exclude_dfs', _('Exclude DFS channels from automatic selection'));
++			o.retain = true;
++			o.depends(onAutoChannel);
++		}
++		if (band == '6g') {
++			o = section.taboption('advanced', form.Flag, 'psc_acs', _('Use 6 GHz preferred scanning channels'),
++				_('Select a primary channel from the 6 GHz PSC list using a channel load algorithm.'));
++			o.retain = true;
++			o.depends(onAutoChannel);
++		}
++	}
+ 	if (band == '5g') {
+ 		profileOption(section, 'vht_1024', _('VHT 1024-QAM (5 GHz)'), null,
+ 			_('Vendor VHT extension; this is separate from HE/EHT QAM negotiation.'));
+@@ -746,6 +818,9 @@ function addDeviceOptions(section, radioNet, CountryValue) {
+ 		['0', _('Long')], ['1', _('Short')], ['2', _('Auto')]
+ 	]);
+ 	radioFeature(featureFlag(section, 'mu_beamformer', _('MU-MIMO beamforming')), ['VHT', 'HE', 'EHT']);
++	radioFeature(profileOption(section, 'itxbfen', _('Implicit transmit beamforming')), ['VHT', 'HE', 'EHT']);
++	radioFeature(profileOption(section, 'sre_enable', _('MediaTek spatial reuse')), ['HE', 'EHT']);
++	profileOption(section, 'vow_airtime_fairness_en', _('MediaTek airtime fairness'));
+ 	o = section.taboption('advanced', form.ListValue, 'twt', _('Target Wake Time'));
+ 	[['0', _('Disabled')], ['1', _('Individual TWT')],
+ 	 ['2', _('Broadcast TWT')], ['3', _('Individual and broadcast TWT')]].forEach(v => o.value(...v));
+@@ -799,6 +874,19 @@ function addDeviceOptions(section, radioNet, CountryValue) {
+ 
+ function addIfaceOptions(section, id, radioNet) {
+ 	add_mlo_interface_option(section, id, radioNet);
++	const mwds = profileOption(section, 'mwds', _('MediaTek mWDS'), null,
++		_('Use MediaTek four-address bridging with a peer configured for mWDS.'));
++	mwds.depends('mode', 'ap');
++	mwds.depends('mode', 'sta');
++	const repeater = section.taboption('advanced', form.Flag, 'mac_repeater', _('MAC address repeater'),
++		_('Enable MAC address translation on this uplink. Locking the BSSID does not enable it.'));
++	repeater.retain = true;
++	repeater.depends({ mode: 'sta', mwds: '0' });
++	repeater.depends({ mode: 'sta', mwds: '' });
++	const rsn = profileOption(section, 'rsn_overriding', _('RSN overriding'), null,
++		_('Use the radio policy when this setting is empty. Standard RSN information takes priority.'));
++	rsn.depends('mode', 'sta');
++	rsn.depends('mode', 'sta-wds');
+ 	for (const [key, title] of [
+ 		['mumimo_dl', _('MU-MIMO DL')], ['mumimo_ul', _('MU-MIMO UL')],
+ 		['ofdma_dl', _('OFDMA DL')], ['ofdma_ul', _('OFDMA UL')],
+diff --git a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
+index 284094d..37a0f56 100644
+--- a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
++++ b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
+@@ -125,6 +125,17 @@ function render_network_badge(radioNet) {
+ function render_radio_status(radioDev, wifiNets) {
+ 	const name = radioDev.getI18n().replace(/ Wireless Controller .+$/, '');
+ 	const node = E('div', [ E('big', {}, E('strong', {}, name)), E('div') ]);
++	const ap = radioDev.ubus('dev', 'activation');
++	if (ap?.phase == 'acs' || ap?.phase == 'cac' || ap?.phase == 'configuring' || ap?.phase == 'configured') {
++		const label = ap.phase == 'cac' ? _('Checking for radar (DFS CAC)') :
++			ap.phase == 'acs' ? _('Selecting a wireless channel') : _('Waiting for the access point');
++		node.lastElementChild.appendChild(E('em', label));
++		return node;
++	}
++	if (ap?.phase == 'failed') {
++		node.lastElementChild.appendChild(E('em', _('The access point failed to start.')));
++		return node;
++	}
+ 	let channel, frequency, bitrate;
+ 
+ 	wifiNets.forEach(wifiNet => {
+@@ -133,6 +144,12 @@ function render_radio_status(radioDev, wifiNets) {
+ 		bitrate   = bitrate   ?? wifiNet.getBitRate();
+ 	});
+ 
++	if (ap?.phase == 'beaconing' || ap?.phase == 'restored') {
++		if (!(channel > 0) && ap.channel > 0) channel = ap.channel;
++		if (!(frequency > 0) && ap.freq > 0) frequency = (ap.freq / 1000).toFixed(3);
++	}
++	if (ap?.phase == 'restored')
++		node.appendChild(E('em', _('Previous wireless configuration restored')));
+ 	if (radioDev.isUp())
+ 		L.itemlist(node.lastElementChild, [
+ 			_('Channel'), `${channel || '?'} (${frequency || '?'} ${_('GHz')})`,
+@@ -1374,6 +1391,14 @@ return view.extend({
+ 							return form.DynamicList.prototype.load.apply(this, [section_id]);
+ 						}, this));
+ 					};
++					if (hwtype == 'mtwifi') {
++						o = ss.taboption('macfilter', form.Value, 'macfile', _('MAC address list file'),
++							_('Absolute path on the router. Entries are combined with the list above.'));
++						o.retain = true;
++						o.validate = (id, value) => !value || value.startsWith('/') || _('Enter an absolute file path.');
++						o.depends('macfilter', 'allow');
++						o.depends('macfilter', 'deny');
++					}
+ 
+ 					mode.value('ap-wds', '%s (%s)'.format(_('Access Point'), _('WDS')));
+ 					mode.value('sta-wds', '%s (%s)'.format(_('Client'), _('WDS')));
+@@ -1680,6 +1705,10 @@ return view.extend({
+ 						}
+ 					};
+ 
++					if (hwtype == 'mtwifi' && !is_6ghz && L.hasSystemFeature('wpasupplicant', 'wps')) {
++						crypto_modes.push(['wps', _('WPS client setup'), 0]);
++						encr.crypto_support.sta.wps = true;
++					}
+ 					encr.crypto_support['ap-wds'] = encr.crypto_support['ap'];
+ 					encr.crypto_support['sta-wds'] = encr.crypto_support['sta'];
+ 
+@@ -2438,6 +2467,11 @@ return view.extend({
+ 							o.depends('encryption', 'sae');
+ 							o.depends('encryption', 'sae-mixed');
+ 							o.depends('encryption', 'sae-compat');
++							if (hwtype == 'mtwifi' && !is_6ghz) {
++								o = ss.taboption('encryption', form.Flag, 'ext_registrar', _('WPS external registrar'),
++									_('Allow a WPS registrar on the attached network bridge.'));
++								o.depends({ mode: 'ap', wps_pushbutton: '1' });
++							}
+ 						}
+ 					}
+ 				}

@@ -1,0 +1,1293 @@
+Subject: [PATCH] luci: integrate MTK private wireless controls and managed MLO
+
+Keep standard hostapd controls and reuse the transactional vendor MLO manager.
+Expose vendor radio/AP options with profile-preserving blank values.
+
+diff --git a/feeds/luci/modules/luci-base/htdocs/luci-static/resources/network.js b/feeds/luci/modules/luci-base/htdocs/luci-static/resources/network.js
+index 4d519b0..34a07f8 100644
+--- a/feeds/luci/modules/luci-base/htdocs/luci-static/resources/network.js
++++ b/feeds/luci/modules/luci-base/htdocs/luci-static/resources/network.js
+@@ -38,6 +38,8 @@ const iface_patterns_ignore = [
+ ];
+ 
+ const iface_patterns_wireless = [
++	/^ra[xiyez]?\d+/,
++	/^apcli[xiyez]?\d+/,
+ 	/^wlan\d+/,
+ 	/^wl\d+/,
+ 	/^ath\d+/,
+diff --git a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
+index ade3e08..0401b15 100644
+--- a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
++++ b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
+@@ -10,6 +10,7 @@
+ 'require network';
+ 'require firewall';
+ 'require tools.widgets as widgets';
++'require tools.mtwifi as mtwifi';
+ 'require uqr';
+ 
+ const isReadonlyView = !L.hasViewPermission();
+@@ -990,6 +991,12 @@ return view.extend({
+ 			return E('td', { 'class': 'td middle cbi-section-actions' }, E('div', btns));
+ 		};
+ 
++		const cancelModal = s.handleModalCancel;
++		s.handleModalCancel = function(map, ev, isSaving) {
++			if (!isSaving) mtwifi.cancel();
++			return cancelModal.call(this, map, ev, isSaving);
++		};
++
+ 		s.addModalOptions = function(s) {
+ 			return network.getWifiNetwork(s.section).then(function(radioNet) {
+ 				const hwtype = uci.get('wireless', radioNet.getWifiDeviceName(), 'type');
+@@ -1067,6 +1074,9 @@ return view.extend({
+ 					o.default = '1';
+ 				}
+ 
++				if (hwtype == 'mtwifi')
++					mtwifi.addDeviceOptions(ss, radioNet, CBIWifiCountryValue);
++
+ 
+ 				o = s.option(form.SectionValue, '_device', form.NamedSection, radioNet.getName(), 'wifi-iface', _('Interface Configuration'));
+ 				o.modalonly = true;
+@@ -1082,7 +1092,7 @@ return view.extend({
+ 						.format(L.url('admin/system/package-manager') + '?query=wpad-mesh', _('802.11s? Install mesh wpad') ) : '');
+ 				o.value('ap', _('Access Point'));
+ 				o.value('sta', _('Client'));
+-				o.value('adhoc', _('Ad-Hoc'));
++				if (hwtype != 'mtwifi') o.value('adhoc', _('Ad-Hoc'));
+ 
+ 				o = ss.taboption('general', form.Value, 'mesh_id', _('Mesh Id'));
+ 				o.depends('mode', 'mesh');
+@@ -1163,13 +1173,15 @@ return view.extend({
+ 				};
+ 
+ 				let encr;
+-				if (hwtype == 'mac80211') {
++				if (hwtype == 'mac80211' || hwtype == 'mtwifi') {
+ 					const mode = ss.children.find(obj => obj.option === 'mode');
+ 					const bssid = ss.children.find(obj => obj.option === 'bssid');
+ 
+-					if (have_mesh) mode.value('mesh', '802.11s');
+-					mode.value('ahdemo', _('Pseudo Ad-Hoc (ahdemo)'));
+-					mode.value('monitor', _('Monitor'));
++					if (hwtype == 'mac80211') {
++						if (have_mesh) mode.value('mesh', '802.11s');
++						mode.value('ahdemo', _('Pseudo Ad-Hoc (ahdemo)'));
++						mode.value('monitor', _('Monitor'));
++					}
+ 
+ 					bssid.depends('mode', 'adhoc');
+ 					bssid.depends('mode', 'sta');
+@@ -1261,11 +1273,13 @@ return view.extend({
+ 					const macaddr = uci.get('wireless', radioNet.getName(), 'macaddr');
+ 					o = ss.taboption('advanced', form.Value, 'macaddr', _('MAC address'), _('Override default MAC address - the range of usable addresses might be limited by the driver'));
+ 					o.value('', _('driver default (%s)').format(!macaddr ? radioNet.getActiveBSSID() : _('no override')));
+-					o.value('random', _('randomly generated'));
+-					o.datatype = "or('random',macaddr)";
++					if (hwtype == 'mac80211') o.value('random', _('randomly generated'));
++					o.datatype = hwtype == 'mtwifi' ? 'macaddr' : "or('random',macaddr)";
+ 
+-					o = ss.taboption('advanced', form.Flag, 'short_preamble', _('Short Preamble'));
+-					o.default = o.enabled;
++					if (hwtype == 'mac80211') {
++						o = ss.taboption('advanced', form.Flag, 'short_preamble', _('Short Preamble'));
++						o.default = o.enabled;
++					}
+ 
+ 					o = ss.taboption('advanced', form.Value, 'dtim_period', _('DTIM Interval'), _('Delivery Traffic Indication Message Interval'));
+ 					o.optional = true;
+@@ -1295,6 +1309,9 @@ return view.extend({
+ 					o.default = o.enabled;
+ 				}
+ 
++				if (hwtype == 'mtwifi')
++					mtwifi.addIfaceOptions(ss, s.section, radioNet);
++
+ 
+ 				encr = o = ss.taboption('encryption', form.ListValue, 'encryption', _('Encryption'));
+ 				o.depends('mode', 'ap');
+@@ -1364,7 +1381,7 @@ return view.extend({
+ 				const crypto_modes = [];
+ 				const is_6ghz = uci.get('wireless', radioNet.getWifiDeviceName(), 'band') == '6g';
+ 
+-				if (hwtype == 'mac80211') {
++				if (hwtype == 'mac80211' || hwtype == 'mtwifi') {
+ 					const has_supplicant = L.hasSystemFeature('wpasupplicant');
+ 					const has_hostapd = L.hasSystemFeature('hostapd');
+ 
+@@ -1406,10 +1423,10 @@ return view.extend({
+ 					}
+ 
+ 					// WPA3-Personal Compatibility Mode uses RSN overriding, which is an AP-only feature
+-					if (has_ap_sae && !is_6ghz)
++					if (hwtype == 'mac80211' && has_ap_sae && !is_6ghz)
+ 						crypto_modes.push(['sae-compat', 'WPA2-PSK/WPA3-SAE Compatibility Mode', 30]);
+ 
+-					if (!is_6ghz && (has_ap_wep || has_sta_wep)) {
++					if (hwtype == 'mac80211' && !is_6ghz && (has_ap_wep || has_sta_wep)) {
+ 						crypto_modes.push(['wep-open',   _('WEP Open System'), 11]);
+ 						crypto_modes.push(['wep-shared', _('WEP Shared Key'),  10]);
+ 					}
+@@ -1904,7 +1921,7 @@ return view.extend({
+ 				}
+ 
+ 
+-				if (hwtype == 'mac80211') {
++				if (hwtype == 'mac80211' || hwtype == 'mtwifi') {
+ 
+ 					// Probe 802.11r support (and EAP support as a proxy for Openwrt)
+ 					const has_80211r = L.hasSystemFeature('hostapd', '11r') || L.hasSystemFeature('hostapd', 'eap');
+@@ -2019,7 +2036,7 @@ return view.extend({
+ 					/* 802.11v settings end */
+ 				}
+ 
+-				if (hwtype == 'mac80211') {
++				if (hwtype == 'mac80211' || hwtype == 'mtwifi') {
+ 					o = ss.taboption('encryption', form.ListValue, 'eap_type', _('EAP-Method'));
+ 					o.value('tls',  'TLS');
+ 					o.value('ttls', 'TTLS');
+@@ -2133,7 +2150,7 @@ return view.extend({
+ 					o.password = true;
+ 
+ 
+-					if (hwtype == 'mac80211') {
++					if (hwtype == 'mac80211' || hwtype == 'mtwifi') {
+ 						// ieee802.11w options
+ 						o = ss.taboption('encryption', form.ListValue, 'ieee80211w', _('802.11w Management Frame Protection'), _("Note: Some wireless drivers do not fully support 802.11w. E.g. mwlwifi may have problems"));
+ 						o.value('0', _('Disabled'));
+@@ -2694,5 +2711,9 @@ return view.extend({
+ 		}, this, m));
+ 	},
+ 
++	handleSaveApply: function(ev, mode) {
++		return mtwifi.handleSaveApply(this, ev, mode, () => this.super('handleSaveApply', [ev, mode]));
++	},
++
+ 	handleReset: null
+ });
+diff --git a/feeds/luci/modules/luci-mod-network/root/usr/share/rpcd/acl.d/luci-mod-network.json b/feeds/luci/modules/luci-mod-network/root/usr/share/rpcd/acl.d/luci-mod-network.json
+index 954b76c..39ede8b 100644
+--- a/feeds/luci/modules/luci-mod-network/root/usr/share/rpcd/acl.d/luci-mod-network.json
++++ b/feeds/luci/modules/luci-mod-network/root/usr/share/rpcd/acl.d/luci-mod-network.json
+@@ -8,6 +8,8 @@
+ 				"/proc/sys/net/ipv6/conf/*/mtu": [ "read" ],
+ 				"/proc/sys/net/ipv6/conf/*/hop_limit": [ "read" ],
+ 				"/usr/libexec/luci-peeraddr": [ "exec" ],
++				"/sbin/l1util": [ "exec" ],
++				"/usr/sbin/mtwifi-mlo-status": [ "exec" ],
+ 				"/proc/sys/net/ipv[46]/conf/*": [ "read" ],
+ 				"/sys/class/net/*/brport/*": [ "read" ]
+ 			},
+@@ -23,7 +25,8 @@
+ 			"file": {
+ 				"/sbin/ifup": [ "exec" ],
+ 				"/sbin/ifdown": [ "exec" ],
+-				"/sbin/wifi": [ "exec" ]
++				"/sbin/wifi": [ "exec" ],
++				"/usr/sbin/mtwifi-mlo-control": [ "exec" ]
+ 			},
+ 			"ubus": {
+ 				"file": [ "exec" ],
+diff --git a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/tools/mtwifi.js b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/tools/mtwifi.js
+new file mode 100644
+index 0000000..3088606
+--- /dev/null
++++ b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/tools/mtwifi.js
+@@ -0,0 +1,776 @@
++'use strict';
++'require baseclass';
++'require fs';
++'require ui';
++'require uci';
++'require form';
++
++// MTK private controls and the existing transactional MLO manager.
++function mlo_error_text(code) {
++	var messages = {
++		busy: _('Another MLO operation is in progress'),
++		member_count: _('Select two or three access points'),
++		invalid_member: _('The selected access point is no longer available'),
++		unsupported_member: _('MLO is only available for supported vendor EHT access points'),
++		duplicate_radio: _('Select no more than one access point per radio'),
++		already_grouped: _('An access point already belongs to another MLO group'),
++		security_mismatch: _('Security settings do not match'),
++		unsupported_security: _('This security mode cannot be checked safely'),
++		invalid_ssid: _('Enter a valid wireless name'),
++		no_group_id: _('No MLO group number is available'),
++		group_limit: _('No MLO group is available; close an existing group first.'),
++		conflict: _('Settings changed outside this page; review them before continuing'),
++		state_corrupt: _('MLO recovery data is damaged; do not overwrite it'),
++		state_write_failed: _('Could not save MLO recovery data'),
++		apply_failed_recovery_required: _('Applying failed. Check the recovery status before retrying'),
++		needs_recovery: _('Wireless changes are not confirmed; the recovery record is saved for another attempt.'),
++		operation_pending: _('Wireless is still applying or restoring. The recovery record is saved; check again later.'),
++		restore_failed: _('Recovery failed; use the recovery action again after checking the settings'),
++		reload_failed: _('Wireless reload failed; the saved configuration needs attention'),
++		runtime_unverified: _('Wireless settings have not been confirmed; recovery remains available for retry.'),
++		external_change_detected: _('Settings changed outside this page; recovery was stopped'),
++		invalid_response: _('The MLO service returned invalid data'),
++		invalid_request: _('The MLO request is invalid'),
++		operation_not_allowed: _('This MLO operation is not allowed'),
++		pending_changes: _('Apply or discard other wireless changes before managing MLO.')
++	};
++
++	return messages[code] || _('The MLO operation failed');
++}
++
++function mlo_invalid_response() {
++	throw { code: 'invalid_response' };
++}
++
++function mlo_normalize_list(value) {
++	if (Array.isArray(value))
++		return value;
++	if (value && typeof value == 'object' && Object.keys(value).length == 0)
++		return [];
++	mlo_invalid_response();
++}
++
++function mlo_normalize_member(member) {
++	if (!member || typeof member != 'object' || Array.isArray(member) ||
++		typeof member.section != 'string' || !member.section)
++		mlo_invalid_response();
++	return member;
++}
++
++function mlo_normalize_group(group) {
++	if (!group || typeof group != 'object' || Array.isArray(group))
++		mlo_invalid_response();
++	var members = mlo_normalize_list(group.members);
++	if (!members.length)
++		mlo_invalid_response();
++	members.forEach(mlo_normalize_member);
++	group.members = members;
++	return group;
++}
++
++function mlo_normalize_rpc_response(response, action) {
++	if (!response || typeof response != 'object' || Array.isArray(response))
++		mlo_invalid_response();
++	if (action == 'status' || Object.prototype.hasOwnProperty.call(response, 'groups')) {
++		response.groups = mlo_normalize_list(response.groups);
++		response.groups.forEach(mlo_normalize_group);
++	}
++	if (action == 'status' || Object.prototype.hasOwnProperty.call(response, 'inventory')) {
++		response.inventory = mlo_normalize_list(response.inventory);
++		response.inventory.forEach(function(item) {
++			if (!item || typeof item != 'object' || Array.isArray(item) ||
++				typeof item.section != 'string' || !item.section ||
++				typeof item.device != 'string' || !item.device)
++				mlo_invalid_response();
++		});
++	}
++	if (Object.prototype.hasOwnProperty.call(response, 'members')) {
++		response.members = mlo_normalize_list(response.members);
++		response.members.forEach(mlo_normalize_member);
++		if (action == 'preview' && (response.members.length < 2 || response.members.length > 3))
++			mlo_invalid_response();
++	}
++	if (Object.prototype.hasOwnProperty.call(response, 'group') && response.group != null)
++		response.group = mlo_normalize_group(response.group);
++	return response;
++}
++
++function mlo_rpc(executable, action, payload) {
++	return fs.exec(executable, [ action, JSON.stringify(payload || {}) ]).then(function(result) {
++		var response;
++		try { response = JSON.parse(result.stdout || '{}'); }
++		catch (e) { throw { code: 'invalid_response' }; }
++		if (!response || typeof response != 'object' || Array.isArray(response))
++			throw { code: 'invalid_response' };
++		if (result.code != 0 || !response.ok)
++			throw { code: response.code || 'operation_failed' };
++		try { return mlo_normalize_rpc_response(response, action); }
++		catch (e) { throw { code: 'invalid_response' }; }
++	});
++}
++
++function mlo_wait_for_operation(id, attempts) {
++	return mlo_rpc('/usr/sbin/mtwifi-mlo-control', 'poll', { id: Number(id) }).then(function(result) {
++		if (!result.pending)
++			return result;
++		if (attempts <= 1)
++			throw { code: 'operation_pending' };
++		return new Promise(function(resolve) { setTimeout(resolve, 1000); }).then(function() {
++			return mlo_wait_for_operation(id, attempts - 1);
++		});
++	});
++}
++
++function mlo_has_pending_wireless_changes() {
++	var state = uci.state || {};
++	for (var key of [ 'changes', 'creates', 'deletes', 'reorder' ]) {
++		if (state[key] && state[key].wireless && Object.keys(state[key].wireless).length)
++			return true;
++	}
++	return false;
++}
++
++function mlo_manager_buttons(buttons) {
++	return E('div', { 'class': 'right' }, buttons);
++}
++
++function mlo_clear(node) {
++	while (node.firstChild)
++		node.removeChild(node.firstChild);
++}
++
++var mlo_pending_action = null;
++function mlo_group_for_section(status, section_id) {
++	var groups = mlo_normalize_list(status && status.groups);
++	return groups.filter(function(group) {
++		return mlo_normalize_group(group).members.some(function(member) { return member.section == section_id; });
++	})[0] || null;
++}
++
++function mlo_pending_changes() {
++	var state = uci.state || {};
++	for (var key of [ 'changes', 'creates', 'deletes', 'reorder' ]) {
++		if (!state[key]) continue;
++		for (var config in state[key])
++			if (state[key][config] && Object.keys(state[key][config]).length)
++				return true;
++	}
++	return false;
++}
++
++function mlo_pending_wireless_changes() {
++	var state = uci.state || {};
++	for (var key of [ 'changes', 'creates', 'deletes', 'reorder' ])
++		if (state[key] && state[key].wireless && Object.keys(state[key].wireless).length)
++			return true;
++	return false;
++}
++
++function mlo_same_payload(a, b) {
++	return !!a && !!b && a.ssid == b.ssid && a.revision == b.revision &&
++		JSON.stringify((a.members || []).slice().sort()) == JSON.stringify((b.members || []).slice().sort());
++}
++
++function mlo_request_fingerprint(payload) {
++	return JSON.stringify({
++		group_id: payload.group_id == null ? null : Number(payload.group_id),
++		members: (payload.members || []).slice().sort(),
++		ssid: String(payload.ssid || '')
++	});
++}
++
++function mlo_stage_action(state, section_id, value) {
++	var enabled = String(value) == '1';
++	if (state.group) {
++		if (!enabled) {
++			mlo_pending_action = { owner: section_id, action: 'close', payload: { id: Number(state.group.id) } };
++		}
++		else if (state.operation == 'edit' && state.payload) {
++			mlo_pending_action = { owner: section_id, action: 'edit', payload: state.payload };
++		}
++		else if (mlo_pending_action && mlo_pending_action.owner == section_id && mlo_pending_action.action == 'close') {
++			mlo_pending_action = null;
++		}
++		return;
++	}
++
++	if (enabled && state.operation == 'create' && state.payload) {
++		mlo_pending_action = { owner: section_id, action: 'create', payload: state.payload };
++	}
++	else if (mlo_pending_action && mlo_pending_action.owner == section_id) {
++		mlo_pending_action = null;
++	}
++}
++
++function mlo_install_inline_styles() {
++	if (document.getElementById('mlo-inline-styles'))
++		return;
++
++	var style = E('style', { 'id': 'mlo-inline-styles' }, `
++.mlo-inline-control { display: inline-flex; align-items: center; }
++.mlo-inline-row .mlo-member-list { display: flex; width: 100%; flex-direction: column; align-items: flex-start; gap: .35rem; }
++.mlo-inline-row .mlo-member-choice { display: flex; align-items: center; justify-content: flex-start; gap: .55rem; width: max-content; max-width: 100%; line-height: 1.5; }
++.mlo-inline-row .mlo-member-choice input[type="checkbox"] { flex: 0 0 1rem; width: 1rem !important; min-width: 1rem !important; height: 1rem !important; margin: 0; }
++.mlo-inline-row .mlo-inline-ssid { width: 16rem; max-width: 100%; min-width: 0; }
++.mlo-inline-row .mlo-inline-note { margin: .25rem 0; line-height: 1.5; }
++.mlo-inline-row .mlo-summary-list { display: grid; width: min(100%, 42rem); }
++.mlo-inline-row .mlo-summary-item { display: grid; grid-template-columns: 4.5rem minmax(0, 1fr) minmax(0, 1fr); gap: .5rem; padding: .3rem .2rem; border-bottom: 1px solid var(--border-color, rgba(127,127,127,.35)); color: inherit; line-height: 1.5; }
++.mlo-inline-row .mlo-summary-item > span { min-width: 0; overflow-wrap: anywhere; }
++.mlo-inline-row .mlo-summary-head { font-weight: 600; opacity: .8; }
++.mlo-inline-row .mlo-summary-item.mlo-summary-single { grid-template-columns: 4.5rem minmax(0, 1fr); }
++.mlo-inline-row .mlo-inline-actions { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; }
++.mlo-inline-row .mlo-inline-message { margin: .25rem 0; line-height: 1.5; }
++.mlo-inline-row .mlo-inline-member { display: flex; gap: .6rem; line-height: 1.5; padding: .2rem 0; }
++.mlo-inline-row .mlo-inline-member > :first-child { flex: 0 0 4.5rem; }
++@media screen and (max-width: 600px) {
++	.mlo-inline-row .mlo-inline-ssid { width: 100%; min-width: 0; }
++	.mlo-inline-row .mlo-summary-item { grid-template-columns: 3.5rem minmax(0, 1fr) minmax(0, 1fr); gap: .25rem; }
++	.mlo-inline-row .mlo-summary-item.mlo-summary-single { grid-template-columns: 3.5rem minmax(0, 1fr); }
++}
++`);
++	document.head.appendChild(style);
++}
++
++function mlo_summary_item(cells, single) {
++	return E('div', { 'class': 'mlo-summary-item' + (single ? ' mlo-summary-single' : '') },
++		cells.map(function(value) { return E('span', {}, value); }));
++}
++
++function mlo_render_group_editor(state, section_id, group) {
++	var inventory = mlo_normalize_list(state.status && state.status.inventory);
++	var editing = !!group;
++	var member_ids = editing ? mlo_normalize_group(group).members.map(function(member) { return member.section; }) : [];
++	var candidates = inventory.filter(function(item) {
++		return item.eligible !== false && !item.disabled && (!item.grouped || (editing && member_ids.indexOf(item.section) >= 0));
++	});
++	var selected = [];
++	if (editing) {
++		selected = member_ids.slice();
++	}
++	else if (state.operation == 'create' && state.payload) {
++		selected = state.payload.members.slice();
++	}
++	else {
++		var by_device = {};
++		candidates.sort(function(a, b) {
++			var order = { '2.4G': 0, '5G': 1, '6G': 2 };
++			return (order[a.band] || 0) - (order[b.band] || 0);
++		});
++		var current = candidates.filter(function(item) { return item.section == section_id; })[0];
++		if (current) {
++			selected.push(current.section);
++			by_device[current.device] = true;
++		}
++		candidates.forEach(function(item) {
++			if (selected.length < 3 && !by_device[item.device]) {
++				selected.push(item.section);
++				by_device[item.device] = true;
++			}
++		});
++	}
++
++	var list = E('div', { 'class': 'mlo-member-list' });
++	var inputs = [];
++	candidates.forEach(function(item) {
++		var is_current = item.section == section_id;
++		var checkbox = E('input', { 'type': 'checkbox', 'value': item.section, 'disabled': editing || is_current || null });
++		checkbox.checked = selected.indexOf(item.section) >= 0;
++		inputs.push(checkbox);
++		list.appendChild(E('label', { 'class': 'mlo-member-choice' }, [ checkbox, E('strong', {}, item.band + ' · ' + item.ssid) ]));
++	});
++	if (!candidates.length || !candidates.some(function(item) { return item.section == section_id; }))
++		list.appendChild(E('p', { 'class': 'alert-message warning mlo-inline-note' }, _('This access point is not available for MLO.')));
++	var member_help = E('p', { 'class': 'cbi-value-description mlo-inline-note' }, _('Choose two or three radios on different bands.'));
++	var capacity_help = state.status && state.status.capabilities && state.status.capabilities.max_groups == 1 ?
++		E('p', { 'class': 'cbi-value-description mlo-inline-note' }, _('This driver supports one MLO group; close it before creating another.')) : null;
++
++	var ssid = E('input', { 'type': 'text', 'class': 'cbi-input-text mlo-inline-ssid', 'maxlength': '32', 'autocomplete': 'off' });
++	var preferred = candidates.filter(function(item) { return item.band == '5G'; })[0] || candidates[0];
++	ssid.value = editing ? group.members[0].ssid :
++		(state.operation == 'create' && state.payload ? state.payload.ssid : (preferred ? preferred.ssid : ''));
++	var ssid_help = E('p', { 'class': 'cbi-value-description mlo-inline-note' }, _('The selected access points will use this name.'));
++	var password = E('span', { 'class': 'mlo-inline-note' }, _('Keep existing password'));
++	var summary = E('div', { 'class': 'mlo-summary-list mlo-change-summary' });
++	var message = E('p', { 'class': 'mlo-inline-message' }, _('Review the changes again after changing the selection or wireless name.'));
++	var preview_button = E('button', { 'class': 'cbi-button cbi-button-action' }, _('Review changes'));
++	var stage_text = E('p', { 'class': 'cbi-value-description mlo-inline-note' }, _('Save this interface, then choose Save & Apply.'));
++	var preview_generation = 0, active_preview_key = null;
++	var current_request = function() {
++		var members = inputs.filter(function(input) { return input.checked; }).map(function(input) { return input.value; });
++		var request = { members: members, ssid: ssid.value };
++		if (editing) request.group_id = Number(group.id);
++		return request;
++	};
++	var invalidate = function() {
++		preview_generation++;
++		active_preview_key = null;
++		if (mlo_pending_action && mlo_pending_action.owner == section_id) mlo_pending_action = null;
++		state.operation = null;
++		state.payload = null;
++		state.preview = null;
++		state.editor.previewed = false;
++		if (state.refreshValidation)
++			state.refreshValidation();
++		while (summary.firstChild) summary.removeChild(summary.firstChild);
++		message.textContent = _('Review the changes again after changing the selection or wireless name.');
++		preview_button.style.display = '';
++		preview_button.disabled = false;
++		state.refreshRows();
++	};
++	inputs.forEach(function(input) { input.addEventListener('change', invalidate); });
++	ssid.addEventListener('input', invalidate);
++	preview_button.addEventListener('click', function() {
++		var chosen = inputs.filter(function(input) { return input.checked; }).map(function(input) { return input.value; });
++		if (chosen.length < 2 || chosen.length > 3) {
++			message.textContent = _('Select two or three access points.');
++			return;
++		}
++		var devices = {};
++		for (var i = 0; i < chosen.length; i++) {
++			var item = candidates.filter(function(candidate) { return candidate.section == chosen[i]; })[0];
++			if (!item || devices[item.device]) {
++				message.textContent = _('Select one access point per radio.');
++				return;
++			}
++			devices[item.device] = true;
++		}
++		if (chosen.indexOf(section_id) < 0) {
++			message.textContent = _('Include the access point currently being edited.');
++			return;
++		}
++		var payload = { members: chosen.slice(), ssid: String(ssid.value) };
++		if (editing) payload.group_id = Number(group.id);
++		var fingerprint = mlo_request_fingerprint(payload);
++		var generation = ++preview_generation;
++		active_preview_key = fingerprint;
++		preview_button.disabled = true;
++		mlo_rpc('/usr/sbin/mtwifi-mlo-status', 'preview', JSON.parse(JSON.stringify(payload))).then(function(result) {
++			if (generation != preview_generation || active_preview_key != fingerprint) return;
++			if (mlo_request_fingerprint(current_request()) != fingerprint) { invalidate(); return; }
++			if (!result || typeof result.revision != 'string' || !Array.isArray(result.members)) {
++				message.textContent = mlo_error_text('invalid_response');
++				preview_button.disabled = false;
++				return;
++			}
++			while (summary.firstChild) summary.removeChild(summary.firstChild);
++			summary.appendChild(mlo_summary_item([ _('Frequency'), _('Current name'), _('New name') ], false));
++			summary.lastChild.classList.add('mlo-summary-head');
++			result.members.forEach(function(member) {
++				summary.appendChild(mlo_summary_item([ member.band, member.ssid, result.ssid ], false));
++			});
++			message.textContent = _('Security settings match. Password and security settings will remain unchanged.');
++			state.operation = editing ? 'edit' : 'create';
++			var reviewed_members = payload.members.slice();
++			state.payload = editing ? { id: Number(group.id), members: reviewed_members, ssid: payload.ssid, revision: result.revision } :
++				{ members: reviewed_members, ssid: payload.ssid, revision: result.revision };
++			state.preview = { members: reviewed_members.slice(), ssid: payload.ssid, revision: result.revision };
++			state.editor.previewed = true;
++			if (state.refreshValidation)
++				state.refreshValidation();
++			if (mlo_pending_action && mlo_pending_action.owner == section_id)
++				mlo_pending_action = null;
++			preview_button.style.display = 'none';
++			state.refreshRows();
++		}).catch(function(error) {
++			if (generation != preview_generation || active_preview_key != fingerprint) return;
++			if (mlo_request_fingerprint(current_request()) != fingerprint) { invalidate(); return; }
++			message.textContent = mlo_error_text(error.code);
++			preview_button.disabled = false;
++		});
++	});
++
++	return {
++		members: E('div', {}, [ list, member_help, capacity_help ]),
++		ssid: E('div', {}, [ ssid, ssid_help ]),
++		password: password,
++		summary: summary,
++		actions: E('div', {}, [ message, E('div', { 'class': 'mlo-inline-actions' }, [ preview_button, stage_text ]) ])
++	};
++}
++
++function mlo_render_group_status(state, section_id) {
++	var group = state.group;
++	var label = group.state == 'saved' ?
++		(group.runtime == 'config_applied' ? _('Configuration applied · MLO link unverified') : _('Saved · runtime not verified')) :
++		(group.state == 'applying' ? _('Applying') :
++		(group.state == 'recovery_pending' ? _('Waiting for wireless confirmation') :
++		(group.state == 'restore_failed' ? _('Restore failed') : _('Needs attention'))));
++	var member_list = E('div', { 'class': 'mlo-summary-list' });
++	group.members.forEach(function(member) {
++		member_list.appendChild(mlo_summary_item([ member.band, member.ssid ], true));
++	});
++	var manage = E('button', { 'class': 'cbi-button cbi-button-action', 'click': function() {
++		state.editing = true;
++		state.refreshRows();
++	} }, _('Manage'));
++	var close = E('button', { 'class': 'cbi-button cbi-button-negative', 'click': function() {
++		state.checkbox.checked = false;
++		state.checkbox.dispatchEvent(new Event('change', { bubbles: true }));
++	} }, _('Close and restore'));
++	var actions = [];
++	if (state.can_create)
++		actions.push(manage);
++	actions.push(close);
++	return E('div', {}, [ E('p', { 'class': 'mlo-inline-note' }, label), member_list, E('div', { 'class': 'mlo-inline-actions' }, actions) ]);
++}
++
++function mlo_render_restore_summary(state) {
++	var members = E('div', { 'class': 'mlo-summary-list' });
++	state.group.members.forEach(function(member) {
++		members.appendChild(mlo_summary_item([ member.band, member.original_ssid || member.ssid ], true));
++	});
++	return E('div', {}, [
++		E('p', { 'class': 'mlo-inline-note' }, _('The original wireless names will be restored.')),
++		members,
++		E('p', { 'class': 'cbi-value-description mlo-inline-note' }, _('Passwords, security settings and network bindings will not change.')),
++		E('p', { 'class': 'cbi-value-description mlo-inline-note' }, _('Your settings will be checked before restoring. If they changed elsewhere, you will be asked what to do.'))
++	]);
++}
++
++function mlo_add_display_option(section, state, section_id, key, title, render_value) {
++	var row = section.taboption('general', form.DummyValue, key, title);
++	row.retain = true;
++	row.cfgvalue = function() { return ''; };
++	row.parse = function() { return Promise.resolve(); };
++	row.write = function() {};
++	row.remove = function() {};
++	row.renderWidget = function() { return render_value(); };
++	var render = row.render;
++	row.render = function(option_index, id, in_table) {
++		return render.call(this, option_index, id, in_table).then(function(node) {
++			node.classList.add('mlo-inline-row', 'mlo-inline-row-' + key);
++			state.rows[key] = node;
++			state.refreshRows();
++			return node;
++		});
++	};
++	return row;
++}
++
++function mlo_legacy_members(status) {
++	if (!status) return [];
++	return mlo_normalize_list(status && status.inventory).filter(function(item) {
++		return item.legacy === true && !item.managed;
++	});
++}
++
++function mlo_legacy_removal_members(state) {
++	var members = mlo_legacy_members(state.status);
++	if (!members.length || mlo_pending_action ||
++		mlo_normalize_list(state.status && state.status.groups).length)
++		throw new Error('legacy_conflict');
++	/* Validate the entire set before staging anything. */
++	members.forEach(function(item) {
++		var group = uci.get('wireless', item.section, 'mldgroup');
++		var flag = uci.get('wireless', item.section, 'mlo');
++		if (uci.get('wireless', item.section, 'device') !== item.device ||
++			uci.get('wireless', item.section, 'mode') !== 'ap' ||
++			uci.get('wireless', item.device, 'type') !== 'mtwifi' ||
++			(group != null && group !== '') || ['1', 'true', 'yes'].indexOf(String(flag)) < 0)
++			throw new Error('legacy_conflict');
++	});
++	return members;
++}
++
++function mlo_stage_legacy_removal(state) {
++	mlo_legacy_removal_members(state);
++	/* Keep this in the modal until Save. Normal LuCI Save & Apply handles
++	 * commit, reload and rollback; Cancel must leave the UCI cache alone.
++	 */
++	state.legacy_cleanup_staged = true;
++	if (state.checkbox) { state.checkbox.checked = false; state.checkbox.disabled = true; }
++	state.operation = state.payload = state.preview = null;
++	state.refreshRows();
++}
++
++function add_mlo_interface_option(section, section_id, radioNet) {
++	var device = radioNet.getWifiDeviceName();
++	var htmode = uci.get('wireless', device, 'htmode') || '';
++	if (uci.get('wireless', device, 'type') != 'mtwifi')
++		return;
++
++	mlo_install_inline_styles();
++	var state = { status: null, group: null, operation: null, payload: null, preview: null, checkbox: null, rows: {}, editing: false, editor: null,
++		can_create: radioNet.getMode() == 'ap' && uci.get('wireless', section_id, 'wds') != '1' && /^EHT/.test(htmode) };
++	var option = section.taboption('general', form.Flag, '_mlo_enabled', _('Enable MLO'), _('MLO is off by default. Choose radios to create a group; security and passwords are not changed.'));
++	option.optional = false;
++	option.rmempty = false;
++	state.refreshRows = function() {
++		var enabled = !!(state.checkbox && state.checkbox.checked);
++		var editor_visible = enabled && (!state.group || state.editing);
++		var visibility = {
++			_mlo_legacy: mlo_legacy_members(state.status).length > 0,
++			_mlo_members: editor_visible,
++			_mlo_ssid: editor_visible,
++			_mlo_password: editor_visible,
++			_mlo_summary: editor_visible && !!(state.editor && state.editor.previewed),
++			_mlo_actions: editor_visible,
++			_mlo_status: enabled && !!state.group && !state.editing,
++			_mlo_restore: !enabled && !!state.group
++		};
++		Object.keys(visibility).forEach(function(key) {
++			if (state.rows[key])
++				state.rows[key].style.display = visibility[key] ? '' : 'none';
++		});
++	};
++	state.getEditor = function() {
++		if (!state.editor)
++			state.editor = mlo_render_group_editor(state, section_id, state.group);
++		return state.editor;
++	};
++	state.refreshValidation = function() {
++		var widget = option.getUIElement(section_id);
++		if (widget)
++			widget.triggerValidation();
++	};
++	option.enabled = '1';
++	option.disabled = '0';
++	option.default = '0';
++	option.retain = true;
++	option.depends('mode', 'ap');
++	option.load = function(id) {
++		return mlo_rpc('/usr/sbin/mtwifi-mlo-status', 'status', {}).then(function(status) {
++			state.status = status;
++			state.group = mlo_group_for_section(status, id);
++			if (mlo_pending_action && mlo_pending_action.owner == id) {
++				state.operation = mlo_pending_action.action;
++				state.payload = mlo_pending_action.payload;
++				state.preview = mlo_pending_action.payload;
++			}
++			return (state.group && !(mlo_pending_action && mlo_pending_action.owner == id && mlo_pending_action.action == 'close')) ||
++				(mlo_pending_action && mlo_pending_action.owner == id && mlo_pending_action.action != 'close') ? '1' : '0';
++		});
++	};
++	option.cfgvalue = function(id) {
++		if (mlo_pending_action && mlo_pending_action.owner == id)
++			return mlo_pending_action.action == 'close' ? '0' : '1';
++		return state.group ? '1' : '0';
++	};
++	option.validate = function(id, value) {
++		value = option.formvalue(id);
++		if (mlo_pending_action && mlo_pending_action.owner != id)
++			return _('Finish the other MLO change before starting another one.');
++		if (!state.group && String(value) == '1' &&
++		    (state.operation != 'create' || !state.payload || !state.preview || !mlo_same_payload(state.payload, state.preview)))
++			return _('Review the MLO changes before saving this interface.');
++		if (state.group && String(value) == '1' && state.operation == 'edit' && !state.payload)
++			return _('Review the MLO changes before saving this interface.');
++		return true;
++	};
++	option.write = function(id, value) {
++		mlo_stage_action(state, id, value);
++	};
++	option.remove = function() {};
++	option.renderWidget = function(id, option_index, cfgvalue) {
++		var widget = form.Flag.prototype.renderWidget.call(this, id, option_index, cfgvalue);
++		var checkbox = widget.querySelector('input[type="checkbox"]');
++		state.checkbox = checkbox;
++		var caps = state.status && state.status.capabilities;
++		var at_capacity = !state.group && caps && state.status.groups && state.status.groups.length >= caps.max_groups;
++		checkbox.disabled = (!state.can_create && !state.group) || !!at_capacity ||
++			mlo_legacy_members(state.status).length > 0 || state.legacy_cleanup_staged;
++		checkbox.addEventListener('change', state.refreshRows);
++		var control = E('div', { 'class': 'mlo-inline-control' }, widget);
++		setTimeout(state.refreshRows, 0);
++		return control;
++	};
++
++	var legacy_row = mlo_add_display_option(section, state, section_id, '_mlo_legacy', _('Legacy MLO settings'), function() {
++		var note = E('p', { 'class': 'cbi-value-description' },
++			_('Legacy MLO flags occupy these radios. Turn off the old group before choosing radios.'));
++		var button = E('button', { 'type': 'button', 'class': 'cbi-button cbi-button-action',
++			'disabled': mlo_normalize_list(state.status && state.status.groups).length > 0 || null },
++			_('Stage legacy MLO removal'));
++		button.addEventListener('click', function() {
++			try {
++				mlo_stage_legacy_removal(state);
++				button.disabled = true;
++				note.textContent = _('Save this interface, then choose Save & Apply. Reopen it to select MLO radios.');
++			} catch (error) {
++				note.textContent = _('Wireless settings changed. Reload this page before clearing legacy MLO flags.');
++			}
++		});
++		return E('div', {}, [ note, button, E('p', { 'class': 'cbi-value-description' },
++			_('Only legacy MLO flags are cleared. Wireless names, passwords and network bindings are preserved.')) ]);
++	});
++	legacy_row.parse = function() {
++		if (state.legacy_cleanup_staged) {
++			try {
++				mlo_legacy_removal_members(state).forEach(function(item) {
++					uci.set('wireless', item.section, 'mlo', '0');
++				});
++				state.legacy_cleanup_staged = false;
++			} catch (error) {
++				throw new Error(_('Wireless settings changed. Reload this page before clearing legacy MLO flags.'));
++			}
++		}
++		return Promise.resolve();
++	};
++	mlo_add_display_option(section, state, section_id, '_mlo_members', _('Select radios'), function() { return state.getEditor().members; });
++	mlo_add_display_option(section, state, section_id, '_mlo_ssid', _('Wireless name'), function() { return state.getEditor().ssid; });
++	mlo_add_display_option(section, state, section_id, '_mlo_password', _('Password'), function() { return state.getEditor().password; });
++	mlo_add_display_option(section, state, section_id, '_mlo_summary', _('Change summary'), function() { return state.getEditor().summary; });
++	mlo_add_display_option(section, state, section_id, '_mlo_actions', _('Actions'), function() { return state.getEditor().actions; });
++	mlo_add_display_option(section, state, section_id, '_mlo_status', _('MLO status'), function() {
++		return state.group ? mlo_render_group_status(state, section_id) : E('span', {});
++	});
++	mlo_add_display_option(section, state, section_id, '_mlo_restore', _('Restore'), function() {
++		return state.group ? mlo_render_restore_summary(state) : E('span', {});
++	});
++}
++
++function mlo_show_save_error(error) {
++	ui.showModal(_('MLO was not applied'), [
++		E('p', {}, mlo_error_text(error && error.code)),
++		E('div', { 'class': 'button-row' }, E('button', { 'class': 'btn cbi-button', 'click': ui.hideModal }, _('Close')))
++	]);
++}
++
++function profileOption(section, key, title, values, description) {
++	const o = section.taboption('advanced', form.ListValue, key, title,
++		description || _('Leave unset to preserve the profile setting.'));
++	o.value('', _('Use profile setting'));
++	(values || [['1', _('Enabled')], ['0', _('Disabled')]]).forEach(v => o.value(v[0], v[1]));
++	o.optional = true;
++	o.rmempty = true;
++	o.retain = true;
++	return o;
++}
++
++function radioFeature(option, prefixes, modes) {
++	for (const prefix of prefixes)
++		for (const width of [20, 40, 80, 160, 320]) {
++			if (width == 320 && prefix != 'EHT') continue;
++			for (const mode of modes || ['']) {
++				const dependency = { '_freq': prefix + width, '!contains': true };
++				if (mode) dependency.mode = mode;
++				option.depends(dependency);
++			}
++		}
++	return option;
++}
++
++function addDeviceOptions(section, radioNet, CountryValue) {
++	const device = radioNet.getWifiDeviceName();
++	const band = uci.get('wireless', device, 'band');
++	let o = section.taboption('general', CountryValue, 'country', _('Country Code'));
++	o.wifiNetwork = radioNet;
++	o = section.taboption('general', form.Value, 'txpower', _('Maximum transmit power'), _('Percentage of the driver power limit. Regulatory and calibration limits still apply.'));
++	o.datatype = 'range(1,100)';
++	o.placeholder = '100';
++	if (band == '5g') {
++		profileOption(section, 'vht_1024', _('VHT 1024-QAM (5 GHz)'), null,
++			_('Vendor VHT extension; this is separate from HE/EHT QAM negotiation.'));
++		profileOption(section, 'doth', _('IEEE 802.11h (DFS)'));
++		profileOption(section, 'dfs', _('DFS'));
++		profileOption(section, 'zw_dfs', _('Zero-Wait DFS'));
++	}
++	radioFeature(profileOption(section, 'he_ldpc', _('HE LDPC (all AP BSSIDs)')), ['HE', 'EHT']);
++	profileOption(section, 'tx_burst', _('Transmit Burst'));
++	profileOption(section, 'tx_preamble', _('Transmit Preamble'), [
++		['0', _('Long')], ['1', _('Short')], ['2', _('Auto')]
++	]);
++	radioFeature(profileOption(section, 'mu_beamformer', _('MU-MIMO beamforming')), ['VHT', 'HE', 'EHT']);
++	radioFeature(profileOption(section, 'twt', _('Target Wake Time'), [
++		['0', _('Disabled')], ['1', _('Individual TWT')],
++		['2', _('Broadcast TWT')], ['3', _('Individual and broadcast TWT')]
++	]), ['HE', 'EHT']);
++	o = profileOption(section, 'eht_restricted_twt', _('EHT Restricted TWT'));
++	['EHT20', 'EHT40', 'EHT80', 'EHT160', 'EHT320', 'EHT320-1', 'EHT320-2'].forEach(htmode =>
++		o.depends({ '_freq': htmode, '!contains': true }));
++	if (band == '2g') {
++		o = section.taboption('advanced', form.Flag, 'noscan', _('Force 40MHz mode'),
++			_('Always use 40 MHz even when the secondary channel overlaps. This does not comply with IEEE 802.11n coexistence requirements.'));
++		o.rmempty = true;
++		o = section.taboption('advanced', form.Flag, 'legacy_rates', _('Allow legacy 802.11b rates'));
++		o.rmempty = true;
++	}
++	o = section.taboption('advanced', form.ListValue, 'cell_density', _('Coverage cell density'));
++	[['0', _('Disabled')], ['1', _('Normal')], ['2', _('High')], ['3', _('Very High')]].forEach(v => o.value(...v));
++	o.optional = true;
++	o = section.taboption('advanced', form.Value, 'distance', _('Distance Optimization'), _('Distance to the farthest client in meters.'));
++	o.datatype = 'range(0,114750)';
++	o.placeholder = '0';
++	if (uci.get('wireless', device, 'dbdc_main') == '1') {
++		o = section.taboption('advanced', form.Value, 'beacon_int', _('Beacon Interval'));
++		o.datatype = 'range(20,999)';
++		o.placeholder = '100';
++	}
++	o = section.taboption('advanced', form.Flag, 'whnat', _('Wireless HWNAT'));
++	o.rmempty = false;
++	o.retain = true;
++	o.default = o.enabled;
++	o.whnatOwners = {};
++	o.load = function(id) {
++		return fs.exec('/sbin/l1util', ['whnat']).then(result => {
++			if (result.code != 0) throw new Error(_('Failed to load the wireless configuration'));
++			this.whnatOwners = JSON.parse(result.stdout);
++			const owner = this.whnatOwners[id];
++			if (!owner || uci.get('wireless', owner, 'type') != 'mtwifi')
++				throw new Error(_('Failed to load the wireless configuration'));
++			return this.cfgvalue(id);
++		});
++	};
++	o.cfgvalue = function(id) { return uci.get('wireless', this.whnatOwners[id] || id, 'whnat') || this.enabled; };
++	o.write = function(id, value) {
++		const owner = this.whnatOwners[id];
++		if (!owner || uci.get('wireless', owner, 'type') != 'mtwifi')
++			throw new Error(_('Failed to load the wireless configuration'));
++		uci.set('wireless', owner, 'whnat', value);
++	};
++	o.remove = function(id) { this.write(id, this.enabled); };
++}
++
++function addIfaceOptions(section, id, radioNet) {
++	add_mlo_interface_option(section, id, radioNet);
++	for (const [key, title] of [
++		['mumimo_dl', _('MU-MIMO DL')], ['mumimo_ul', _('MU-MIMO UL')],
++		['ofdma_dl', _('OFDMA DL')], ['ofdma_ul', _('OFDMA UL')],
++		['amsdu', _('A-MSDU')], ['autoba', _('Auto Block ACK')], ['uapsd', _('U-APSD')]
++	]) {
++		const o = profileOption(section, key, title);
++		if (['mumimo_dl', 'mumimo_ul', 'ofdma_dl', 'ofdma_ul'].includes(key))
++			radioFeature(o, ['HE', 'EHT'], ['ap', 'ap-wds']);
++		else {
++			o.depends('mode', 'ap');
++			o.depends('mode', 'ap-wds');
++		}
++	}
++	for (const [key, title, datatype, placeholder] of [
++		['kicklow', _('Kick low RSSI station threshold'), 'range(-100,0)', '0'],
++		['assocthres', _('Station associate threshold'), 'range(-100,0)', '0'],
++		['frag', _('Fragmentation Threshold'), 'range(256,2346)', '2346'],
++		['rts', _('RTS/CTS Threshold'), 'range(0,2347)', '2347']
++	]) {
++		const o = section.taboption('advanced', form.Value, key, title);
++		o.datatype = datatype;
++		o.placeholder = placeholder;
++		o.optional = true;
++		o.depends('mode', 'ap');
++		o.depends('mode', 'ap-wds');
++	}
++}
++
++function handleSaveApply(view, ev, mode, fallback) {
++	if (!mlo_pending_action) return fallback();
++	if (mode != '0' || mlo_pending_changes()) {
++		mlo_pending_action = null;
++		ui.addNotification(null, E('p', _('Apply other wireless changes first, then reopen the interface to manage MLO.')));
++		return fallback();
++	}
++	const pending = mlo_pending_action;
++	ui.showModal(_('Applying MLO changes'), E('p', { 'class': 'spinning' }, _('Please wait…')));
++	return mlo_rpc('/usr/sbin/mtwifi-mlo-control', pending.action, pending.payload).then(result =>
++		result.pending ? mlo_wait_for_operation(result.id || pending.payload.id, 360) : result
++	).then(result => {
++		mlo_pending_action = null;
++		if (result.state == 'rolled_back')
++			ui.addNotification(null, E('p', _('MLO could not be applied; the previous wireless settings were restored.')));
++		window.location.reload();
++	}).catch(error => { mlo_pending_action = null; mlo_show_save_error(error); });
++}
++
++return baseclass.extend({
++	addDeviceOptions, addIfaceOptions, handleSaveApply,
++	cancel: function() { mlo_pending_action = null; }
++});
+--- a/feeds/luci/modules/luci-base/po/zh_Hans/base.po
++++ b/feeds/luci/modules/luci-base/po/zh_Hans/base.po
+@@ -17,3 +17,316 @@
++
++msgid "A-MSDU"
++msgstr "MSDU聚合（A-MSDU）"
++
++msgid "Always use 40 MHz even when the secondary channel overlaps. This does not comply with IEEE 802.11n coexistence requirements."
++msgstr "即使辅助信道重叠也使用 40 MHz，这不符合 IEEE 802.11n 共存要求。"
++
++msgid "An access point already belongs to another MLO group"
++msgstr "所选无线接口已属于其他 MLO 组"
++
++msgid "Another MLO operation is in progress"
++msgstr "另一个 MLO 操作正在进行"
++
++msgid "Apply or discard other wireless changes before managing MLO."
++msgstr "请先应用或放弃其他无线更改，再管理 MLO。"
++
++msgid "Apply other wireless changes first, then reopen the interface to manage MLO."
++msgstr "请先应用其他无线设置，再重新打开接口管理 MLO。"
++
++msgid "Applying"
++msgstr "应用中"
++
++msgid "Applying MLO changes"
++msgstr "正在应用 MLO 更改"
++
++msgid "Applying failed. Check the recovery status before retrying"
++msgstr "应用失败，请检查恢复状态后再重试"
++
++msgid "Auto"
++msgstr "自动"
++
++msgid "Auto Block ACK"
++msgstr "自动块确认"
++
++msgid "Broadcast TWT"
++msgstr "广播 TWT"
++
++msgid "Change summary"
++msgstr "变更摘要"
++
++msgid "Choose two or three radios on different bands."
++msgstr "选择两个或三个不同频段的无线接口。"
++
++msgid "Close and restore"
++msgstr "关闭并恢复"
++
++msgid "Configuration applied · MLO link unverified"
++msgstr "配置已应用 · 多链路状态未验证"
++
++msgid "Could not save MLO recovery data"
++msgstr "无法保存 MLO 恢复数据"
++
++msgid "Current name"
++msgstr "当前名称"
++
++msgid "DFS"
++msgstr "动态频率选择（DFS）"
++
++msgid "Distance to the farthest client in meters."
++msgstr "距离最远客户端的距离，单位为米。"
++
++msgid "EHT Restricted TWT"
++msgstr "EHT 受限 TWT"
++
++msgid "Enable MLO"
++msgstr "启用 MLO"
++
++msgid "Enter a valid wireless name"
++msgstr "请输入有效的无线名称"
++
++msgid "Failed to load the wireless configuration"
++msgstr "无法加载无线配置"
++
++msgid "Finish the other MLO change before starting another one."
++msgstr "请先完成当前 MLO 操作，再开始其他操作。"
++
++msgid "Frequency"
++msgstr "频段"
++
++msgid "HE LDPC (all AP BSSIDs)"
++msgstr "HE LDPC（所有 AP BSSID）"
++
++msgid "IEEE 802.11h (DFS)"
++msgstr "IEEE 802.11h（DFS）"
++
++msgid "Include the access point currently being edited."
++msgstr "必须包含当前正在编辑的无线接口。"
++
++msgid "Individual TWT"
++msgstr "独立 TWT"
++
++msgid "Individual and broadcast TWT"
++msgstr "独立和广播 TWT"
++
++msgid "Keep existing password"
++msgstr "沿用现有密码"
++
++msgid "Kick low RSSI station threshold"
++msgstr "弱信号剔除阈值"
++
++msgid "Leave unset to preserve the profile setting."
++msgstr "留空可保留配置文件中的设置。"
++
++msgid "Legacy MLO flags occupy these radios. Turn off the old group before choosing radios."
++msgstr "旧版 MLO 配置占用了这些射频。请先关闭旧组，再选择需要的频段。"
++
++msgid "Legacy MLO settings"
++msgstr "旧版 MLO 配置"
++
++msgid "Long"
++msgstr "长"
++
++msgid "MLO could not be applied; the previous wireless settings were restored."
++msgstr "MLO 应用失败，已恢复之前的无线设置。"
++
++msgid "MLO is off by default. Choose radios to create a group; security and passwords are not changed."
++msgstr "MLO 默认关闭。开启后，同一分组需使用相同的无线名称和安全设置。"
++
++msgid "MLO is only available for supported vendor EHT access points"
++msgstr "MLO 仅支持兼容的厂商 EHT AP"
++
++msgid "MLO recovery data is damaged; do not overwrite it"
++msgstr "MLO 恢复数据已损坏，请勿覆盖"
++
++msgid "MLO status"
++msgstr "MLO 状态"
++
++msgid "MLO was not applied"
++msgstr "MLO 未应用"
++
++msgid "MU-MIMO DL"
++msgstr "下行 MU-MIMO"
++
++msgid "MU-MIMO UL"
++msgstr "上行 MU-MIMO"
++
++msgid "MU-MIMO beamforming"
++msgstr "MU-MIMO 波束成形"
++
++msgid "Manage"
++msgstr "管理"
++
++msgid "Needs attention"
++msgstr "需要检查"
++
++msgid "New name"
++msgstr "新名称"
++
++msgid "No MLO group is available; close an existing group first."
++msgstr "没有可用的 MLO 组；请先关闭现有组。"
++
++msgid "No MLO group number is available"
++msgstr "没有可用的 MLO 组"
++
++msgid "OFDMA DL"
++msgstr "下行 OFDMA"
++
++msgid "OFDMA UL"
++msgstr "上行 OFDMA"
++
++msgid "Only legacy MLO flags are cleared. Wireless names, passwords and network bindings are preserved."
++msgstr "此操作仅关闭旧版 MLO 标志，保留现有无线名称、密码和网络绑定。"
++
++msgid "Passwords, security settings and network bindings will not change."
++msgstr "不会更改密码、安全设置和网络绑定。"
++
++msgid "Percentage of the driver power limit. Regulatory and calibration limits still apply."
++msgstr "驱动功率上限的百分比，实际发射功率仍受法规和校准限制。"
++
++msgid "Please wait…"
++msgstr "请稍候…"
++
++msgid "Recovery failed; use the recovery action again after checking the settings"
++msgstr "恢复失败，请检查设置后再次尝试恢复"
++
++msgid "Restore failed"
++msgstr "恢复失败"
++
++msgid "Review changes"
++msgstr "预览变更"
++
++msgid "Review the MLO changes before saving this interface."
++msgstr "保存此接口前，请先预览 MLO 更改。"
++
++msgid "Review the changes again after changing the selection or wireless name."
++msgstr "更改所选接口或无线名称后，请重新预览。"
++
++msgid "Save this interface, then choose Save & Apply."
++msgstr "先保存此接口，再点击“保存并应用”。"
++
++msgid "Save this interface, then choose Save & Apply. Reopen it to select MLO radios."
++msgstr "请先保存此接口并点击“保存并应用”，再重新打开以选择 MLO 射频。"
++
++msgid "Saved · runtime not verified"
++msgstr "已保存 · 运行状态待验证"
++
++msgid "Security settings do not match"
++msgstr "安全设置不一致"
++
++msgid "Security settings match. Password and security settings will remain unchanged."
++msgstr "安全设置一致；不会更改密码和安全设置。"
++
++msgid "Select no more than one access point per radio"
++msgstr "每个射频最多选择一个无线接口"
++
++msgid "Select one access point per radio."
++msgstr "每个射频只能选择一个无线接口。"
++
++msgid "Select radios"
++msgstr "选择射频"
++
++msgid "Select two or three access points"
++msgstr "请选择两个或三个无线接口"
++
++msgid "Select two or three access points."
++msgstr "请选择两个或三个无线接口。"
++
++msgid "Settings changed outside this page; recovery was stopped"
++msgstr "检测到其他位置的设置变更，已停止恢复"
++
++msgid "Settings changed outside this page; review them before continuing"
++msgstr "设置已在其他位置更改，请检查后再继续"
++
++msgid "Short"
++msgstr "短"
++
++msgid "Stage legacy MLO removal"
++msgstr "关闭旧版 MLO 配置"
++
++msgid "Station associate threshold"
++msgstr "弱信号接入阈值"
++
++msgid "Target Wake Time"
++msgstr "目标唤醒时间（TWT）"
++
++msgid "The MLO operation failed"
++msgstr "MLO 操作失败"
++
++msgid "The MLO request is invalid"
++msgstr "MLO 请求无效"
++
++msgid "The MLO service returned invalid data"
++msgstr "MLO 服务返回了无效数据"
++
++msgid "The original wireless names will be restored."
++msgstr "关闭后将恢复原无线名称。"
++
++msgid "The selected access point is no longer available"
++msgstr "所选无线接口已不可用"
++
++msgid "The selected access points will use this name."
++msgstr "所选无线接口将使用此无线名称。"
++
++msgid "This MLO operation is not allowed"
++msgstr "不允许执行此 MLO 操作"
++
++msgid "This access point is not available for MLO."
++msgstr "当前无线接口不能用于 MLO。"
++
++msgid "This driver supports one MLO group; close it before creating another."
++msgstr "当前驱动仅支持一个 MLO 组；如需新建，请先关闭现有组。"
++
++msgid "This security mode cannot be checked safely"
++msgstr "无法安全校验此加密方式"
++
++msgid "Transmit Burst"
++msgstr "连续发送"
++
++msgid "Transmit Preamble"
++msgstr "发送前导码"
++
++msgid "U-APSD"
++msgstr "U-APSD 省电模式"
++
++msgid "Use profile setting"
++msgstr "使用配置文件设置"
++
++msgid "VHT 1024-QAM (5 GHz)"
++msgstr "VHT 1024-QAM（5 GHz）"
++
++msgid "Vendor VHT extension; this is separate from HE/EHT QAM negotiation."
++msgstr "厂商 VHT 扩展，独立于 HE/EHT 的 QAM 协商。"
++
++msgid "Waiting for wireless confirmation"
++msgstr "等待无线服务确认"
++
++msgid "Wireless HWNAT"
++msgstr "无线硬件加速"
++
++msgid "Wireless changes are not confirmed; the recovery record is saved for another attempt."
++msgstr "无线配置尚未确认；恢复记录已保存，可稍后重试。"
++
++msgid "Wireless is still applying or restoring. The recovery record is saved; check again later."
++msgstr "无线配置仍在应用或恢复；恢复记录已保存，请稍后查看。"
++
++msgid "Wireless name"
++msgstr "无线名称"
++
++msgid "Wireless reload failed; the saved configuration needs attention"
++msgstr "无线重载失败，已保存的配置需要检查"
++
++msgid "Wireless settings changed. Reload this page before clearing legacy MLO flags."
++msgstr "无线配置已变化，请刷新页面后再清理旧版 MLO 配置。"
++
++msgid "Wireless settings have not been confirmed; recovery remains available for retry."
++msgstr "无线设置尚未确认应用，恢复记录会保留以便重试。"
++
++msgid "Your settings will be checked before restoring. If they changed elsewhere, you will be asked what to do."
++msgstr "关闭前会核对配置；如检测到其他修改，会提示处理，避免覆盖。"
++
++msgid "Zero-Wait DFS"
++msgstr "零等待 DFS"
++
+ 
+ #: modules/luci-mod-network/htdocs/luci-static/resources/view/network/dhcp.js:212
+ msgid "!known (not known)"
