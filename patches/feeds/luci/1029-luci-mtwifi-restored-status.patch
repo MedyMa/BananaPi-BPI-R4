@@ -1,0 +1,11 @@
+--- a/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
++++ b/feeds/luci/modules/luci-mod-network/htdocs/luci-static/resources/view/network/wireless.js
+@@ -147,7 +147,7 @@ function render_radio_status(radioDev, wifiNets) {
+ 		if (!(frequency > 0) && ap.freq > 0) frequency = (ap.freq / 1000).toFixed(3);
+ 	}
+ 	if (ap?.phase == 'restored')
+-		node.appendChild(E('em', _('Previous wireless configuration restored')));
++		node.insertBefore(E('em', _('Previous wireless configuration restored')), node.lastElementChild);
+ 	if (radioDev.isUp())
+ 		L.itemlist(node.lastElementChild, [
+ 			_('Channel'), `${channel || '?'} (${frequency || '?'} ${_('GHz')})`,

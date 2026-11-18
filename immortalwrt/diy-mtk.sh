@@ -81,26 +81,29 @@ configure_luci() {
     local patch_dir="$build_root/patches/feeds/luci"
     local overview="$patch_dir/1019-luci-system-acceleration-row.patch"
     local index
-    local -a wireless=("$patch_dir"/102[0-8]-luci-mtwifi-*.patch)
+    local -a wireless=("$patch_dir"/102[0-9]-luci-mtwifi-*.patch)
 
     if ! git apply --reverse --check "$overview" >/dev/null 2>&1; then
         git apply "$overview"
     fi
     grep -qx 'CONFIG_PACKAGE_mtwifi-scripts=y' .config || return 0
-    [ -f "${wireless[0]}" ] || {
-        echo 'MTK wireless LuCI patches are missing' >&2
+    [ "${#wireless[@]}" -eq 10 ] || {
+        echo 'Incomplete MTK wireless LuCI patch series' >&2
         return 1
     }
 
-    # Later patches may change earlier context. Resume after the latest match.
-    for ((index=${#wireless[@]}-1; index>=0; index--)); do
-        if git apply --reverse --check "${wireless[index]}" >/dev/null 2>&1; then
+    # Reverse-check the complete prefix because the individual patches overlap.
+    for ((index=${#wireless[@]}; index>0; index--)); do
+        if git apply --reverse --check - < <(cat "${wireless[@]:0:index}") 2>/dev/null; then
             break
         fi
     done
-    for ((index+=1; index<${#wireless[@]}; index++)); do
-        git apply "${wireless[index]}"
+    for ((; index<${#wireless[@]}; index++)); do
+        if ! git apply --reverse --check "${wireless[index]}" >/dev/null 2>&1; then
+            git apply "${wireless[index]}" || return 1
+        fi
     done
+    git apply --reverse --check - < <(cat "${wireless[@]}")
 }
 
 case "${1:-}" in
