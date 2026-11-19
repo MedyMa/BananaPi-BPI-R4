@@ -1,21 +1,19 @@
 name: immortalwrt_25.12_wifi7
+run-name: BPI-R4 25.12 WEXT validation (9a039ead)
 
 on:
-  schedule:
-    - cron: '0 16 * * *'
   workflow_dispatch:
 
 permissions:
-  actions: write
-  contents: write
+  contents: read
 
 env:
   REPO_URL: https://github.com/MedyMa/immortalwrt-mt798x-25.12
   REPO_BRANCH: main
+  SOURCE_REVISION: "9a039eade8d218c4b172511b5f7e0d3490afb159"
   CONFIG_FILE: immortalwrt/MTK/defconfig
   DIY_P1_SH: immortalwrt/diy-mtk.sh
   UPLOAD_FIRMWARE: true
-  UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
   OPENWRT_NAME: immortalwrt
   OPENWRT_DEVICE: MT7988_wifi7
@@ -66,7 +64,11 @@ jobs:
       run: |
         git clone --filter=blob:none --single-branch -c core.abbrev=7 $REPO_URL -b $REPO_BRANCH openwrt
         cd openwrt
-        echo "SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+        git checkout --detach "$SOURCE_REVISION"
+        source_sha="$(git rev-parse HEAD)"
+        test "$source_sha" = "$SOURCE_REVISION"
+        echo "SOURCE_SHA=$source_sha" >> "$GITHUB_ENV"
+        printf 'Firmware source: %s\n' "$source_sha" >> "$GITHUB_STEP_SUMMARY"
         git log --pretty=tformat:"%h" -n1 tools toolchain || echo "No toolchain history"
 
     - name: Generate cache keys
@@ -140,93 +142,6 @@ jobs:
         echo "date2=$(date "+%Y年%m月%d日")" >> $GITHUB_ENV
         echo "status=success" >> $GITHUB_OUTPUT
 
-    - name: Save ccache
-      if: steps.compile.outputs.status == 'success' && steps.ccache-restore.outputs.cache-hit != 'true'
-      uses: actions/cache/save@v5.0.5
-      with:
-        path: openwrt/.ccache
-        key: ${{ steps.ccache-restore.outputs.cache-primary-key }}
-
-    - name: Prune old caches
-      if: steps.compile.outputs.status == 'success' && !cancelled()
-      continue-on-error: true
-      uses: actions/github-script@v8
-      env:
-        CCACHE_PREFIX: ccache-${{ env.OPENWRT_NAME }}-${{ env.OPENWRT_DEVICE }}-${{ env.REPO_BRANCH }}-
-        TOOLCHAIN_PREFIX: ${{ env.OPENWRT_NAME }}-${{ env.OPENWRT_DEVICE }}-${{ env.REPO_BRANCH }}-cache-openwrt-
-        CURRENT_CCACHE_KEY: ${{ steps.ccache-restore.outputs.cache-primary-key }}
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        script: |
-          const { owner, repo } = context.repo;
-          const ccachePrefix = process.env.CCACHE_PREFIX;
-          const toolchainPrefix = process.env.TOOLCHAIN_PREFIX;
-          const currentKey = process.env.CURRENT_CCACHE_KEY || '';
-          if (!ccachePrefix || !toolchainPrefix)
-            throw new Error('Cache prefixes are required');
-
-          const caches = [];
-          for (let page = 1; ; page++) {
-            const response = await github.request('GET /repos/{owner}/{repo}/actions/caches', {
-              owner, repo, per_page: 100, page,
-            });
-            const rows = response.data.actions_caches || [];
-            caches.push(...rows);
-            if (rows.length < 100) break;
-          }
-
-          const newest = (a, b) => new Date(b.last_accessed_at || b.created_at || 0)
-            - new Date(a.last_accessed_at || a.created_at || 0);
-          const toolchains = caches.filter(c => (c.key || '').startsWith(toolchainPrefix)).sort(newest);
-          // A missing restore output must not evict every ccache entry.
-          const staleCcache = currentKey.startsWith(ccachePrefix)
-            ? caches.filter(c => (c.key || '').startsWith(ccachePrefix) && c.key !== currentKey) : [];
-          const stale = [...staleCcache, ...toolchains.slice(1)];
-          for (const cache of stale) {
-            core.info(`Deleting cache ${cache.key} (${cache.id})`);
-            await github.request('DELETE /repos/{owner}/{repo}/actions/caches/{cache_id}', {
-              owner, repo, cache_id: cache.id,
-            });
-          }
-          core.info(`Deleted ${stale.length} stale build cache(s)`);
-
-    - name: 清理旧的CI运行记录
-      if: ${{ !cancelled() }}
-      continue-on-error: true
-      uses: actions/github-script@v8
-      env:
-        KEEP_RUNS: '15'
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        script: |
-          const { owner, repo } = context.repo;
-          const keep = Number(process.env.KEEP_RUNS || '15');
-          if (!Number.isInteger(keep) || keep < 1)
-            throw new Error('KEEP_RUNS must be a positive integer');
-
-          const current = await github.request('GET /repos/{owner}/{repo}/actions/runs/{run_id}', {
-            owner, repo, run_id: context.runId,
-          });
-          const workflow_id = current.data.workflow_id;
-          if (!workflow_id) throw new Error('Current workflow ID is missing');
-          const runs = [];
-          for (let page = 1; ; page++) {
-            const response = await github.request('GET /repos/{owner}/{repo}/actions/workflows/{workflow_id}/runs', {
-              owner, repo, workflow_id, status: 'completed', per_page: 100, page,
-            });
-            const rows = response.data.workflow_runs || [];
-            runs.push(...rows.filter(run => run.status === 'completed' && run.id !== context.runId));
-            if (rows.length < 100) break;
-          }
-          runs.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-          for (const run of runs.slice(keep)) {
-            core.info(`Deleting completed run ${run.id} from ${run.created_at}`);
-            await github.request('DELETE /repos/{owner}/{repo}/actions/runs/{run_id}', {
-              owner, repo, run_id: run.id,
-            });
-          }
-          core.info(`Kept ${Math.min(keep, runs.length)} completed runs; deleted ${Math.max(0, runs.length - keep)}`);
-
     - name: Organize and Rename Files
       id: organize
       if: ${{ steps.compile.outputs.status == 'success' && env.UPLOAD_FIRMWARE == 'true' && !cancelled() }}
@@ -242,34 +157,3 @@ jobs:
       with:
         name: ${{ env.date1 }}_${{ env.OPENWRT_NAME }}_${{ env.OPENWRT_DEVICE }}-${{ env.OPENWRT_LINE }}
         path: ${{ env.FIRMWARE }}
-
-    - name: Generate release tags
-      id: tag
-      if: steps.compile.outputs.status == 'success' && env.UPLOAD_RELEASE == 'true' && !cancelled()
-      run: |
-        echo "release_tag=${{ env.date1 }}-${{ env.OPENWRT_NAME }}_${{ env.OPENWRT_DEVICE }}-${{ env.OPENWRT_LINE }}" >> $GITHUB_OUTPUT
-        echo "📥 BPI-R4 BE14 WiFi7 固件" > release.txt
-        echo "Target line: ${{ env.OPENWRT_LINE }}" >> release.txt
-        echo "Wireless: mt_wifi7 / HWIFI; BE14000-20260721" >> release.txt
-        echo "status=success" >> $GITHUB_OUTPUT
-
-    - name: Publish to release
-      uses: softprops/action-gh-release@v3
-      if: steps.tag.outputs.status == 'success' && !cancelled()
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      with:
-        files: ${{ env.FIRMWARE }}/*
-        name: ${{ steps.tag.outputs.release_tag }}
-        tag_name: ${{ steps.tag.outputs.release_tag }}
-        body_path: release.txt
-
-    - name: 删除旧的Releases
-      if: steps.tag.outputs.status == 'success' && !cancelled()
-      uses: MedyMa/delete-older-releases@v0.3.4
-      with:
-        keep_latest: 3
-        delete_tags: true
-        delete_tag_pattern: '^.*-immortalwrt_MT7988_wifi7-25\.12$'
-      env:
-        GITHUB_TOKEN: ${{ secrets.RELEASES_TOKEN }}
