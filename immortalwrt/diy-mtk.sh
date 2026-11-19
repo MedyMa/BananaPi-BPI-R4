@@ -31,7 +31,7 @@ configure_wifi7() {
             echo 'The selected source does not provide mtwifi-scripts' >&2
             exit 1
         }
-        for package in mtwifi-cfg wifi-scripts luci-app-mtwifi-cfg \
+        for package in be14-ucg mtwifi-dot1x mtwifi-cfg wifi-scripts luci-app-mtwifi-cfg \
             luci-i18n-mtwifi-cfg-zh-cn; do
             symbol="CONFIG_PACKAGE_${package}"
             sed -i "/^${symbol}=/d; /^# ${symbol} is not set$/d" "$cfg"
@@ -63,7 +63,7 @@ verify_ucode_wifi7() {
             return 1
         }
     done
-    for symbol in CONFIG_PACKAGE_mtwifi-cfg CONFIG_PACKAGE_wifi-scripts \
+    for symbol in CONFIG_PACKAGE_be14-ucg CONFIG_PACKAGE_mtwifi-dot1x CONFIG_PACKAGE_mtwifi-cfg CONFIG_PACKAGE_wifi-scripts \
         CONFIG_PACKAGE_luci-app-mtwifi-cfg CONFIG_PACKAGE_luci-i18n-mtwifi-cfg-zh-cn \
         CONFIG_PACKAGE_wifi-profile CONFIG_PACKAGE_wifi-script \
         CONFIG_PACKAGE_kmod-mt7996e CONFIG_PACKAGE_kmod-en_npu; do
