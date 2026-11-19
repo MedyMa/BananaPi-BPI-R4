@@ -75,6 +75,36 @@ verify_ucode_wifi7() {
     echo '[DIY] verified: vendor OSAL/cfg80211, shared wpad and ucode management'
 }
 
+verify_wext_wifi7() {
+    local cfg="$1" symbol
+    [ -r "$cfg" ] || { echo "Cannot read config: $cfg" >&2; return 1; }
+    for symbol in CONFIG_PACKAGE_mtwifi-cfg CONFIG_PACKAGE_wifi-scripts \
+        CONFIG_PACKAGE_wireless-tools CONFIG_PACKAGE_luci-app-mtwifi-cfg \
+        CONFIG_PACKAGE_luci-i18n-mtwifi-cfg-zh-cn CONFIG_PACKAGE_luci-lib-uqr \
+        CONFIG_PACKAGE_luci-mod-network CONFIG_PACKAGE_rpcd-mod-iwinfo \
+        CONFIG_PACKAGE_wifi-dats CONFIG_PACKAGE_kmod-mt_wifi7 \
+        CONFIG_PACKAGE_kmod-mt_hwifi CONFIG_PACKAGE_kmod-mt_wifi_osal \
+        CONFIG_MTK_WIFI7_OSAL_SUPPORT CONFIG_MTK_WIFI7_LED_CONTROL_SUPPORT \
+        CONFIG_MTK_HWIFI_FW_BE14000_20260721; do
+        grep -qx "${symbol}=y" "$cfg" || {
+            echo "Resolved WEXT firmware configuration is missing ${symbol}=y" >&2
+            return 1
+        }
+    done
+    for symbol in CONFIG_PACKAGE_mtwifi-scripts CONFIG_WIFI_SCRIPTS_UCODE \
+        CONFIG_MTK_WIFI7_CFG80211_SUPPORT CONFIG_MTK_WIFI_OSAL_CFG80211_SUPPORT \
+        CONFIG_MTK_WIFI7_IWCOMMAND_CFG80211_SUPPORT CONFIG_MTK_WIFI7_CFG80211_FULL_OPS_SUPPORT \
+        CONFIG_MTK_WIFI7_HOSTAPD_MBSS_SUPPORT CONFIG_MTK_WIFI7_APCLI_SUPPLICANT_SUPPORT \
+        CONFIG_MTK_WIFI7_MAP_HOSTAPD_SUPPORT CONFIG_PACKAGE_wifi-profile CONFIG_PACKAGE_wifi-script \
+        CONFIG_PACKAGE_kmod-mt_wifi_cmn CONFIG_PACKAGE_kmod-mt7996e CONFIG_PACKAGE_kmod-en_npu; do
+        if grep -Eq "^${symbol}=[ym]$" "$cfg"; then
+            echo "Conflicting WEXT firmware option: ${symbol}" >&2
+            return 1
+        fi
+    done
+    echo '[DIY] verified: vendor OSAL/WEXT, mtwifi-cfg and dedicated LuCI'
+}
+
 configure_luci() {
     local LC_ALL=C
     local build_root="${GITHUB_WORKSPACE:-$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)}"
@@ -110,14 +140,17 @@ case "${1:-}" in
     --configure)
         configure_wifi7 "${2:-.config}"
         if [ "${2:-.config}" = '.config' ]; then
+            verifier=verify_wext_wifi7
             if grep -qx 'CONFIG_PACKAGE_mtwifi-scripts=y' .config; then
-                make defconfig
-                verify_ucode_wifi7 .config
+                verifier=verify_ucode_wifi7
             fi
+            make defconfig
+            "$verifier" .config
             configure_luci
         fi
         exit ;;
     --verify-ucode) verify_ucode_wifi7 "${2:-.config}"; exit ;;
+    --verify-wext) verify_wext_wifi7 "${2:-.config}"; exit ;;
     "") ;;
     *) echo "Unknown DIY mode: $1" >&2; exit 2 ;;
 esac
