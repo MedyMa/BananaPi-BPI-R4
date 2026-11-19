@@ -4,15 +4,6 @@ on:
   schedule:
     - cron: '0 16 * * *'
   workflow_dispatch:
-    inputs:
-      source_revision:
-        description: 'Optional full commit SHA from the firmware source branch'
-        type: string
-        required: false
-      publish_release:
-        description: 'Publish the firmware as a dated GitHub Release'
-        type: boolean
-        default: false
 
 permissions:
   actions: write
@@ -24,7 +15,7 @@ env:
   CONFIG_FILE: immortalwrt/MTK/defconfig
   DIY_P1_SH: immortalwrt/diy-mtk.sh
   UPLOAD_FIRMWARE: true
-  UPLOAD_RELEASE: ${{ github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.publish_release == true) }}
+  UPLOAD_RELEASE: true
   TZ: Asia/Shanghai
   OPENWRT_NAME: immortalwrt
   OPENWRT_DEVICE: MT7988_wifi7
@@ -72,24 +63,10 @@ jobs:
         $GITHUB_WORKSPACE/$OPENWRT_NAME/system-Information.sh
 
     - name: Download firmware source code
-      env:
-        SOURCE_REVISION: ${{ inputs.source_revision }}
       run: |
-        set -euo pipefail
-        git clone --filter=blob:none --single-branch -c core.abbrev=7 -b "$REPO_BRANCH" -- "$REPO_URL" openwrt
+        git clone --filter=blob:none --single-branch -c core.abbrev=7 $REPO_URL -b $REPO_BRANCH openwrt
         cd openwrt
-        revision="${SOURCE_REVISION:-}"
-        revision="${revision,,}"
-        if [ -n "$revision" ]; then
-          if [[ ! "$revision" =~ ^[0-9a-f]{40}$ ]] || ! git merge-base --is-ancestor "$revision" HEAD; then
-            printf 'source_revision must be a full commit SHA on the firmware source branch %s\n' "$REPO_BRANCH" >&2
-            exit 1
-          fi
-          git checkout --detach "$revision"
-        fi
-        source_sha="$(git rev-parse HEAD)"
-        printf 'SOURCE_SHA=%s\n' "$source_sha" >> "$GITHUB_ENV"
-        printf 'Firmware source: %s\n' "$source_sha" >> "$GITHUB_STEP_SUMMARY"
+        echo "SOURCE_SHA=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
         git log --pretty=tformat:"%h" -n1 tools toolchain || echo "No toolchain history"
 
     - name: Generate cache keys
@@ -164,14 +141,14 @@ jobs:
         echo "status=success" >> $GITHUB_OUTPUT
 
     - name: Save ccache
-      if: env.UPLOAD_RELEASE == 'true' && steps.compile.outputs.status == 'success' && steps.ccache-restore.outputs.cache-hit != 'true'
+      if: steps.compile.outputs.status == 'success' && steps.ccache-restore.outputs.cache-hit != 'true'
       uses: actions/cache/save@v5.0.5
       with:
         path: openwrt/.ccache
         key: ${{ steps.ccache-restore.outputs.cache-primary-key }}
 
     - name: Prune old caches
-      if: env.UPLOAD_RELEASE == 'true' && steps.compile.outputs.status == 'success' && !cancelled()
+      if: steps.compile.outputs.status == 'success' && !cancelled()
       continue-on-error: true
       uses: actions/github-script@v8
       env:
@@ -214,7 +191,7 @@ jobs:
           core.info(`Deleted ${stale.length} stale build cache(s)`);
 
     - name: 清理旧的CI运行记录
-      if: ${{ env.UPLOAD_RELEASE == 'true' && !cancelled() }}
+      if: ${{ !cancelled() }}
       continue-on-error: true
       uses: actions/github-script@v8
       env:
