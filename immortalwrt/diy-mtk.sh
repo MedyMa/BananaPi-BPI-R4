@@ -262,12 +262,21 @@ case "$_go_default" in
         exit 1
         ;;
 esac
-if ! grep -qxF "PKG_NAME:=golang$_go_default" "feeds/packages/lang/golang/golang$_go_default/Makefile"; then
+_go_recipe="feeds/packages/lang/golang/golang$_go_default/Makefile"
+if ! grep -qxF "PKG_NAME:=golang$_go_default" "$_go_recipe"; then
     echo "Missing native Go $_go_default toolchain in the packages feed" >&2
     exit 1
 fi
 if [ "$_go_default" != "$_go_feed_default" ]; then
     sed -i "s/^GO_DEFAULT_VERSION:=.*/GO_DEFAULT_VERSION:=$_go_default/" "$_go_values" || exit 1
+fi
+# AdGuardHome 1.0 requires Go 1.27.4. Backport openwrt/packages db68036b
+# while the ImmortalWrt feed still ships an earlier 1.27 patch release.
+if [ "$_go_default" = 1.27 ] && grep -Eq '^GO_VERSION_PATCH:=[0-3]?$' "$_go_recipe"; then
+    sed -i -e 's/^GO_VERSION_PATCH:=.*/GO_VERSION_PATCH:=4/' \
+        -e 's/^GO_VERSION_RC:=.*/GO_VERSION_RC:=/' \
+        -e 's/^PKG_HASH:=.*/PKG_HASH:=73cfb8571aec0c01177687db87163d46aa20e9779672772891aa17654d9a6099/' \
+        "$_go_recipe" || exit 1
 fi
 rm -rf feeds/packages/net/mosdns
 git clone --depth=1 https://github.com/sbwml/luci-app-mosdns -b v5 package/mosdns
