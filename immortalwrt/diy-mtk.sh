@@ -79,7 +79,8 @@ verify_ucode_wifi7() {
 verify_wext_wifi7() {
     local cfg="$1" symbol
     [ -r "$cfg" ] || { echo "Cannot read config: $cfg" >&2; return 1; }
-    for symbol in CONFIG_PACKAGE_mtwifi-cfg CONFIG_PACKAGE_wifi-scripts \
+    for symbol in CONFIG_PACKAGE_be14-ucg CONFIG_PACKAGE_luci-app-unifi CONFIG_PACKAGE_luci-i18n-unifi-zh-cn \
+        CONFIG_PACKAGE_mtwifi-dot1x CONFIG_PACKAGE_mtwifi-cfg CONFIG_PACKAGE_wifi-scripts \
         CONFIG_PACKAGE_wireless-tools CONFIG_PACKAGE_luci-app-mtwifi-cfg \
         CONFIG_PACKAGE_luci-i18n-mtwifi-cfg-zh-cn CONFIG_PACKAGE_luci-lib-uqr \
         CONFIG_PACKAGE_luci-mod-network CONFIG_PACKAGE_rpcd-mod-iwinfo \

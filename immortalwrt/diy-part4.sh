@@ -13,3 +13,6 @@ if ! grep -q '_FORTIFY_SOURCE=0' package/libs/mbedtls/Makefile; then
     echo 'TARGET_CFLAGS += -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0' >> package/libs/mbedtls/Makefile
   fi
 fi
+
+# Check the resolved package selection for the private BE14 image.
+make defconfig && bash "$(dirname -- "${BASH_SOURCE[0]}")/diy-mtk.sh" --verify-wext .config

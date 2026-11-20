@@ -75,6 +75,7 @@ merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-mode
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-sfp-status
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-turboacc-mtk
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-traffic
+merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-unifi
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/luci-app-hqos-mtk
 merge_package https://github.com/MedyMa/luci-app luci-app/Luci-app/rpcd-mod-router-status
 if [ ! -f package/openwrt-packages/rpcd-mod-router-status/Makefile ] || \
