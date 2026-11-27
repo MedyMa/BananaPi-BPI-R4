@@ -248,6 +248,7 @@ patch_makefile_dep \
 
 apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1005-luci-dockerman-docker-menu.patch" || exit 1
 apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1006-luci-argon-docker-menu-layout.patch" || exit 1
+sh "$GITHUB_WORKSPACE/scripts/build-argon-styles.sh" package/community/luci-theme-argon || exit 1
 
 apply_workspace_patch "$GITHUB_WORKSPACE/patches/filogic/25.12/1007-luci-dhcpv4-hide-empty-identifiers.patch" || exit 1
 

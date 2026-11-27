@@ -333,6 +333,7 @@ for _luci_feed_patch in \
         git apply "$_luci_feed_patch"
     fi
 done
+sh "$GITHUB_WORKSPACE/scripts/build-argon-styles.sh" package/community/luci-theme-argon
 if grep -q '^define Package/weechat-minimal$' feeds/packages/net/weechat/Makefile 2>/dev/null && \
     grep -qF ' +weechat ' feeds/luci/applications/luci-app-weechat/Makefile 2>/dev/null; then
     patch_makefile_dep feeds/luci/applications/luci-app-weechat/Makefile \
